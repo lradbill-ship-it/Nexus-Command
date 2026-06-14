@@ -1,0 +1,46 @@
+# CLAUDE.md — Project Stratadug
+
+You are picking up an in-progress game project. Read this file, then `docs/DESIGN_SPEC.md`, then skim `playable/nexus-command-v2.html` (the current best playable build) before writing any code.
+
+## Mission
+
+Build **NEXUS COMMAND**: a real-time strategy game in the spirit of Command & Conquer (Red Alert Remastered is the visual benchmark — see DESIGN_SPEC) with a modern drones-and-cyber-warfare twist. The owner (Lane) plays on a Mac. Target quality: "as visually appealing as anything on a modern top-level graphics card/console" — interpret as: the best achievable with a real engine, real assets, WebGL rendering, and polished UX. The previous attempts were single-file hand-drawn `<canvas>` builds; they hit a quality ceiling. Your job is the real version.
+
+## Hard requirements (owner's words, all six)
+
+1. **Restart button** — in-game, regenerates a fresh battlefield without reloading hassle.
+2. **No edge-scrolling drift** — the camera must NEVER move just because the cursor approaches a screen edge (it caused the map to shift when reaching for the sidebar). Pan via WASD/arrows, middle-mouse drag, and minimap click only. (Optional: edge-scroll as an off-by-default setting.)
+3. **Looks like real C&C** — rich natural terrain (grass, forests, rock ridges, rivers with bridges, ore/crystal fields), detailed sprite-quality buildings and vehicles, real explosions. Not neon geometric shapes.
+4. **Randomly generated maps** every match (the procedural generator in `wip-v3/p1-core.html` works and is worth porting).
+5. **Modern stereo sound** — positional/panned SFX, layered impacts, ambient bed. "PS5 level," not chiptune beeps. The WebAudio engine in `wip-v3/p1-core.html` (noise-buffer impacts + StereoPannerNode + compressor) is a working starting point; replace or augment with real recorded SFX assets if available.
+6. **Top-level visually, logically, and UX-wise** — A* pathfinding (working implementation in `wip-v3/p2-systems.js`), responsive controls, control groups, polished C&C-style sidebar.
+
+## Recommended stack (your call, but justify deviations)
+
+- **Phaser 3** (or PixiJS v8) with WebGL — sprite-based rendering is exactly the C&C look. Vite for dev/build. Plain TypeScript preferred.
+- **Assets**: use CC0/free asset packs rather than hand-drawn canvas art. Good sources: Kenney.nl (RTS/topdown packs), OpenGameArt (CC0 filters). Keep an `assets/CREDITS.md`.
+- Output should run in a browser on a Mac via `npm run dev` / static build. An Electron/Tauri wrapper is optional, not required.
+- Keep it a fully offline, local game — no server.
+
+## Game systems to carry over (all already implemented and tuned in `playable/nexus-command-v2.html` — port the logic, not the rendering)
+
+- **4 factions**: NEXUS (player, teal), HELIX COMBINE (warlord, red), AURUM SYNDICATE (merchant, gold), VANTA CELL (covert, violet). Distinct AI personalities — see DESIGN_SPEC for behavior tables.
+- **Economy**: harvesters gather from crystal fields → refinery/HQ; power production/consumption with half-speed penalty when negative; building construction over time; per-foundry unit queues; rally points.
+- **Diplomacy**: pairwise relations (−100..100); WAR below −30; alliances (need relation thresholds by persona: warlord 75 / merchant 40 / covert 55) grant shared vision and drag allies into your wars; trade pacts (+9/s each side); gifts (+12 rel for 300); AI↔AI wars and alliances happen autonomously; destroying things and attacking neutrals tanks relations.
+- **Covert ops** (require Cyber Ops Center, faction-targeted): Steal Data, Sabotage, Recon Sweep, Incite War — costs/cooldowns/success odds in DESIGN_SPEC. Failure = detection = relations hit. VANTA runs covert ops against everyone, including the player.
+- **Cyber abilities**: EMP Pulse (AoE disable 8s), System Hijack (permanently steal a unit).
+- **Combat**: turret-aim smoothing, waves that scale with time, fog of war (player + allies' vision), win = every surviving faction is you or your ally; lose = all your buildings destroyed.
+- **Slow build-up pacing**: first AI attack ~2.5–3.5 min, escalating size/frequency.
+
+## What exists in `wip-v3/` (the interrupted canvas rewrite — mine it for logic)
+
+- `p1-core.html`: complete HTML/CSS C&C-style metal sidebar skin, stereo WebAudio engine, value-noise **procedural map generator** (rivers, bridges, forests, rock, roads carved to guarantee base/resource connectivity, border walls, crystal field placement).
+- `p2-systems.js`: complete painted-terrain pre-renderer, **A\* pathfinding** (8-dir, corner-safe, LOS smoothing, stuck detection/repath), all entity/economy/combat/AI/diplomacy systems updated for terrain blocking.
+- Part 3 (pseudo-3D painters, input, render pipeline, boot) was lost to an interruption — do NOT try to resurrect the canvas approach; rebuild rendering properly in the engine you choose.
+
+## Process expectations
+
+- Work in small verifiable increments; keep the game runnable at every commit.
+- Commit history that tells a story; `README.md` updated with run instructions.
+- Playtest pacing: a full skirmish should feel like classic C&C — slow eco start, mid-game skirmishes over bridges/center crystals, late-game pushes.
+- Ask Lane before changing faction design, diplomacy rules, or pacing targets.

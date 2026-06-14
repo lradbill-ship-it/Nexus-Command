@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NEXUS COMMAND — Remastered-Class Build</title>
+<style>
+  :root{
+    --steel-hi:#aeb6c2; --steel:#7d8693; --steel-lo:#4b525d; --steel-dk:#2b303a;
+    --bezel:#11141a; --screen:#0b0f14; --ink:#d8e4ea; --dim:#7c8a97;
+    --gold:#e8b64c; --green:#69d84f;
+    --p1:#3ec8b4; --p2:#e8483a; --p3:#e9a93d; --p4:#9b6fe8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;user-select:none;}
+  html,body{height:100%;overflow:hidden;background:#000;
+    font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;color:var(--ink);}
+  #wrap{display:flex;height:100vh;}
+  #gameArea{position:relative;flex:1;min-width:0;}
+  canvas#game{display:block;background:#0a0e08;cursor:crosshair;}
+  /* top bar */
+  #topbar{position:absolute;top:0;left:0;right:0;height:40px;display:flex;align-items:center;
+    gap:18px;padding:0 14px;
+    background:linear-gradient(180deg,rgba(8,10,8,.92),rgba(8,10,8,.45) 75%,transparent);
+    font-size:12px;letter-spacing:.08em;pointer-events:none;z-index:5;}
+  #topbar .stat b{color:var(--gold);font-weight:600;}
+  #topbar .stat.bad b{color:var(--p2);}
+  #topbar .spacer{flex:1;}
+  #uiHint{color:var(--gold);}
+  #restartBtn{pointer-events:auto;background:linear-gradient(180deg,var(--steel),var(--steel-lo));
+    border:1px solid var(--steel-dk);border-top-color:var(--steel-hi);color:#16191f;
+    font:inherit;font-weight:700;font-size:10px;letter-spacing:.14em;padding:6px 12px;cursor:pointer;}
+  #restartBtn:hover{filter:brightness(1.12);}
+  /* ====== C&C-style metal sidebar ====== */
+  #sidebar{width:288px;display:flex;flex-direction:column;
+    background:linear-gradient(180deg,#878f9b 0%,#6d7480 6%,#5a606b 50%,#4a505a 100%);
+    border-left:3px solid #2a2e36;box-shadow:inset 2px 0 0 #9ba3af;}
+  .frame{margin:8px 8px 0;padding:5px;
+    background:linear-gradient(145deg,#9aa2ae,#5a616c);
+    border:1px solid #353a44;border-radius:3px;
+    box-shadow:inset 1px 1px 0 rgba(255,255,255,.35), inset -1px -1px 0 rgba(0,0,0,.45), 0 2px 4px rgba(0,0,0,.4);}
+  .screenIn{background:var(--screen);border:1px solid #05070a;border-radius:2px;
+    box-shadow:inset 0 0 14px rgba(0,0,0,.9);}
+  #credits{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;
+    font-size:13px;letter-spacing:.12em;}
+  #credits b{color:var(--gold);font-weight:600;text-shadow:0 0 8px rgba(232,182,76,.5);}
+  #credits .pw{font-size:10px;color:var(--dim);}
+  #credits .pw b{font-size:11px;color:var(--green);text-shadow:0 0 6px rgba(105,216,79,.4);}
+  #credits .pw.bad b{color:var(--p2);text-shadow:0 0 6px rgba(232,72,58,.5);}
+  #minimap{display:block;width:100%;aspect-ratio:1;cursor:pointer;}
+  #selInfo{min-height:40px;padding:6px 9px;font-size:11px;line-height:1.5;color:var(--ink);}
+  #selInfo .nm{color:var(--gold);}
+  /* tabs */
+  .tabRow{display:flex;gap:3px;margin:8px 8px 0;}
+  .tabRow button{flex:1;font:inherit;font-size:9.5px;letter-spacing:.12em;font-weight:700;padding:8px 0;cursor:pointer;
+    color:#21252d;background:linear-gradient(180deg,var(--steel-hi),var(--steel-lo));
+    border:1px solid #30353f;border-radius:3px 3px 0 0;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.4);}
+  .tabRow button.on{background:linear-gradient(180deg,#cfd6df,#8a93a0);box-shadow:inset 0 1px 0 #fff,0 0 8px rgba(232,182,76,.35);}
+  #paneHolder{flex:1;overflow-y:auto;margin:0 8px 8px;padding:7px;
+    background:linear-gradient(145deg,#3a4049,#262b33);
+    border:1px solid #353a44;border-top:none;border-radius:0 0 3px 3px;
+    box-shadow:inset 0 2px 8px rgba(0,0,0,.5);}
+  .tab{display:none;flex-direction:column;gap:7px;}
+  .tab.on{display:flex;}
+  h3.sec{font-size:9px;letter-spacing:.22em;color:#9aa6b2;font-weight:700;margin:3px 0 0;text-shadow:0 1px 0 #000;}
+  .btnGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;}
+  button.cmd{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;
+    padding:4px 2px 5px;cursor:pointer;font:inherit;
+    background:linear-gradient(180deg,#2d3540,#1b212a);
+    border:1px solid #424a56;border-radius:2px;color:var(--ink);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 1px 2px rgba(0,0,0,.5);}
+  button.cmd canvas{display:block;background:linear-gradient(180deg,#15314a 0%,#0e1f30 60%,#13270f 100%);
+    border:1px solid #000;border-radius:1px;}
+  button.cmd .lbl{font-size:8.2px;letter-spacing:.04em;line-height:1.15;text-align:center;color:#c8d4dc;}
+  button.cmd .cost{font-size:8px;color:var(--gold);}
+  button.cmd:hover:not(:disabled){border-color:var(--gold);box-shadow:0 0 7px rgba(232,182,76,.35);}
+  button.cmd:disabled{opacity:.32;cursor:default;filter:grayscale(.6);}
+  button.cmd.armed{border-color:var(--gold);box-shadow:0 0 10px rgba(232,182,76,.6) inset;}
+  button.cmd .cd{position:absolute;left:0;bottom:0;height:3px;background:var(--gold);width:0%;}
+  button.cmd .key{position:absolute;top:2px;right:4px;font-size:8px;color:var(--dim);}
+  /* diplomacy */
+  .dipRow{background:linear-gradient(180deg,#222831,#181d24);border:1px solid #3a414d;padding:7px 8px;border-radius:2px;}
+  .dipRow .hd{display:flex;align-items:center;gap:7px;font-size:10.5px;}
+  .dipRow .sw{width:9px;height:9px;border-radius:2px;box-shadow:0 0 5px currentColor;}
+  .dipRow .st{margin-left:auto;font-size:8.5px;letter-spacing:.14em;font-weight:700;}
+  .st.WAR{color:var(--p2);} .st.NEUTRAL{color:var(--dim);} .st.ALLIED{color:var(--green);} .st.GONE{color:#555;}
+  .relBar{height:6px;background:#0a0d11;border:1px solid #3a414d;margin:6px 0;position:relative;border-radius:2px;}
+  .relBar .fill{position:absolute;top:0;bottom:0;border-radius:2px;}
+  .relBar .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:#666;}
+  .dipBtns{display:flex;gap:4px;}
+  .dipBtns button{flex:1;font:inherit;font-size:8.5px;padding:5px 2px;cursor:pointer;letter-spacing:.04em;
+    background:linear-gradient(180deg,#39414d,#262c35);border:1px solid #4a5260;color:var(--ink);border-radius:2px;}
+  .dipBtns button:hover:not(:disabled){border-color:var(--gold);}
+  .dipBtns button:disabled{opacity:.3;cursor:default;}
+  .dipBtns button.active{color:var(--gold);border-color:var(--gold);}
+  .chips{display:flex;gap:4px;}
+  .chips button{flex:1;font:inherit;font-size:8.5px;padding:6px 2px;cursor:pointer;letter-spacing:.04em;
+    background:linear-gradient(180deg,#2d3540,#1b212a);border:1px solid #424a56;color:var(--dim);border-radius:2px;}
+  .chips button.on{color:#fff;box-shadow:0 0 7px currentColor;}
+  #log{font-size:9.6px;color:#93a2ae;line-height:1.6;padding:5px 8px;min-height:74px;max-height:96px;overflow:hidden;}
+  #log .hot{color:var(--gold);} #log .war{color:#ff7d70;} #log .good{color:var(--green);}
+  /* overlays */
+  .overlay{position:absolute;inset:0;background:rgba(4,6,9,.93);z-index:20;display:flex;align-items:center;justify-content:center;}
+  .panelBox{width:min(660px,92%);max-height:92vh;overflow-y:auto;padding:26px 32px;
+    background:linear-gradient(180deg,#20262f,#14181f);border:1px solid #4a5260;border-radius:4px;
+    box-shadow:0 0 0 4px #2b303a,0 0 60px rgba(0,0,0,.8);}
+  .panelBox h1{font-size:25px;letter-spacing:.26em;color:var(--gold);font-weight:700;text-shadow:0 0 16px rgba(232,182,76,.4);}
+  .panelBox h1 span{color:var(--ink);}
+  .panelBox h2{font-size:11.5px;letter-spacing:.2em;color:var(--dim);margin:4px 0 14px;font-weight:400;}
+  .panelBox p,.panelBox li{font-size:12px;line-height:1.7;}
+  .panelBox ul{margin:8px 0 12px 16px;}
+  .panelBox kbd{background:#0d1117;border:1px solid #3a414d;padding:1px 5px;font:inherit;font-size:10.5px;color:var(--gold);border-radius:2px;}
+  .facList{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 14px;}
+  .facCard{border:1px solid #3a414d;border-left-width:3px;padding:8px 10px;font-size:10.8px;line-height:1.55;background:rgba(0,0,0,.25);}
+  .facCard b{display:block;letter-spacing:.1em;}
+  .panelBox .go{display:block;width:100%;margin-top:8px;border:1px solid #1a1d14;cursor:pointer;
+    background:linear-gradient(180deg,#f0c25e,#b9893a);color:#1c1606;
+    font:inherit;font-weight:700;letter-spacing:.18em;font-size:13px;padding:13px;border-radius:3px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 2px 6px rgba(0,0,0,.5);}
+  .panelBox .go:hover{filter:brightness(1.1);}
+  #endOverlay{display:none;}
+  #endOverlay h1.win{color:var(--green);} #endOverlay h1.lose{color:var(--p2);}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="gameArea">
+    <canvas id="game"></canvas>
+    <div id="topbar">
+      <div class="stat">UPTIME <b id="uiTime">00:00</b></div>
+      <div class="spacer"></div>
+      <div class="stat" id="uiHint"></div>
+      <button id="restartBtn" title="Restart with a brand new random map">⟳ NEW MAP / RESTART</button>
+    </div>
+
+    <div class="overlay" id="introOverlay">
+      <div class="panelBox">
+        <h1>NEXUS <span>COMMAND</span></h1>
+        <h2>REMASTERED-CLASS BUILD // RANDOM BATTLEFIELDS // FOUR FACTIONS</h2>
+        <p>Every battle is fought on a freshly generated battlefield — rivers, bridges, forests, rock ridges, and golden data-crystal fields. Harvest, build, scheme, and conquer.</p>
+        <div class="facList">
+          <div class="facCard" style="border-left-color:var(--p2)"><b style="color:var(--p2)">HELIX COMBINE</b>Militarist warlords. They will come for you.</div>
+          <div class="facCard" style="border-left-color:var(--p3)"><b style="color:var(--p3)">AURUM SYNDICATE</b>Merchant cartel. Trades and allies readily.</div>
+          <div class="facCard" style="border-left-color:var(--p4)"><b style="color:var(--p4)">VANTA CELL</b>Spies. They steal and sabotage — even in peacetime.</div>
+          <div class="facCard" style="border-left-color:var(--p1)"><b style="color:var(--p1)">NEXUS (YOU)</b>Win when everyone left standing is you or your ally.</div>
+        </div>
+        <ul>
+          <li><kbd>Drag</kbd> select · <kbd>Right-click</kbd> move / attack / harvest · <kbd>T</kbd> attack-move</li>
+          <li>Scroll with <kbd>W A S D</kbd> / arrows, <kbd>middle-mouse drag</kbd>, or the radar map — the screen never drifts on its own</li>
+          <li><b>DIPLOMACY</b>: gifts, trade pacts (+9/s each), alliances (shared vision, allies join your wars), declarations of war</li>
+          <li><b>OPS</b> (needs Cyber Ops Center): <kbd>E</kbd> EMP · <kbd>H</kbd> Hijack · covert theft, sabotage, recon, incitement</li>
+          <li>Forests, rock and water block movement — fight for the bridges. <kbd>⟳</kbd> up top regenerates the world.</li>
+        </ul>
+        <button class="go" id="startBtn">DEPLOY</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="endOverlay">
+      <div class="panelBox">
+        <h1 id="endTitle">VICTORY</h1>
+        <h2 id="endSub"></h2>
+        <p id="endText"></p>
+        <button class="go" onclick="location.reload()">NEW BATTLEFIELD</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="sidebar">
+    <div class="frame"><div class="screenIn" id="credits">
+      <span>▣ <b id="uiData">0</b></span>
+      <span class="pw" id="uiPowerWrap">PWR <b id="uiPower">0/0</b></span>
+    </div></div>
+    <div class="frame"><div class="screenIn"><canvas id="minimap" width="248" height="248"></canvas></div></div>
+    <div class="frame"><div class="screenIn" id="selInfo">Nothing selected.</div></div>
+    <div class="tabRow">
+      <button id="tabBase" class="on">BASE</button>
+      <button id="tabOps">OPS</button>
+      <button id="tabDip">DIPLOMACY</button>
+    </div>
+    <div id="paneHolder">
+      <div class="tab on" id="paneBase">
+        <h3 class="sec">CONSTRUCT</h3>
+        <div class="btnGrid" id="buildBtns"></div>
+        <h3 class="sec">FABRICATE</h3>
+        <div class="btnGrid" id="unitBtns"></div>
+      </div>
+      <div class="tab" id="paneOps">
+        <h3 class="sec">CYBER WARFARE</h3>
+        <div class="btnGrid" id="abilityBtns"></div>
+        <h3 class="sec">COVERT TARGET</h3>
+        <div class="chips" id="covChips"></div>
+        <h3 class="sec">COVERT MISSIONS</h3>
+        <div class="btnGrid" id="covBtns"></div>
+      </div>
+      <div class="tab" id="paneDip">
+        <div id="dipRows" style="display:flex;flex-direction:column;gap:7px;"></div>
+      </div>
+      <h3 class="sec" style="margin-top:8px">BATTLEFIELD FEED</h3>
+      <div class="screenIn" id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   NEXUS COMMAND — Remastered-class build
+   Procedural battlefields · pseudo-3D art · A* pathfinding ·
+   stereo positional audio · 4 factions · diplomacy/trade/covert ops
+   ===================================================================== */
+const TILE=32, MAPW=84, MAPH=84;
+const WORLD_W=MAPW*TILE, WORLD_H=MAPH*TILE;
+const canvas=document.getElementById('game'), ctx=canvas.getContext('2d');
+const mmCanvas=document.getElementById('minimap'), mmCtx=mmCanvas.getContext('2d');
+if(!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){this.rect(x,y,w,h);};
+}
+
+/* ---------- factions ---------- */
+const PLAYER=1;
+const FAC={
+  1:{name:'NEXUS',          col:'#3ec8b4', rgb:'62,200,180',  persona:'player'},
+  2:{name:'HELIX COMBINE',  col:'#e8483a', rgb:'232,72,58',   persona:'warlord'},
+  3:{name:'AURUM SYNDICATE',col:'#e9a93d', rgb:'233,169,61',  persona:'merchant'},
+  4:{name:'VANTA CELL',     col:'#9b6fe8', rgb:'155,111,232', persona:'covert'},
+};
+const AIS=[2,3,4];
+
+/* ---------- unit & building definitions ---------- */
+const B={
+  hq:      {name:'Command HQ',     w:3,h:3, hp:1700, cost:0,   power:+20, buildTime:0,  sight:8, hgt:26, desc:'Primary structure. Accepts crystal deliveries.'},
+  power:   {name:'Power Plant',    w:2,h:2, hp:430,  cost:300, power:+50, buildTime:8,  sight:4, hgt:20, desc:'+50 power.'},
+  refinery:{name:'Crystal Refinery',w:3,h:2,hp:700,  cost:600, power:-10, buildTime:12, sight:5, hgt:20, desc:'Harvester drop-off. Free Harvester on completion.'},
+  foundry: {name:'War Foundry',    w:3,h:2, hp:900,  cost:500, power:-15, buildTime:12, sight:5, hgt:22, desc:'Fabricates all vehicles and drones.'},
+  turret:  {name:'Sentinel Turret',w:1,h:1, hp:520,  cost:400, power:-10, buildTime:8,  sight:7, hgt:8,  dmg:13, range:188, rof:0.65, desc:'Automated point defense.'},
+  cyber:   {name:'Cyber Ops Center',w:2,h:2,hp:740,  cost:800, power:-20, buildTime:14, sight:6, hgt:20, desc:'Unlocks cyber abilities & covert missions.'},
+};
+const U={
+  harvester:{name:'Harvester',     cost:400,hp:310,speed:74, radius:11,sight:5,buildTime:10,cargo:200, desc:'Gathers data crystals. Your economy.'},
+  recon:    {name:'Recon Drone',   cost:150,hp:78, speed:140,radius:8, sight:9,buildTime:6, dmg:4, range:96, rof:0.4, desc:'Fast scout quadcopter.'},
+  strike:   {name:'Hover Tank',    cost:300,hp:155,speed:96, radius:10,sight:7,buildTime:9, dmg:11,range:124,rof:0.8, desc:'Backbone main battle tank.'},
+  walker:   {name:'Railgun Walker',cost:700,hp:440,speed:56, radius:13,sight:7,buildTime:16,dmg:48,range:182,rof:2.2, desc:'Quad-legged siege platform.'},
+};
+const ABILITIES={
+  emp:   {name:'EMP Pulse',    cost:300, cd:60, key:'E', desc:'Disable non-allied units & turrets in a zone for 8s. Hitting neutrals angers them.'},
+  hijack:{name:'System Hijack',cost:600, cd:90, key:'H', desc:'Seize one enemy unit permanently. A hostile act against neutrals.'},
+};
+const COVERT={
+  steal:   {name:'Steal Data', cost:250, cd:45,  chance:0.70, desc:'Siphon up to 600 crystals from the target. Detection: −20 relations.'},
+  sabotage:{name:'Sabotage',   cost:500, cd:75,  chance:0.65, desc:'Cripple a random enemy structure. Detection: −25.'},
+  recon:   {name:'Recon Sweep',cost:150, cd:40,  chance:1.00, desc:'Reveal the target base for 15s. Never detected.'},
+  incite:  {name:'Incite War', cost:700, cd:120, chance:0.55, desc:'Poison relations between the target and another faction (−40). Detection: −25.'},
+};
+
+/* ---------- terrain types ---------- */
+const T_GRASS=0,T_DIRT=1,T_WATER=2,T_ROCK=3,T_FOREST=4,T_BRIDGE=5,T_ROAD=6;
+const PASSABLE=[1,1,0,0,0,1,1];
+
+/* ---------- state ---------- */
+let game={
+  started:false,over:false,t:0,
+  money:{1:1500,2:2200,3:2400,4:2200},
+  cam:{x:0,y:0},
+  buildings:[],units:[],shots:[],parts:[],nodes:[],trees:[],waterTiles:[],
+  terr:new Uint8Array(MAPW*MAPH),
+  occupied:new Uint8Array(MAPW*MAPH),
+  explored:new Uint8Array(MAPW*MAPH),
+  visible:new Uint8Array(MAPW*MAPH),
+  selection:[],placing:null,armed:null,
+  cooldowns:{emp:0,hijack:0},covCd:{steal:0,sabotage:0,recon:0,incite:0},
+  covTarget:2,tempVision:[],shake:0,aggroT:{},ai:{},eliminated:{},
+};
+let dip={rel:{},alliance:{},trade:{}};
+const rk=(a,b)=>a<b?a+'-'+b:b+'-'+a;
+const getRel=(a,b)=>dip.rel[rk(a,b)]??0;
+function setRel(a,b,v){dip.rel[rk(a,b)]=Math.max(-100,Math.min(100,v));}
+function addRel(a,b,d){if(a!==b)setRel(a,b,getRel(a,b)+d);}
+const isAllied=(a,b)=>a===b||!!dip.alliance[rk(a,b)];
+const isWar=(a,b)=>a!==b&&!isAllied(a,b)&&getRel(a,b)<=-30;
+const stateOf=(a,b)=>game.eliminated[b]?'GONE':(isAllied(a,b)?'ALLIED':(isWar(a,b)?'WAR':'NEUTRAL'));
+setRel(1,2,-20);setRel(1,3,10);setRel(1,4,0);
+setRel(2,3,-12);setRel(2,4,-15);setRel(3,4,5);
+
+let lastHint=0;
+const idx=(tx,ty)=>ty*MAPW+tx;
+const inMap=(tx,ty)=>tx>=0&&ty>=0&&tx<MAPW&&ty<MAPH;
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const tPassable=(tx,ty)=>inMap(tx,ty)&&PASSABLE[game.terr[idx(tx,ty)]]===1;
+const passable=(tx,ty)=>tPassable(tx,ty)&&game.occupied[idx(tx,ty)]===0;
+function logMsg(msg,cls){
+  const el=document.getElementById('log');
+  const d=document.createElement('div');if(cls)d.className=cls;
+  d.textContent='› '+msg;el.prepend(d);
+  while(el.children.length>7)el.lastChild.remove();
+}
+function hint(msg){document.getElementById('uiHint').textContent=msg;lastHint=game.t;}
+
+/* =====================================================================
+   STEREO AUDIO ENGINE — positional panning, noise-based impacts
+   ===================================================================== */
+let AC=null,masterG=null,noiseBuf=null,muted=false;
+const sfxLast={};
+function initAudio(){
+  if(AC)return;
+  try{
+    AC=new (window.AudioContext||window.webkitAudioContext)();
+    masterG=AC.createGain();masterG.gain.value=0.9;
+    const comp=AC.createDynamicsCompressor();
+    comp.threshold.value=-18;comp.ratio.value=6;
+    masterG.connect(comp);comp.connect(AC.destination);
+    noiseBuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);
+    const ch=noiseBuf.getChannelData(0);
+    for(let i=0;i<ch.length;i++)ch[i]=Math.random()*2-1;
+    // ambient wind bed
+    const amb=AC.createBufferSource();amb.buffer=noiseBuf;amb.loop=true;
+    const af=AC.createBiquadFilter();af.type='lowpass';af.frequency.value=170;
+    const ag=AC.createGain();ag.gain.value=0.014;
+    amb.connect(af);af.connect(ag);ag.connect(masterG);amb.start();
+  }catch(e){}
+}
+function panFor(x){
+  if(x===undefined)return 0;
+  return clamp(((x-game.cam.x)-canvas.width/2)/(canvas.width*0.65),-1,1);
+}
+function chain(nodes,pan){
+  let p=null;
+  try{p=AC.createStereoPanner();p.pan.value=pan;}catch(e){}
+  for(let i=0;i<nodes.length-1;i++)nodes[i].connect(nodes[i+1]);
+  const tail=nodes[nodes.length-1];
+  if(p){tail.connect(p);p.connect(masterG);}else tail.connect(masterG);
+}
+function noiseHit(pan,{dur=0.5,f0=900,f1=110,vol=0.4,type='lowpass'}={}){
+  const t=AC.currentTime;
+  const src=AC.createBufferSource();src.buffer=noiseBuf;
+  src.playbackRate.value=0.8+Math.random()*0.4;
+  const flt=AC.createBiquadFilter();flt.type=type;
+  flt.frequency.setValueAtTime(f0,t);
+  flt.frequency.exponentialRampToValueAtTime(Math.max(40,f1),t+dur*0.85);
+  const g=AC.createGain();
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  chain([src,flt,g],pan);src.start(t);src.stop(t+dur+0.02);
+}
+function tone(pan,{w='sine',f0=440,f1=null,dur=0.2,vol=0.06,delay=0}={}){
+  const t=AC.currentTime+delay;
+  const o=AC.createOscillator();o.type=w;
+  o.frequency.setValueAtTime(f0,t);
+  if(f1)o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur*0.85);
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  chain([o,g],pan);o.start(t);o.stop(t+dur+0.03);
+}
+function sfx(type,x){
+  if(muted||!AC)return;
+  const now=performance.now();
+  const minGap={shot:45,boom:70,cash:120}[type]||30;
+  if(sfxLast[type]&&now-sfxLast[type]<minGap)return;
+  sfxLast[type]=now;
+  const pan=panFor(x);
+  try{
+    switch(type){
+      case 'shot':
+        noiseHit(pan,{dur:0.07,f0:2400,f1:900,vol:0.05,type:'bandpass'});
+        tone(pan,{w:'square',f0:520,f1:170,dur:0.06,vol:0.025});break;
+      case 'rail':
+        noiseHit(pan,{dur:0.12,f0:3600,f1:500,vol:0.07,type:'bandpass'});
+        tone(pan,{w:'triangle',f0:2300,f1:210,dur:0.14,vol:0.05});
+        tone(pan,{w:'sine',f0:130,f1:55,dur:0.18,vol:0.07});break;
+      case 'boom':
+        noiseHit(pan,{dur:0.65,f0:1000,f1:90,vol:0.5});
+        tone(pan,{w:'sine',f0:105,f1:36,dur:0.5,vol:0.4});
+        noiseHit(pan,{dur:0.18,f0:5200,f1:1500,vol:0.1,type:'highpass'});break;
+      case 'bigboom':
+        noiseHit(pan,{dur:1.0,f0:800,f1:60,vol:0.6});
+        tone(pan,{w:'sine',f0:85,f1:30,dur:0.8,vol:0.5});
+        noiseHit(pan,{dur:0.3,f0:6000,f1:1200,vol:0.12,type:'highpass'});break;
+      case 'emp':
+        tone(pan,{w:'sawtooth',f0:75,f1:1400,dur:0.45,vol:0.07});
+        noiseHit(pan,{dur:0.4,f0:5000,f1:9000,vol:0.03,type:'highpass'});break;
+      case 'click': tone(0,{w:'sine',f0:660,dur:0.045,vol:0.05});break;
+      case 'place': tone(0,{w:'sine',f0:330,f1:220,dur:0.12,vol:0.07});
+        noiseHit(0,{dur:0.1,f0:700,f1:200,vol:0.06});break;
+      case 'cash':
+        tone(pan,{w:'square',f0:880,dur:0.05,vol:0.025});
+        tone(pan,{w:'square',f0:1320,dur:0.07,vol:0.025,delay:0.05});break;
+      case 'chime':
+        tone(0,{w:'sine',f0:660,dur:0.22,vol:0.05});
+        tone(0,{w:'sine',f0:990,dur:0.3,vol:0.045,delay:0.09});break;
+      case 'war':
+        tone(0,{w:'square',f0:330,dur:0.16,vol:0.055});
+        tone(0,{w:'square',f0:262,dur:0.22,vol:0.055,delay:0.18});break;
+      case 'covert': tone(pan,{w:'triangle',f0:360,f1:120,dur:0.2,vol:0.05});break;
+    }
+  }catch(e){}
+}
+
+/* =====================================================================
+   PROCEDURAL MAP GENERATION — new battlefield every load
+   ===================================================================== */
+function makeNoise(){
+  const p=[...Array(256).keys()];
+  for(let i=255;i>0;i--){const j=Math.random()*(i+1)|0;[p[i],p[j]]=[p[j],p[i]];}
+  const perm=new Uint8Array(512);
+  for(let i=0;i<512;i++)perm[i]=p[i&255];
+  const rnd=(x,y)=>perm[(perm[x&255]+y)&255]/255;
+  const sm=t=>t*t*(3-2*t);
+  function n2(x,y){
+    const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
+    const a=rnd(xi,yi),b=rnd(xi+1,yi),c=rnd(xi,yi+1),d=rnd(xi+1,yi+1);
+    const u=sm(xf),v=sm(yf);
+    return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;
+  }
+  return (x,y,oct=3)=>{
+    let s=0,amp=1,f=1,tot=0;
+    for(let o=0;o<oct;o++){s+=n2(x*f,y*f)*amp;tot+=amp;amp*=.5;f*=2;}
+    return s/tot;
+  };
+}
+const BASE_INFO={
+  1:{tx:7, ty:74, sx:+1, sy:-1},
+  2:{tx:74,ty:7,  sx:-1, sy:+1},
+  3:{tx:74,ty:74, sx:-1, sy:-1},
+  4:{tx:7, ty:7,  sx:+1, sy:+1},
+};
+const NODE_SITES=[ {x:17,y:66},{x:66,y:17},{x:66,y:66},{x:17,y:17},
+  {x:42,y:42},{x:42,y:13},{x:42,y:71},{x:13,y:42},{x:71,y:42} ];
+function generateMap(){
+  const T=game.terr;
+  const nE=makeNoise(),nM=makeNoise(),nD=makeNoise();
+  for(let y=0;y<MAPH;y++)for(let x=0;x<MAPW;x++){
+    const e=nE(x*0.055,y*0.055),m=nM(x*0.07,y*0.07),d=nD(x*0.11,y*0.11);
+    let t=T_GRASS;
+    if(e>0.70)t=T_ROCK;
+    else if(m>0.635)t=T_FOREST;
+    else if(d>0.66)t=T_DIRT;
+    T[idx(x,y)]=t;
+  }
+  // rivers (1-2 random walks across the map)
+  const nRivers=1+(Math.random()<0.65?1:0);
+  for(let r=0;r<nRivers;r++){
+    const vert=Math.random()<0.5;
+    let x=vert?10+Math.random()*(MAPW-20):0;
+    let y=vert?0:10+Math.random()*(MAPH-20);
+    let drift=0;
+    while(vert?y<MAPH:x<MAPW){
+      drift+=(Math.random()-0.5)*0.9;drift=clamp(drift,-1.4,1.4);
+      if(vert){x+=drift;y+=1;}else{y+=drift;x+=1;}
+      const w=Math.random()<0.18?2:1;
+      for(let oy=-w;oy<=w;oy++)for(let ox=-w;ox<=w;ox++){
+        const tx=Math.round(x)+ox,ty=Math.round(y)+oy;
+        if(inMap(tx,ty)&&ox*ox+oy*oy<=w*w)T[idx(tx,ty)]=T_WATER;
+      }
+    }
+  }
+  // roads: each base -> center, each node site -> center (guarantees connectivity)
+  const center={x:42,y:42};
+  function carve(ax,ay,bx,by){
+    let x=ax,y=ay;
+    let guard=0;
+    while((Math.abs(x-bx)>1||Math.abs(y-by)>1)&&guard++<500){
+      const dx=bx-x,dy=by-y;
+      if(Math.abs(dx)>Math.abs(dy))x+=Math.sign(dx);else y+=Math.sign(dy);
+      if(Math.random()<0.25){ if(Math.random()<0.5)x+=Math.sign(bx-x||1)*0; y+=0; }
+      for(let oy=0;oy<=1;oy++)for(let ox=0;ox<=1;ox++){
+        const tx=x+ox,ty=y+oy;
+        if(!inMap(tx,ty))continue;
+        const i=idx(tx,ty);
+        T[i]=T[i]===T_WATER?T_BRIDGE:T_ROAD;
+      }
+    }
+  }
+  for(const f of [1,2,3,4]){const bi=BASE_INFO[f];carve(bi.tx+1,bi.ty+1,center.x,center.y);}
+  for(const s of NODE_SITES)carve(s.x,s.y,center.x,center.y);
+  // clearings around bases & node sites
+  function clear(cx,cy,r){
+    for(let y=cy-r;y<=cy+r;y++)for(let x=cx-r;x<=cx+r;x++){
+      if(!inMap(x,y))continue;
+      if((x-cx)*(x-cx)+(y-cy)*(y-cy)>r*r)continue;
+      const i=idx(x,y);
+      if(T[i]===T_ROCK||T[i]===T_FOREST||T[i]===T_WATER)T[i]=T_GRASS;
+    }
+  }
+  for(const f of [1,2,3,4]){const bi=BASE_INFO[f];clear(bi.tx+1,bi.ty+1,9);}
+  for(const s of NODE_SITES)clear(s.x,s.y,4);
+  clear(center.x,center.y,6);
+  // map border = rock wall
+  for(let i=0;i<MAPW;i++){T[idx(i,0)]=T_ROCK;T[idx(i,MAPH-1)]=T_ROCK;}
+  for(let i=0;i<MAPH;i++){T[idx(0,i)]=T_ROCK;T[idx(MAPW-1,i)]=T_ROCK;}
+  // trees & water tile lists
+  game.trees.length=0;game.waterTiles.length=0;
+  for(let y=0;y<MAPH;y++)for(let x=0;x<MAPW;x++){
+    const t=T[idx(x,y)];
+    if(t===T_FOREST){
+      const pine=Math.random()<0.45;
+      game.trees.push({x:x*TILE+8+Math.random()*16,y:y*TILE+10+Math.random()*16,
+        r:9+Math.random()*5,pine,tone:Math.random()});
+    } else if(t===T_WATER)game.waterTiles.push({x,y});
+  }
+  // data crystal fields
+  game.nodes.length=0;
+  for(const s of NODE_SITES){
+    const big=(s.x===42&&s.y===42);
+    const count=big?8:5;
+    for(let i=0;i<count;i++){
+      let nx,ny,tries=0;
+      do{
+        const a=Math.random()*Math.PI*2,r=Math.random()*(big?90:62);
+        nx=s.x*TILE+Math.cos(a)*r;ny=s.y*TILE+Math.sin(a)*r;
+      }while(!tPassable(nx/TILE|0,ny/TILE|0)&&++tries<20);
+      game.nodes.push({x:nx,y:ny,amount:big?4600:3300,max:big?4600:3300,
+        pulse:Math.random()*6,shards:2+(Math.random()*4|0)});
+    }
+  }
+}

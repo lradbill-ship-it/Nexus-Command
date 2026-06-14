@@ -1,0 +1,432 @@
+import Phaser from 'phaser';
+import {
+  TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, FAC, B, U, BASE_INFO,
+  idx, clamp, dist,
+} from '../sim/constants';
+import { game, resetState, isAllied } from '../sim/state';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility } from '../sim/sim';
+import { generateMap } from '../sim/mapgen';
+import { renderTerrain, getTerrainCanvas, scorch, terrainDirty, clearTerrainDirty } from '../render/terrain';
+import { buildAllTextures, originOf } from '../render/textures';
+import { initAudio, sfx, setViewWidth, toggleMute } from '../audio';
+import type { Building, Unit, Entity } from '../sim/types';
+
+interface SpriteRec { body: Phaser.GameObjects.Image; barrel?: Phaser.GameObjects.Image; glow?: Phaser.GameObjects.Image; }
+
+export class BattleScene extends Phaser.Scene {
+  private terrainImg!: Phaser.GameObjects.Image;
+  private terrainTex!: Phaser.Textures.CanvasTexture;
+  private fogTex!: Phaser.Textures.CanvasTexture;
+  private fogImg!: Phaser.GameObjects.Image;
+  private fxAdd!: Phaser.GameObjects.Graphics;
+  private fxNorm!: Phaser.GameObjects.Graphics;
+  private overlay!: Phaser.GameObjects.Graphics;
+  private recs = new Map<number, SpriteRec>();
+  private crystals = new Map<object, { spr: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image }>();
+  private keys!: Record<string, Phaser.Input.Keyboard.Key>;
+  private dragStart: { x: number; y: number } | null = null;
+  private dragging = false;
+  private midPan: { x: number; y: number } | null = null;
+  private onEnd: (win: boolean) => void = () => {};
+  private mm!: HTMLCanvasElement;
+  private mmCtx!: CanvasRenderingContext2D;
+
+  constructor() { super('battle'); }
+
+  create() {
+    buildAllTextures(this);
+    setScorchHook(scorch);
+    setEndHook((win) => this.onEnd(win));
+
+    this.cameras.main.setBackgroundColor('#0a0e08');
+    this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
+    this.cameras.main.setZoom(1);
+
+    // layers
+    this.terrainImg = this.add.image(0, 0, '__DEFAULT').setOrigin(0, 0).setDepth(-100);
+    this.fxNorm = this.add.graphics().setDepth(9000);
+    this.fxAdd = this.add.graphics().setDepth(9001).setBlendMode(Phaser.BlendModes.ADD);
+    this.fogImg = this.add.image(0, 0, '__DEFAULT').setOrigin(0, 0).setDepth(10000);
+    this.overlay = this.add.graphics().setDepth(11000);
+
+    // fog texture (84x84, soft-filtered)
+    this.fogTex = this.textures.createCanvas('fog', MAPW, MAPH)!;
+    this.fogTex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+    this.fogImg.setTexture('fog').setDisplaySize(WORLD_W, WORLD_H);
+
+    // minimap
+    this.mm = document.getElementById('minimap') as HTMLCanvasElement;
+    this.mmCtx = this.mm.getContext('2d')!;
+    this.mm.addEventListener('mousedown', (e) => this.minimapJump(e));
+    this.mm.addEventListener('mousemove', (e) => { if (e.buttons & 1) this.minimapJump(e); });
+
+    // input
+    this.input.mouse?.disableContextMenu();
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.setupPointer();
+    this.setupKeys();
+
+    setViewWidth(this.scale.width);
+    this.scale.on('resize', () => setViewWidth(this.scale.width));
+
+    this.newMatch(false);
+  }
+
+  setEndHandler(fn: (win: boolean) => void) { this.onEnd = fn; }
+
+  /** Regenerate a fresh battlefield. start=true skips the intro (used by restart). */
+  newMatch(start: boolean) {
+    // wipe sprites
+    for (const r of this.recs.values()) { r.body.destroy(); r.barrel?.destroy(); r.glow?.destroy(); }
+    this.recs.clear();
+    for (const c of this.crystals.values()) { c.spr.destroy(); c.glow.destroy(); }
+    this.crystals.clear();
+
+    resetState();
+    resetSimLocals();
+    generateMap();
+    setupBases();
+    computeVision();
+
+    // upload terrain
+    renderTerrain();
+    if (this.textures.exists('terrain')) this.textures.remove('terrain');
+    this.terrainTex = this.textures.addCanvas('terrain', getTerrainCanvas())!;
+    clearTerrainDirty();
+    this.terrainImg.setTexture('terrain');
+
+    // camera to player's base (SW)
+    const bi = BASE_INFO[PLAYER];
+    this.cameras.main.setZoom(1);
+    this.cameras.main.centerOn((bi.tx + 1) * TILE, (bi.ty + 1) * TILE);
+
+    game.started = start;
+    game.selection = [];
+  }
+
+  // ── input ────────────────────────────────────────────────────────────────
+  private setupPointer() {
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      initAudio();
+      if (p.middleButtonDown()) { this.midPan = { x: p.x, y: p.y }; return; }
+      if (!game.started || game.over) return;
+      if (p.leftButtonDown()) { this.dragStart = { x: p.worldX, y: p.worldY }; this.dragging = false; }
+      else if (p.rightButtonDown()) {
+        if (game.placing || game.armed) { game.placing = null; game.armed = null; return; }
+        issueOrder(p.worldX, p.worldY, false);
+      }
+    });
+
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (this.midPan) {
+        const z = this.cameras.main.zoom;
+        this.cameras.main.scrollX -= (p.x - this.midPan.x) / z;
+        this.cameras.main.scrollY -= (p.y - this.midPan.y) / z;
+        this.midPan = { x: p.x, y: p.y };
+        return;
+      }
+      if (this.dragStart && p.leftButtonDown() && Phaser.Math.Distance.Between(this.dragStart.x, this.dragStart.y, p.worldX, p.worldY) > 8 / this.cameras.main.zoom) this.dragging = true;
+    });
+
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (p.middleButtonReleased()) { this.midPan = null; return; }
+      if (!game.started || game.over) { this.dragStart = null; return; }
+      if (!p.leftButtonReleased()) return;
+      if (game.placing) { tryPlace(p.worldX, p.worldY); this.dragStart = null; this.dragging = false; return; }
+      if (game.armed) { castAbility(game.armed, p.worldX, p.worldY); this.dragStart = null; this.dragging = false; return; }
+      if (this.dragging && this.dragStart) {
+        const x1 = Math.min(this.dragStart.x, p.worldX), x2 = Math.max(this.dragStart.x, p.worldX);
+        const y1 = Math.min(this.dragStart.y, p.worldY), y2 = Math.max(this.dragStart.y, p.worldY);
+        game.selection = game.units.filter(u => u.team === PLAYER && u.x > x1 && u.x < x2 && u.y > y1 && u.y < y2);
+        if (game.selection.length) sfx('click');
+      } else if (this.dragStart) {
+        const wx = p.worldX, wy = p.worldY;
+        let hit: Entity | null = null;
+        for (const u of game.units) { if (u.team !== PLAYER) continue; if (dist(u, { x: wx, y: wy }) < U[u.type].radius + 6) { hit = u; break; } }
+        if (!hit) for (const b of game.buildings) { if (b.team !== PLAYER) continue; if (Math.abs(wx - b.x) < b.w / 2 && Math.abs(wy - b.y) < b.h / 2) { hit = b; break; } }
+        game.selection = hit ? [hit] : [];
+        if (hit) sfx('click');
+      }
+      this.dragStart = null; this.dragging = false;
+    });
+
+    this.input.on('wheel', (_p: any, _o: any, _dx: number, dy: number) => {
+      const z = clamp(this.cameras.main.zoom * (dy > 0 ? 0.9 : 1.1), 0.55, 1.7);
+      this.cameras.main.setZoom(z);
+    });
+  }
+
+  private setupKeys() {
+    const kb = this.input.keyboard!;
+    kb.on('keydown', (e: KeyboardEvent) => {
+      if (!game.started) return;
+      const k = e.key.toLowerCase();
+      if (k === 'escape') { game.placing = null; game.armed = null; }
+      else if (k === 'e') tryAbility('emp');
+      else if (k === 'h') tryAbility('hijack');
+      else if (k === 'm') toggleMute();
+      else if (k === 't') { if (game.selection.some(s => s.kind === 'u')) game.armed = 'amove'; }
+      else if (k >= '1' && k <= '9') this.controlGroup(+k, e.ctrlKey || e.metaKey, e.shiftKey);
+    });
+  }
+  private controlGroup(n: number, assign: boolean, add: boolean) {
+    if (assign) {
+      game.groups[n] = game.selection.filter(s => s.kind === 'u').map(s => s.id);
+      sfx('click');
+    } else {
+      const ids = game.groups[n] || [];
+      const units = game.units.filter(u => ids.includes(u.id));
+      if (add) for (const u of units) { if (!game.selection.includes(u)) game.selection.push(u); }
+      else game.selection = units;
+      if (units.length) sfx('click');
+    }
+  }
+
+  private minimapJump(e: MouseEvent) {
+    const r = this.mm.getBoundingClientRect();
+    const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    this.cameras.main.centerOn(fx * WORLD_W, fy * WORLD_H);
+  }
+
+  // ── main loop ──────────────────────────────────────────────────────────────
+  update(_time: number, delta: number) {
+    const dt = clamp(delta / 1000, 0, 0.05);
+    if (game.started && !game.over) {
+      this.panCamera(dt);
+      stepWorld(dt);
+    }
+    // sync game.cam for audio panning
+    game.cam.x = this.cameras.main.scrollX; game.cam.y = this.cameras.main.scrollY;
+
+    this.syncCrystals();
+    this.syncEntities();
+    this.drawFx();
+    this.drawOverlay();
+    this.updateFog();
+    this.drawMinimap();
+    if (terrainDirty()) { this.terrainTex.refresh(); clearTerrainDirty(); }
+
+    // screen shake
+    if (game.shake > 0.1) this.cameras.main.setScroll(
+      this.cameras.main.scrollX + (Math.random() - 0.5) * game.shake,
+      this.cameras.main.scrollY + (Math.random() - 0.5) * game.shake,
+    );
+  }
+
+  private panCamera(dt: number) {
+    const cam = this.cameras.main;
+    const sp = 900 * dt;
+    const k = this.keys;
+    if (k.W.isDown || k.UP.isDown) cam.scrollY -= sp;
+    if (k.S.isDown || k.DOWN.isDown) cam.scrollY += sp;
+    if (k.A.isDown || k.LEFT.isDown) cam.scrollX -= sp;
+    if (k.D.isDown || k.RIGHT.isDown) cam.scrollX += sp;
+  }
+
+  // ── entity sprites ─────────────────────────────────────────────────────────
+  private setOrigin(img: Phaser.GameObjects.Image, key: string) {
+    const o = originOf[key]; if (o) img.setOrigin(o.ox, o.oy);
+  }
+  private syncEntities() {
+    const live = new Set<number>();
+    for (const b of game.buildings) { live.add(b.id); this.syncBuilding(b); }
+    for (const u of game.units) { live.add(u.id); this.syncUnit(u); }
+    for (const [id, r] of this.recs) if (!live.has(id)) { r.body.destroy(); r.barrel?.destroy(); r.glow?.destroy(); this.recs.delete(id); }
+  }
+  private syncBuilding(b: Building) {
+    let r = this.recs.get(b.id);
+    const key = `b_${b.type}_${b.team}`;
+    if (!r) {
+      const body = this.add.image(b.x, b.y, key); this.setOrigin(body, key);
+      const glow = this.add.image(b.x, b.y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(Phaser.Display.Color.HexStringToColor(FAC[b.team].col).color);
+      r = { body, glow };
+      if (b.type === 'turret') { r.barrel = this.add.image(b.x, b.y, `t_turret_${b.team}`); this.setOrigin(r.barrel, `t_turret_${b.team}`); }
+      this.recs.set(b.id, r);
+    }
+    const vis = canSee(b);
+    r.body.setVisible(vis).setDepth(b.y);
+    // construction look: darken + fade while building
+    const built = b.progress >= 1;
+    r.body.setAlpha(built ? 1 : 0.55).setTint(built ? 0xffffff : 0x6b7a5a);
+    if (r.glow) {
+      const pulse = 0.5 + 0.5 * Math.sin(b.anim * 2.4);
+      r.glow.setVisible(vis && built).setDepth(b.y + 0.2)
+        .setAlpha(0.12 + pulse * 0.16).setDisplaySize(b.w * 0.9, b.h * 0.9)
+        .setPosition(b.x, b.y - B[b.type].hgt * 0.3);
+    }
+    if (r.barrel) {
+      r.barrel.setVisible(vis && built).setDepth(b.y + 0.4)
+        .setPosition(b.x, b.y - B[b.type].hgt * 0.5).setRotation(b.aim + Math.PI / 2);
+    }
+  }
+  private syncUnit(u: Unit) {
+    let r = this.recs.get(u.id);
+    const key = `u_${u.type}_${u.team}`;
+    if (!r) {
+      const body = this.add.image(u.x, u.y, key); this.setOrigin(body, key);
+      r = { body };
+      if (u.type === 'strike' || u.type === 'walker') { const bk = `t_${u.type}_${u.team}`; r.barrel = this.add.image(u.x, u.y, bk); this.setOrigin(r.barrel, bk); }
+      this.recs.set(u.id, r);
+    } else if (r.body.texture.key !== key) {
+      // team changed (hijack) — reskin
+      r.body.setTexture(key); this.setOrigin(r.body, key);
+      if (r.barrel && (u.type === 'strike' || u.type === 'walker')) { const bk = `t_${u.type}_${u.team}`; r.barrel.setTexture(bk); this.setOrigin(r.barrel, bk); }
+    }
+    const vis = canSee(u);
+    const bob = Math.sin(game.t * 3 + u.bob) * 1.5;
+    r.body.setVisible(vis).setDepth(u.y).setPosition(u.x, u.y + bob).setRotation(u.facing + Math.PI / 2)
+      .setAlpha(u.disabledUntil > game.t ? 0.6 : 1);
+    if (r.barrel) r.barrel.setVisible(vis).setDepth(u.y + 0.5).setPosition(u.x, u.y + bob).setRotation(u.aim + Math.PI / 2);
+  }
+
+  private syncCrystals() {
+    const live = new Set<object>();
+    for (const n of game.nodes) {
+      if (n.amount <= 0) continue;
+      live.add(n);
+      let c = this.crystals.get(n);
+      if (!c) {
+        const glow = this.add.image(n.x, n.y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(0x9bd4ff).setDepth(-51);
+        const spr = this.add.image(n.x, n.y, 'crystal').setDepth(-50);
+        c = { spr, glow }; this.crystals.set(n, c);
+      }
+      const p = 0.6 + 0.4 * Math.sin(game.t * 2 + n.pulse);
+      const sc = 0.6 + 0.5 * (n.amount / n.max);
+      c.spr.setScale(sc);
+      c.glow.setAlpha(0.3 * p).setDisplaySize(34 * sc, 34 * sc).setRotation(game.t * 0.2);
+    }
+    for (const [n, c] of this.crystals) if (!live.has(n)) { c.spr.destroy(); c.glow.destroy(); this.crystals.delete(n); }
+  }
+
+  // ── FX (shots, particles, explosions) ───────────────────────────────────────
+  private drawFx() {
+    const a = this.fxAdd, n = this.fxNorm;
+    a.clear(); n.clear();
+    for (const s of game.shots) {
+      if (!s.target) continue;
+      const ang = Math.atan2(s.target.y - s.y, s.target.x - s.x);
+      const len = s.rail ? 22 : 11;
+      const x0 = s.x - Math.cos(ang) * len, y0 = s.y - Math.sin(ang) * len;
+      const col = Phaser.Display.Color.HexStringToColor(s.col).color;
+      a.lineStyle(s.rail ? 5 : 3, col, 0.35); a.beginPath(); a.moveTo(x0, y0); a.lineTo(s.x, s.y); a.strokePath();
+      a.lineStyle(s.rail ? 2 : 1.2, 0xffffff, 0.95); a.beginPath(); a.moveTo(x0, y0); a.lineTo(s.x, s.y); a.strokePath();
+    }
+    for (const p of game.parts) {
+      const k = 1 - p.t / p.life;
+      if (p.type === 'ring') {
+        const r = (p.big ? 16 : 9) + p.t * (p.big ? 170 : 95);
+        a.lineStyle(3, 0xffb46e, k); a.strokeCircle(p.x, p.y, r);
+      } else if (p.type === 'emp') {
+        const r = p.t / p.life * 132;
+        a.lineStyle(2, 0x96c3ff, k); a.strokeCircle(p.x, p.y, r); a.strokeCircle(p.x, p.y, r * 0.55);
+      } else if (p.type === 'flash') {
+        a.fillStyle(0xffffff, k); a.fillCircle(p.x, p.y, (p.big ? 26 : 13) * (0.5 + p.t / p.life));
+      } else if (p.type === 'smoke' || p.type === 'steam') {
+        const c = Phaser.Display.Color.RGBStringToColor('rgb(' + (p.rgb || '90,90,100') + ')').color;
+        n.fillStyle(c, 0.3 * k); n.fillCircle(p.x, p.y, (p.size || 6) * (1 + p.t));
+      } else if (p.type === 'debris') {
+        const c = Phaser.Display.Color.RGBStringToColor('rgb(' + (p.rgb || '120,120,128') + ')').color;
+        n.fillStyle(c, k); n.fillCircle(p.x, p.y, (p.size || 2) * k + 0.5);
+      } else { // muzzle, spark, fire, mote
+        const c = Phaser.Display.Color.RGBStringToColor('rgb(' + (p.rgb || '255,235,180') + ')').color;
+        a.fillStyle(c, k); a.fillCircle(p.x, p.y, (p.size || 2) * k + 0.5);
+      }
+    }
+  }
+
+  // ── overlay (selection, hp, placement ghost, marquee) ───────────────────────
+  private drawOverlay() {
+    const g = this.overlay; g.clear();
+    const drawHp = (x: number, y: number, w: number, f: number, col: number) => {
+      g.fillStyle(0x000000, 0.7); g.fillRect(x - w / 2 - 1, y - 1, w + 2, 5);
+      const c = f > 0.5 ? col : (f > 0.25 ? 0xe9a93d : 0xe8483a);
+      g.fillStyle(c, 1); g.fillRect(x - w / 2, y, w * f, 3);
+    };
+    const drawBr = (x: number, y: number, r: number) => {
+      g.lineStyle(1.6, 0xffffff, 0.85);
+      const c = r * 0.5, pp = Math.sin(game.t * 5) * 1.5, rr = r + pp;
+      for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        g.beginPath(); g.moveTo(x + sx * rr, y + sy * (rr - c)); g.lineTo(x + sx * rr, y + sy * rr); g.lineTo(x + sx * (rr - c), y + sy * rr); g.strokePath();
+      }
+    };
+    const sel = new Set(game.selection);
+    for (const b of game.buildings) {
+      if (!canSee(b)) continue;
+      const col = Phaser.Display.Color.HexStringToColor(FAC[b.team].col).color;
+      if (b.progress < 1) {
+        g.fillStyle(0x000000, 0.5); g.fillRect(b.x - b.w / 2, b.y - b.h / 2 - 9, b.w, 4);
+        g.fillStyle(0xe9a93d, 1); g.fillRect(b.x - b.w / 2, b.y - b.h / 2 - 9, b.w * b.progress, 4);
+      } else if (b.type === 'foundry' && b.queue.length) {
+        const f = b.queueT / U[b.queue[0]].buildTime;
+        g.fillStyle(0x000000, 0.5); g.fillRect(b.x - 14, b.y + b.h * 0.32, 28, 4);
+        g.fillStyle(col, 1); g.fillRect(b.x - 14, b.y + b.h * 0.32, 28 * f, 4);
+      }
+      if (b.hp < b.hpMax || sel.has(b)) drawHp(b.x, b.y - b.h / 2 - B[b.type].hgt * 0.4 - 6, b.w * 0.85, b.hp / b.hpMax, col);
+      if (sel.has(b)) drawBr(b.x, b.y, Math.max(b.w, b.h) / 2 + 5);
+      if (sel.has(b) && b.type === 'foundry' && b.rally) {
+        g.lineStyle(1, 0x3ec8b4, 0.6); g.lineBetween(b.x, b.y, b.rally.x, b.rally.y);
+        g.fillStyle(0x3ec8b4, 0.8); g.fillCircle(b.rally.x, b.rally.y, 4);
+      }
+    }
+    for (const u of game.units) {
+      if (!canSee(u)) continue;
+      const d = U[u.type], col = Phaser.Display.Color.HexStringToColor(FAC[u.team].col).color;
+      if (sel.has(u)) drawBr(u.x, u.y, d.radius + 7);
+      if (u.hp < u.hpMax || sel.has(u)) drawHp(u.x, u.y - d.radius - 9, 22, u.hp / u.hpMax, col);
+      if (u.type === 'harvester' && u.cargo > 0) {
+        const f = u.cargo / U.harvester.cargo!;
+        g.fillStyle(0x9bd4ff, 0.85); g.fillRect(u.x - 6, u.y + d.radius + 2, 12 * f, 2);
+      }
+    }
+    // placement ghost
+    if (game.placing) {
+      const d = B[game.placing], p = this.input.activePointer;
+      const tx = Math.round(p.worldX / TILE - d.w / 2), ty = Math.round(p.worldY / TILE - d.h / 2);
+      const ok = canPlaceHere(game.placing, tx, ty);
+      g.fillStyle(ok ? 0x3ec8b4 : 0xe8483a, 0.2); g.fillRect(tx * TILE, ty * TILE, d.w * TILE, d.h * TILE);
+      g.lineStyle(2, ok ? 0x3ec8b4 : 0xe8483a, 1); g.strokeRect(tx * TILE, ty * TILE, d.w * TILE, d.h * TILE);
+    }
+    if (game.armed === 'emp') {
+      const p = this.input.activePointer;
+      g.lineStyle(2, 0x96c3ff, 0.7); g.strokeCircle(p.worldX, p.worldY, 132);
+    }
+    // marquee
+    if (this.dragging && this.dragStart) {
+      const p = this.input.activePointer;
+      g.lineStyle(1, 0x3ec8b4, 0.9); g.fillStyle(0x3ec8b4, 0.07);
+      const x = Math.min(this.dragStart.x, p.worldX), y = Math.min(this.dragStart.y, p.worldY);
+      const w = Math.abs(p.worldX - this.dragStart.x), h = Math.abs(p.worldY - this.dragStart.y);
+      g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h);
+    }
+  }
+
+  // ── fog texture ──────────────────────────────────────────────────────────────
+  private updateFog() {
+    const ctx = this.fogTex.context;
+    const img = ctx.getImageData(0, 0, MAPW, MAPH);
+    const px = img.data;
+    for (let i = 0; i < MAPW * MAPH; i++) {
+      const o = i * 4; px[o] = 2; px[o + 1] = 4; px[o + 2] = 3;
+      px[o + 3] = game.visible[i] ? 0 : (game.explored[i] ? 125 : 255);
+    }
+    ctx.putImageData(img, 0, 0);
+    this.fogTex.refresh();
+  }
+
+  // ── minimap ──────────────────────────────────────────────────────────────────
+  private drawMinimap() {
+    const ctx = this.mmCtx, s = this.mm.width / MAPW;
+    ctx.fillStyle = '#04070c'; ctx.fillRect(0, 0, this.mm.width, this.mm.height);
+    ctx.fillStyle = '#1a2b1e';
+    for (let y = 0; y < MAPH; y++) for (let x = 0; x < MAPW; x++) if (game.explored[idx(x, y)]) ctx.fillRect(x * s, y * s, s + 0.5, s + 0.5);
+    ctx.fillStyle = '#9bd4ff';
+    for (const nd of game.nodes) if (nd.amount > 0 && game.explored[idx(nd.x / TILE | 0, nd.y / TILE | 0)]) ctx.fillRect(nd.x / TILE * s - 1, nd.y / TILE * s - 1, 3, 3);
+    for (const b of game.buildings) { if (!canSee(b)) continue; ctx.fillStyle = FAC[b.team].col; ctx.fillRect(b.tx * s, b.ty * s, B[b.type].w * s, B[b.type].h * s); }
+    for (const u of game.units) { if (!canSee(u)) continue; ctx.fillStyle = FAC[u.team].col; ctx.fillRect(u.x / TILE * s - 1, u.y / TILE * s - 1, 2.4, 2.4); }
+    // camera viewport box
+    const cam = this.cameras.main;
+    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1;
+    ctx.strokeRect(cam.scrollX / WORLD_W * this.mm.width, cam.scrollY / WORLD_H * this.mm.height,
+      cam.worldView.width / WORLD_W * this.mm.width, cam.worldView.height / WORLD_H * this.mm.height);
+  }
+}
