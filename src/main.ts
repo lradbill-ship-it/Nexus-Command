@@ -4,11 +4,16 @@ import { game, logMsg as stateLog } from './sim/state';
 import { makeUI, refresh, showEnd, resetOverlays, setRestartHook, setStartHook, logMsg } from './ui/sidebar';
 import { initAudio, sfx } from './audio';
 
-makeUI();
+// Guard against duplicate boots (Vite HMR can re-run this module without a full
+// page reload, which would otherwise stack multiple Phaser games on one page).
+const w = window as unknown as { __nexusGame?: Phaser.Game; __nexusUI?: boolean };
+if (w.__nexusGame) w.__nexusGame.destroy(true);
+
+if (!w.__nexusUI) { makeUI(); setInterval(() => refresh(), 130); w.__nexusUI = true; }
 
 const scene = new BattleScene();
 
-new Phaser.Game({
+w.__nexusGame = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'gameArea',
   backgroundColor: '#0a0e08',
@@ -37,5 +42,4 @@ setRestartHook(() => {
 // keep state's logMsg hook pointed at the live feed even before makeUI hooks bind
 void stateLog;
 
-setInterval(() => { refresh(); }, 130);
 refresh();

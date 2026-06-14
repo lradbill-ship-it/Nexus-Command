@@ -4,7 +4,7 @@ import {
   idx, clamp, dist,
 } from '../sim/constants';
 import { game, resetState, isAllied } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, scorch, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import { buildAllTextures, originOf } from '../render/textures';
@@ -162,15 +162,13 @@ export class BattleScene extends Phaser.Scene {
       if (!game.started) return;
       const k = e.key.toLowerCase();
       if (k === 'escape') { game.placing = null; game.armed = null; }
-      else if (k === 'e') this.armAbility('emp');
-      else if (k === 'h') this.armAbility('hijack');
+      else if (k === 'e') tryAbility('emp');
+      else if (k === 'h') tryAbility('hijack');
       else if (k === 'm') toggleMute();
       else if (k === 't') { if (game.selection.some(s => s.kind === 'u')) game.armed = 'amove'; }
       else if (k >= '1' && k <= '9') this.controlGroup(+k, e.ctrlKey || e.metaKey, e.shiftKey);
     });
   }
-  private armAbility(key: string) { import('../sim/sim').then(m => m.tryAbility(key)); }
-
   private controlGroup(n: number, assign: boolean, add: boolean) {
     if (assign) {
       game.groups[n] = game.selection.filter(s => s.kind === 'u').map(s => s.id);
