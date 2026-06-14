@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS COMMAND</title>
+<style>
+  :root{
+    --steel-hi:#aeb6c2; --steel:#7d8693; --steel-lo:#4b525d; --steel-dk:#2b303a;
+    --bezel:#11141a; --screen:#0b0f14; --ink:#d8e4ea; --dim:#7c8a97;
+    --gold:#e8b64c; --green:#69d84f;
+    --p1:#3ec8b4; --p2:#e8483a; --p3:#e9a93d; --p4:#9b6fe8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;user-select:none;}
+  html,body{height:100%;overflow:hidden;background:#000;
+    font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;color:var(--ink);}
+  #wrap{display:flex;height:100vh;}
+  #gameArea{position:relative;flex:1;min-width:0;}
+  #gameArea canvas{display:block;}
+  /* top bar */
+  #topbar{position:absolute;top:0;left:0;right:0;height:40px;display:flex;align-items:center;
+    gap:18px;padding:0 14px;
+    background:linear-gradient(180deg,rgba(8,10,8,.92),rgba(8,10,8,.45) 75%,transparent);
+    font-size:12px;letter-spacing:.08em;pointer-events:none;z-index:5;}
+  #topbar .stat b{color:var(--gold);font-weight:600;}
+  #topbar .stat.bad b{color:var(--p2);}
+  #topbar .stat.trade b{color:var(--green);}
+  #topbar .spacer{flex:1;}
+  #uiHint{color:var(--gold);}
+  #restartBtn{pointer-events:auto;background:linear-gradient(180deg,var(--steel),var(--steel-lo));
+    border:1px solid var(--steel-dk);border-top-color:var(--steel-hi);color:#16191f;
+    font:inherit;font-weight:700;font-size:10px;letter-spacing:.14em;padding:6px 12px;cursor:pointer;border-radius:2px;}
+  #restartBtn:hover{filter:brightness(1.12);}
+  /* ====== C&C-style metal sidebar ====== */
+  #sidebar{width:288px;display:flex;flex-direction:column;
+    background:linear-gradient(180deg,#878f9b 0%,#6d7480 6%,#5a606b 50%,#4a505a 100%);
+    border-left:3px solid #2a2e36;box-shadow:inset 2px 0 0 #9ba3af;}
+  .frame{margin:8px 8px 0;padding:5px;
+    background:linear-gradient(145deg,#9aa2ae,#5a616c);
+    border:1px solid #353a44;border-radius:3px;
+    box-shadow:inset 1px 1px 0 rgba(255,255,255,.35), inset -1px -1px 0 rgba(0,0,0,.45), 0 2px 4px rgba(0,0,0,.4);}
+  .screenIn{background:var(--screen);border:1px solid #05070a;border-radius:2px;
+    box-shadow:inset 0 0 14px rgba(0,0,0,.9);}
+  #credits{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;
+    font-size:13px;letter-spacing:.12em;}
+  #credits b{color:var(--gold);font-weight:600;text-shadow:0 0 8px rgba(232,182,76,.5);}
+  #credits .pw{font-size:10px;color:var(--dim);}
+  #credits .pw b{font-size:11px;color:var(--green);text-shadow:0 0 6px rgba(105,216,79,.4);}
+  #credits .pw.bad b{color:var(--p2);text-shadow:0 0 6px rgba(232,72,58,.5);}
+  #minimap{display:block;width:100%;aspect-ratio:1;cursor:pointer;image-rendering:pixelated;}
+  #selInfo{min-height:40px;padding:6px 9px;font-size:11px;line-height:1.5;color:var(--ink);}
+  #selInfo .nm{color:var(--gold);}
+  /* tabs */
+  .tabRow{display:flex;gap:3px;margin:8px 8px 0;}
+  .tabRow button{flex:1;font:inherit;font-size:9.5px;letter-spacing:.12em;font-weight:700;padding:8px 0;cursor:pointer;
+    color:#21252d;background:linear-gradient(180deg,var(--steel-hi),var(--steel-lo));
+    border:1px solid #30353f;border-radius:3px 3px 0 0;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.4);}
+  .tabRow button.on{background:linear-gradient(180deg,#cfd6df,#8a93a0);box-shadow:inset 0 1px 0 #fff,0 0 8px rgba(232,182,76,.35);}
+  #paneHolder{flex:1;overflow-y:auto;margin:0 8px 8px;padding:7px;
+    background:linear-gradient(145deg,#3a4049,#262b33);
+    border:1px solid #353a44;border-top:none;border-radius:0 0 3px 3px;
+    box-shadow:inset 0 2px 8px rgba(0,0,0,.5);}
+  .tab{display:none;flex-direction:column;gap:7px;}
+  .tab.on{display:flex;}
+  h3.sec{font-size:9px;letter-spacing:.22em;color:#9aa6b2;font-weight:700;margin:3px 0 0;text-shadow:0 1px 0 #000;}
+  .btnGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;}
+  button.cmd{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;
+    padding:4px 2px 5px;cursor:pointer;font:inherit;
+    background:linear-gradient(180deg,#2d3540,#1b212a);
+    border:1px solid #424a56;border-radius:2px;color:var(--ink);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 1px 2px rgba(0,0,0,.5);}
+  button.cmd canvas{display:block;background:linear-gradient(180deg,#15314a 0%,#0e1f30 60%,#13270f 100%);
+    border:1px solid #000;border-radius:1px;}
+  button.cmd .lbl{font-size:8.2px;letter-spacing:.04em;line-height:1.15;text-align:center;color:#c8d4dc;}
+  button.cmd .cost{font-size:8px;color:var(--gold);}
+  button.cmd:hover:not(:disabled){border-color:var(--gold);box-shadow:0 0 7px rgba(232,182,76,.35);}
+  button.cmd:disabled{opacity:.32;cursor:default;filter:grayscale(.6);}
+  button.cmd.armed{border-color:var(--gold);box-shadow:0 0 10px rgba(232,182,76,.6) inset;}
+  button.cmd .cd{position:absolute;left:0;bottom:0;height:3px;background:var(--gold);width:0%;}
+  button.cmd .key{position:absolute;top:2px;right:4px;font-size:8px;color:var(--dim);}
+  button.cmd .qbadge{position:absolute;top:2px;left:4px;font-size:8px;color:var(--green);font-weight:700;}
+  /* diplomacy */
+  .dipRow{background:linear-gradient(180deg,#222831,#181d24);border:1px solid #3a414d;padding:7px 8px;border-radius:2px;}
+  .dipRow .hd{display:flex;align-items:center;gap:7px;font-size:10.5px;}
+  .dipRow .sw{width:9px;height:9px;border-radius:2px;box-shadow:0 0 5px currentColor;}
+  .dipRow .st{margin-left:auto;font-size:8.5px;letter-spacing:.14em;font-weight:700;}
+  .st.WAR{color:var(--p2);} .st.NEUTRAL{color:var(--dim);} .st.ALLIED{color:var(--green);} .st.GONE{color:#555;}
+  .relBar{height:6px;background:#0a0d11;border:1px solid #3a414d;margin:6px 0;position:relative;border-radius:2px;}
+  .relBar .fill{position:absolute;top:0;bottom:0;border-radius:2px;}
+  .relBar .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:#666;}
+  .dipBtns{display:flex;gap:4px;}
+  .dipBtns button{flex:1;font:inherit;font-size:8.5px;padding:5px 2px;cursor:pointer;letter-spacing:.04em;
+    background:linear-gradient(180deg,#39414d,#262c35);border:1px solid #4a5260;color:var(--ink);border-radius:2px;}
+  .dipBtns button:hover:not(:disabled){border-color:var(--gold);}
+  .dipBtns button:disabled{opacity:.3;cursor:default;}
+  .dipBtns button.active{color:var(--gold);border-color:var(--gold);}
+  .chips{display:flex;gap:4px;}
+  .chips button{flex:1;font:inherit;font-size:8.5px;padding:6px 2px;cursor:pointer;letter-spacing:.04em;
+    background:linear-gradient(180deg,#2d3540,#1b212a);border:1px solid #424a56;color:var(--dim);border-radius:2px;}
+  .chips button.on{color:#fff;box-shadow:0 0 7px currentColor;}
+  #log{font-size:9.6px;color:#93a2ae;line-height:1.6;padding:5px 8px;min-height:74px;max-height:104px;overflow:hidden;}
+  #log .hot{color:var(--gold);} #log .war{color:#ff7d70;} #log .good{color:var(--green);}
+  /* overlays */
+  .overlay{position:absolute;inset:0;background:rgba(4,6,9,.93);z-index:20;display:flex;align-items:center;justify-content:center;}
+  .panelBox{width:min(660px,92%);max-height:92vh;overflow-y:auto;padding:26px 32px;
+    background:linear-gradient(180deg,#20262f,#14181f);border:1px solid #4a5260;border-radius:4px;
+    box-shadow:0 0 0 4px #2b303a,0 0 60px rgba(0,0,0,.8);}
+  .panelBox h1{font-size:25px;letter-spacing:.26em;color:var(--gold);font-weight:700;text-shadow:0 0 16px rgba(232,182,76,.4);}
+  .panelBox h1 span{color:var(--ink);}
+  .panelBox h2{font-size:11.5px;letter-spacing:.2em;color:var(--dim);margin:4px 0 14px;font-weight:400;}
+  .panelBox p,.panelBox li{font-size:12px;line-height:1.7;}
+  .panelBox ul{margin:8px 0 12px 16px;}
+  .panelBox kbd{background:#0d1117;border:1px solid #3a414d;padding:1px 5px;font:inherit;font-size:10.5px;color:var(--gold);border-radius:2px;}
+  .facList{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 14px;}
+  .facCard{border:1px solid #3a414d;border-left-width:3px;padding:8px 10px;font-size:10.8px;line-height:1.55;background:rgba(0,0,0,.25);}
+  .facCard b{display:block;letter-spacing:.1em;}
+  .panelBox .go{display:block;width:100%;margin-top:8px;border:1px solid #1a1d14;cursor:pointer;
+    background:linear-gradient(180deg,#f0c25e,#b9893a);color:#1c1606;
+    font:inherit;font-weight:700;letter-spacing:.18em;font-size:13px;padding:13px;border-radius:3px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 2px 6px rgba(0,0,0,.5);}
+  .panelBox .go:hover{filter:brightness(1.1);}
+  #endOverlay{display:none;}
+  #endOverlay h1.win{color:var(--green);} #endOverlay h1.lose{color:var(--p2);}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="gameArea">
+    <!-- Phaser injects its WebGL canvas here -->
+    <div id="topbar">
+      <div class="stat">▣ DATA <b id="uiData">0</b></div>
+      <div class="stat" id="uiTradeWrap" style="display:none">TRADE <b id="uiTrade">+0/s</b></div>
+      <div class="stat">UPTIME <b id="uiTime">00:00</b></div>
+      <div class="spacer"></div>
+      <div class="stat" id="uiHint"></div>
+      <button id="restartBtn" title="Restart with a brand new random map">⟳ NEW MAP / RESTART</button>
+    </div>
+
+    <div class="overlay" id="introOverlay">
+      <div class="panelBox">
+        <h1>NEXUS <span>COMMAND</span></h1>
+        <h2>WEBGL BUILD // RANDOM BATTLEFIELDS // FOUR FACTIONS</h2>
+        <p>Every battle is fought on a freshly generated battlefield — rivers, bridges, forests, rock ridges, and golden data-crystal fields. Harvest, build, scheme, and conquer.</p>
+        <div class="facList">
+          <div class="facCard" style="border-left-color:var(--p2)"><b style="color:var(--p2)">HELIX COMBINE</b>Militarist warlords. They will come for you.</div>
+          <div class="facCard" style="border-left-color:var(--p3)"><b style="color:var(--p3)">AURUM SYNDICATE</b>Merchant cartel. Trades and allies readily.</div>
+          <div class="facCard" style="border-left-color:var(--p4)"><b style="color:var(--p4)">VANTA CELL</b>Spies. They steal and sabotage — even in peacetime.</div>
+          <div class="facCard" style="border-left-color:var(--p1)"><b style="color:var(--p1)">NEXUS (YOU)</b>Win when everyone left standing is you or your ally.</div>
+        </div>
+        <ul>
+          <li><kbd>Drag</kbd> select · <kbd>Right-click</kbd> move / attack / harvest · <kbd>T</kbd> attack-move · <kbd>1-9</kbd> control groups</li>
+          <li>Scroll with <kbd>W A S D</kbd> / arrows, <kbd>middle-mouse drag</kbd>, or the radar map — the screen never drifts on its own</li>
+          <li><b>DIPLOMACY</b>: gifts, trade pacts (+9/s each), alliances (shared vision, allies join your wars), declarations of war</li>
+          <li><b>OPS</b> (needs Cyber Ops Center): <kbd>E</kbd> EMP · <kbd>H</kbd> Hijack · covert theft, sabotage, recon, incitement</li>
+          <li>Forests, rock and water block movement — fight for the bridges. <kbd>⟳</kbd> up top regenerates the world.</li>
+        </ul>
+        <button class="go" id="startBtn">DEPLOY</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="endOverlay">
+      <div class="panelBox">
+        <h1 id="endTitle">VICTORY</h1>
+        <h2 id="endSub"></h2>
+        <p id="endText"></p>
+        <button class="go" id="endBtn">NEW BATTLEFIELD</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="sidebar">
+    <div class="frame"><div class="screenIn" id="credits">
+      <span>▣ <b id="uiDataSide">0</b></span>
+      <span class="pw" id="uiPowerWrap">PWR <b id="uiPower">0/0</b></span>
+    </div></div>
+    <div class="frame"><div class="screenIn"><canvas id="minimap" width="252" height="252"></canvas></div></div>
+    <div class="frame"><div class="screenIn" id="selInfo">Nothing selected.</div></div>
+    <div class="tabRow">
+      <button id="tabBase" class="on">BASE</button>
+      <button id="tabOps">OPS</button>
+      <button id="tabDip">DIPLOMACY</button>
+    </div>
+    <div id="paneHolder">
+      <div class="tab on" id="paneBase">
+        <h3 class="sec">CONSTRUCT</h3>
+        <div class="btnGrid" id="buildBtns"></div>
+        <h3 class="sec">FABRICATE</h3>
+        <div class="btnGrid" id="unitBtns"></div>
+      </div>
+      <div class="tab" id="paneOps">
+        <h3 class="sec">CYBER WARFARE</h3>
+        <div class="btnGrid" id="abilityBtns"></div>
+        <h3 class="sec">COVERT TARGET</h3>
+        <div class="chips" id="covChips"></div>
+        <h3 class="sec">COVERT MISSIONS</h3>
+        <div class="btnGrid" id="covBtns"></div>
+      </div>
+      <div class="tab" id="paneDip">
+        <div id="dipRows" style="display:flex;flex-direction:column;gap:7px;"></div>
+      </div>
+      <h3 class="sec" style="margin-top:8px">BATTLEFIELD FEED</h3>
+      <div class="screenIn" id="log"></div>
+    </div>
+  </div>
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

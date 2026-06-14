@@ -1,0 +1,41 @@
+import Phaser from 'phaser';
+import { BattleScene } from './scene/BattleScene';
+import { game, logMsg as stateLog } from './sim/state';
+import { makeUI, refresh, showEnd, resetOverlays, setRestartHook, setStartHook, logMsg } from './ui/sidebar';
+import { initAudio, sfx } from './audio';
+
+makeUI();
+
+const scene = new BattleScene();
+
+new Phaser.Game({
+  type: Phaser.AUTO,
+  parent: 'gameArea',
+  backgroundColor: '#0a0e08',
+  scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
+  render: { antialias: true, powerPreference: 'high-performance' },
+  scene,
+});
+
+scene.setEndHandler((win) => { showEnd(win); sfx(win ? 'chime' : 'war'); });
+
+setStartHook(() => {
+  initAudio();
+  game.started = true;
+  logMsg('Uplink established. Three networks are watching, Commander.');
+  sfx('click');
+});
+
+setRestartHook(() => {
+  initAudio();
+  resetOverlays();
+  scene.newMatch(true);
+  logMsg('New battlefield generated. Deploy your forces, Commander.');
+  sfx('place');
+});
+
+// keep state's logMsg hook pointed at the live feed even before makeUI hooks bind
+void stateLog;
+
+setInterval(() => { refresh(); }, 130);
+refresh();
