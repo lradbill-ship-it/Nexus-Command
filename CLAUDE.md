@@ -32,6 +32,24 @@ Build **NEXUS COMMAND**: a real-time strategy game in the spirit of Command & Co
 - **Combat**: turret-aim smoothing, waves that scale with time, fog of war (player + allies' vision), win = every surviving faction is you or your ally; lose = all your buildings destroyed.
 - **Slow build-up pacing**: first AI attack ~2.5–3.5 min, escalating size/frequency.
 
+## v4 Phase 3b — Neutral settlements (IMPLEMENTED, branch `feature/v4-phase3b-settlements`)
+
+Lane's item 7 (recruit / persuade / intimidate map population) — DESIGN_SPEC_v4 §3.2. Completes Phase 3.
+
+- **Model**: `Settlement {x,y,pop,owner,capBy,capT,seed}` + `game.settlements`; `mapgen` scatters 7 neutral
+  villages between bases. Each holds a civilian `pop` that joins whoever takes it.
+- **`settlementTick`**: a settlement flips to the single uncontested faction with units within `SETTLE_R`
+  (~6s presence); contested presence stalls it; empty cools it off. Capture grants `pop` to the owner.
+  Troops-only takeover = **intimidate** (−6 happy, resentful); a paid claim = **recruit/persuade** (+6 happy).
+- **`tryRecruit`** (player): right-click a settlement with a unit nearby + 160 crystals → instant peaceful claim.
+  Right-click without funds/range falls through to a normal move (→ presence capture).
+- Owned settlements grant vision (`computeVision`). Render: hut cluster + owner-colour flag + capture-progress
+  ring (`BattleScene.drawSettlements`, depth −40), minimap markers.
+- Verified headlessly: 7 neutral settlements; intimidate flips owner (+14 pop, −happy); paid recruit flips
+  owner (+13 pop, −160 crystals, +happy). `tsc + vite` clean.
+- **Note**: marching troops past a settlement intimidates it (−happy) — intentional occupation cost.
+- **Next: Phase 4** — government / leaders / elections / coups (DESIGN_SPEC_v4 §4).
+
 ## v4 Phase 3a — Civilian population & society (IMPLEMENTED, branch `feature/v4-phase3a-population`)
 
 Lane's item 10 (in-faction population) — DESIGN_SPEC_v4 §3. Population is FLAVOUR/ECONOMY + leverage, **never a win-con**.

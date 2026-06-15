@@ -171,4 +171,21 @@ export function generateMap() {
     const s = NODE_SITES[i];
     spawnResourceField(kind, s.x + jit(), s.y + jit(), 5, 3200, 58);
   }
+  // neutral civilian settlements — capturable population centres scattered between bases
+  game.settlements.length = 0;
+  let sid = 1;
+  const farFromBases = (tx: number, ty: number) => {
+    for (const f of ALL_TEAMS) { const bi = BASE_INFO[f]; if (Math.hypot(tx - bi.tx, ty - bi.ty) < 16) return false; }
+    return true;
+  };
+  for (let n = 0, tries = 0; n < 7 && tries < 400; tries++) {
+    const tx = 8 + (Math.random() * (MAPW - 16) | 0), ty = 8 + (Math.random() * (MAPH - 16) | 0);
+    if (!tPassable(tx, ty) || !farFromBases(tx, ty)) continue;
+    if (game.settlements.some(s => Math.hypot(s.x / TILE - tx, s.y / TILE - ty) < 12)) continue;
+    game.settlements.push({
+      id: sid++, x: tx * TILE + 16, y: ty * TILE + 16,
+      pop: 10 + (Math.random() * 16 | 0), owner: 0, capBy: 0, capT: 0, seed: Math.random(),
+    });
+    n++;
+  }
 }

@@ -29,6 +29,7 @@ export class BattleScene extends Phaser.Scene {
   private fogImg!: Phaser.GameObjects.Image;
   private fxAdd!: Phaser.GameObjects.Graphics;
   private fxNorm!: Phaser.GameObjects.Graphics;
+  private settleGfx!: Phaser.GameObjects.Graphics;
   private overlay!: Phaser.GameObjects.Graphics;
   private recs = new Map<number, SpriteRec>();
   private crystals = new Map<object, { spr: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image }>();
@@ -53,6 +54,7 @@ export class BattleScene extends Phaser.Scene {
 
     // layers
     this.terrainImg = this.add.image(0, 0, '__DEFAULT').setOrigin(0, 0).setDepth(-100);
+    this.settleGfx = this.add.graphics().setDepth(-40);   // settlements sit on the ground, under units
     this.fxNorm = this.add.graphics().setDepth(9000);
     this.fxAdd = this.add.graphics().setDepth(9001).setBlendMode(Phaser.BlendModes.ADD);
     this.fogImg = this.add.image(0, 0, '__DEFAULT').setOrigin(0, 0).setDepth(10000);
@@ -209,6 +211,7 @@ export class BattleScene extends Phaser.Scene {
     game.cam.x = this.cameras.main.scrollX; game.cam.y = this.cameras.main.scrollY;
 
     this.syncCrystals();
+    this.drawSettlements();
     this.syncEntities();
     this.drawFx();
     this.drawOverlay();
@@ -301,6 +304,36 @@ export class BattleScene extends Phaser.Scene {
     if (r.barrel) r.barrel.setVisible(vis).setDepth(depth + 0.5).setPosition(u.x, dy).setRotation(u.aim + Math.PI / 2);
     if (r.rotor) r.rotor.setVisible(vis).setDepth(depth + 0.6).setPosition(u.x, dy).setRotation(game.t * 22)
       .setScale(u.type === 'aircraft' ? 1 : 0.6).setAlpha(0.5);
+  }
+
+  private drawSettlements() {
+    const g = this.settleGfx; g.clear();
+    for (const s of game.settlements) {
+      const tx = s.x / TILE | 0, ty = s.y / TILE | 0;
+      if (!game.explored[idx(tx, ty)]) continue;                  // hidden in unexplored fog
+      const dim = !game.visible[idx(tx, ty)];                     // explored-but-not-visible → faded
+      const a = dim ? 0.5 : 1;
+      // little cluster of huts (seeded layout)
+      const huts: [number, number][] = [[-9, 2], [3, -4], [8, 5], [-3, -8], [0, 7]];
+      for (let i = 0; i < 4 + (s.seed * 2 | 0); i++) {
+        const [hx, hy] = huts[i % huts.length];
+        const ox = hx + (s.seed * 13 + i * 7 % 5) - 2;
+        g.fillStyle(0x6b5436, a); g.fillRect(s.x + ox - 4, s.y + hy - 3, 8, 7);
+        g.fillStyle(0x9a8050, a * 0.9); g.fillRect(s.x + ox - 5, s.y + hy - 5, 10, 3);   // roof
+      }
+      // flag — neutral grey, else owner colour
+      const col = s.owner ? Phaser.Display.Color.HexStringToColor(FAC[s.owner].col).color : 0xb8bcc4;
+      g.lineStyle(1.5, 0x2a2018, a); g.lineBetween(s.x + 10, s.y - 14, s.x + 10, s.y + 2);
+      g.fillStyle(col, a); g.fillTriangle(s.x + 10, s.y - 14, s.x + 10, s.y - 7, s.x + 19, s.y - 10.5);
+      // capture progress ring
+      if (s.capT > 0.02 && s.capBy) {
+        const cc = Phaser.Display.Color.HexStringToColor(FAC[s.capBy].col).color;
+        g.lineStyle(2, cc, 0.9); g.beginPath();
+        g.arc(s.x, s.y, 18, -Math.PI / 2, -Math.PI / 2 + s.capT * Math.PI * 2); g.strokePath();
+      } else if (!s.owner) {
+        g.lineStyle(1, 0xb8bcc4, a * 0.5); g.strokeCircle(s.x, s.y, 18);   // neutral marker
+      }
+    }
   }
 
   private syncCrystals() {
@@ -451,6 +484,12 @@ export class BattleScene extends Phaser.Scene {
     }
     for (const b of game.buildings) { if (!canSee(b)) continue; ctx.fillStyle = FAC[b.team].col; ctx.fillRect(b.tx * s, b.ty * s, B[b.type].w * s, B[b.type].h * s); }
     for (const u of game.units) { if (!canSee(u)) continue; ctx.fillStyle = FAC[u.team].col; ctx.fillRect(u.x / TILE * s - 1, u.y / TILE * s - 1, 2.4, 2.4); }
+    // settlements (square markers: grey neutral, else owner colour)
+    for (const st of game.settlements) {
+      if (!game.explored[idx(st.x / TILE | 0, st.y / TILE | 0)]) continue;
+      ctx.fillStyle = st.owner ? FAC[st.owner].col : '#b8bcc4';
+      ctx.fillRect(st.x / TILE * s - 1.5, st.y / TILE * s - 1.5, 3.5, 3.5);
+    }
     // camera viewport box
     const cam = this.cameras.main;
     ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1;

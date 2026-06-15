@@ -6,7 +6,7 @@ import {
 import {
   game, dip, rk, getRel, setRel, addRel, isAllied, isWar, stateOf, logMsg, hint,
 } from './state';
-import type { Building, Unit, Entity, Vec, Particle } from './types';
+import type { Building, Unit, Entity, Vec, Particle, Settlement } from './types';
 import { findPath, passable } from './pathfind';
 import { spawnResourceField } from './mapgen';
 import { sfx } from '../audio';
@@ -116,6 +116,7 @@ export function computeVision() {
   };
   for (const b of game.buildings) if (isAllied(PLAYER, b.team)) stamp(b.x, b.y, B[b.type].sight);
   for (const u of game.units) if (isAllied(PLAYER, u.team)) stamp(u.x, u.y, U[u.type].sight);
+  for (const s of game.settlements) if (s.owner && isAllied(PLAYER, s.owner)) stamp(s.x, s.y, 5);
   game.tempVision = game.tempVision.filter(v => v.until > game.t);
   for (const v of game.tempVision) stamp(v.x, v.y, v.r);
 }
@@ -233,6 +234,48 @@ export function conscript(team: number) {
   const s = freeSpotNear(hq.x, hq.y + hq.h * 0.6 + 18);
   addUnit('infantry', s.x, s.y, team);
   if (team === PLAYER) { logMsg('Conscripted a Rifle Trooper from the population', 'hot'); sfx('place', hq.x); }
+}
+
+// ── Neutral settlements: recruit / persuade / intimidate (DESIGN_SPEC_v4 §3.2) ─
+const SETTLE_R = 4 * TILE;   // capture influence radius
+function captureSettlement(s: Settlement, team: number, militaryOnly: boolean) {
+  const prev = s.owner;
+  s.owner = team; s.capT = 0; s.capBy = 0;
+  game.pop[team] = (game.pop[team] || 0) + s.pop;                 // its citizens join your population
+  // intimidated (troops only) subjects resent it; persuaded/recruited ones welcome it
+  game.happy[team] = clamp((game.happy[team] ?? 60) + (militaryOnly ? -6 : 6), 0, 100);
+  if (team === PLAYER) { logMsg((militaryOnly ? 'Intimidated' : 'Won over') + ' a settlement — +' + s.pop + ' population', 'good'); sfx('chime'); }
+  else if (prev === PLAYER) { logMsg(FAC[team].name + ' has seized one of our settlements', 'war'); sfx('war'); }
+}
+function settlementTick(dt: number) {
+  for (const s of game.settlements) {
+    const army: Record<number, number> = {}, civ: Record<number, number> = {};
+    forNearbyUnits(s.x, s.y, SETTLE_R, (u) => {
+      if (dist(u, s) > SETTLE_R) return;
+      if (U[u.type].harvests) civ[u.team] = (civ[u.team] || 0) + 1; else army[u.team] = (army[u.team] || 0) + 1;
+    });
+    const present = new Set<number>([...Object.keys(army), ...Object.keys(civ)].map(Number));
+    const challengers = [...present].filter(t => t !== s.owner);
+    if (challengers.length === 1) {                                // uncontested takeover
+      const team = challengers[0];
+      s.capBy = team; s.capT += dt / 6;                            // ~6s of presence to flip
+      if (s.capT >= 1) captureSettlement(s, team, !civ[team] && !!army[team]);   // troops-only ⇒ intimidation
+    } else if (present.size === 0) {
+      s.capT = Math.max(0, s.capT - dt / 10); if (s.capT === 0) s.capBy = 0;     // unattended → cools off
+    } else {
+      s.capT = Math.max(0, s.capT - dt / 18);                      // contested → stalls
+    }
+  }
+}
+/** Player pays to instantly win over a settlement near their forces (the "recruit" path). */
+export function tryRecruit(s: Settlement): boolean {
+  const COST = 160;
+  if (s.owner === PLAYER) return false;
+  const near = game.units.some(u => isAllied(PLAYER, u.team) && dist(u, s) < SETTLE_R + 20);
+  if (!near) { hint('Move a unit next to the settlement to recruit it'); return false; }
+  if (game.money[PLAYER] < COST) { hint('Recruiting costs ' + COST + ' crystals'); return false; }
+  game.money[PLAYER] -= COST; captureSettlement(s, PLAYER, false);
+  return true;
 }
 
 // ── Crystal regeneration ──────────────────────────────────────────────────────
@@ -889,6 +932,10 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
     if (f) { f.rally = { x: wx, y: wy }; hint('Rally point set'); }
     return;
   }
+  // right-clicking a settlement you don't own tries to recruit it (paid); on failure,
+  // fall through so the units simply move there and take it by presence.
+  const clickedSettle = game.settlements.find(s => s.owner !== PLAYER && dist(s, { x: wx, y: wy }) < 30);
+  if (clickedSettle && tryRecruit(clickedSettle)) return;
   let tgt: Entity | null = null;
   for (const u of game.units) {
     if (isAllied(PLAYER, u.team)) continue;
@@ -1000,6 +1047,7 @@ export function stepWorld(dt: number) {
   regenCrystals(dt);
   waterStep(dt);
   societyTick(dt);
+  settlementTick(dt);
   computeVision();
   checkEnd();
 }
