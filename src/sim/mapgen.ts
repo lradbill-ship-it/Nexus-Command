@@ -1,13 +1,12 @@
 import {
   TILE, MAPW, MAPH, idx, inMap, clamp,
   T_GRASS, T_DIRT, T_WATER, T_ROCK, T_FOREST, T_BRIDGE, T_ROAD, PASSABLE,
-  BASE_INFO, NODE_SITES, HOME_RES,
+  BASE_INFO, NODE_SITES, HOME_RES, ALL_TEAMS,
 } from './constants';
 import { game } from './state';
 import type { ResourceKind } from './types';
 
-// the "scarce other" home-resource pairing (alloy is no faction's home yet → unused)
-const OTHER: Record<ResourceKind, ResourceKind> = { crystal: 'coolant', coolant: 'crystal', alloy: 'crystal' };
+const SECONDARIES: ResourceKind[] = ['coolant', 'alloy'];   // crystal = universal currency, present at every base
 
 /** Seeded-ish value-noise generator (fresh permutation each call). */
 export function makeNoise() {
@@ -95,7 +94,7 @@ export function generateMap() {
     blob(T, lx | 0, ly | 0, 3 + Math.random() * 4, T_WATER, nD);
   }
   // roads: each base -> center, each node site -> center (guarantees connectivity)
-  const center = { x: 42, y: 42 };
+  const center = { x: MAPW >> 1, y: MAPH >> 1 };
   function carve(ax: number, ay: number, bx: number, by: number) {
     let x = ax, y = ay, guard = 0;
     while ((Math.abs(x - bx) > 1 || Math.abs(y - by) > 1) && guard++ < 500) {
@@ -109,7 +108,7 @@ export function generateMap() {
       }
     }
   }
-  for (const f of [1, 2, 3, 4]) { const bi = BASE_INFO[f]; carve(bi.tx + 1, bi.ty + 1, center.x, center.y); }
+  for (const f of ALL_TEAMS) { const bi = BASE_INFO[f]; carve(bi.tx + 1, bi.ty + 1, center.x, center.y); }
   for (const s of NODE_SITES) carve(s.x, s.y, center.x, center.y);
   // clearings around bases & node sites
   function clear(cx: number, cy: number, r: number) {
@@ -120,7 +119,7 @@ export function generateMap() {
       if (T[i] === T_ROCK || T[i] === T_FOREST || T[i] === T_WATER) T[i] = T_GRASS;
     }
   }
-  for (const f of [1, 2, 3, 4]) { const bi = BASE_INFO[f]; clear(bi.tx + 1, bi.ty + 1, 9); }
+  for (const f of ALL_TEAMS) { const bi = BASE_INFO[f]; clear(bi.tx + 1, bi.ty + 1, 9); }
   for (const s of NODE_SITES) clear(s.x, s.y, 4);
   clear(center.x, center.y, 6);
   // scattered single-tile boulders & dirt patches for visual texture (open grass only)
@@ -145,25 +144,31 @@ export function generateMap() {
       });
     } else if (t === T_WATER) game.waterTiles.push({ x, y });
   }
-  // resource fields — each base rich in its home resource, with scarce caches of the
-  // other two further out; the centre & frontier are contested-rich. Alloy is nobody's
-  // home → it must always be fought for (DESIGN_SPEC_v4 §2.3).
+  // resource fields (DESIGN_SPEC_v4 §2.3). Crystals (the currency) are present at every
+  // base so no faction is starved; each base is RICH in its home secondary and SCARCE in
+  // the other — forcing expansion to the contested centre & frontier for a full economy.
   game.nodes.length = 0;
   const jit = () => Math.random() * 3 - 1.5;
-  for (let i = 0; i < 4; i++) {                                    // corner sites → bases 1..4
-    const s = NODE_SITES[i], home = HOME_RES[i + 1], off = OTHER[home];
-    spawnResourceField(home, s.x + jit(), s.y + jit(), 6, 3600, 64);            // rich home field
-    const ox = s.x + (center.x - s.x) * 0.3, oy = s.y + (center.y - s.y) * 0.3;
-    spawnResourceField(off, ox + jit(), oy + jit(), 2, 1200, 30);              // scarce off-resource starter
-    const ax = s.x + (center.x - s.x) * 0.5, ay = s.y + (center.y - s.y) * 0.5;
-    spawnResourceField('alloy', ax + jit(), ay + jit(), 2, 1200, 30);          // scarce alloy starter (mid-field)
+  for (let i = 0; i < 6; i++) {                                    // NODE_SITES 0-5 → bases 1..6
+    const s = NODE_SITES[i], team = i + 1, home = HOME_RES[team], crystalHome = home === 'crystal';
+    // crystal currency at every base — larger for the two crystal-home factions
+    spawnResourceField('crystal', s.x + jit(), s.y + jit(), crystalHome ? 6 : 4, crystalHome ? 3600 : 2400, crystalHome ? 62 : 50);
+    if (!crystalHome) spawnResourceField(home, s.x + jit(), s.y + jit(), 5, 3200, 52);   // rich home secondary
+    // scarce caches of the secondaries this base lacks, partway toward the centre
+    let f = 0.30;
+    for (const k of SECONDARIES) {
+      if (k === home) continue;
+      const ox = s.x + (center.x - s.x) * f, oy = s.y + (center.y - s.y) * f;
+      spawnResourceField(k, ox + jit(), oy + jit(), 2, 1200, 30);
+      f += 0.14;
+    }
   }
-  spawnResourceField('crystal', center.x - 3, center.y - 1, 6, 4000, 66);      // contested centre…
-  spawnResourceField('coolant', center.x + 3, center.y + 1, 6, 4000, 66);      // …rich in all three…
-  spawnResourceField('alloy', center.x, center.y - 3, 6, 4000, 60);            // …including alloy
-  const mids: [number, ResourceKind][] = [[5, 'alloy'], [6, 'crystal'], [7, 'alloy'], [8, 'coolant']];
+  spawnResourceField('crystal', center.x - 3, center.y - 1, 6, 4200, 66);      // contested centre,
+  spawnResourceField('coolant', center.x + 3, center.y + 1, 6, 4200, 66);      // rich in all three
+  spawnResourceField('alloy', center.x, center.y - 4, 6, 4200, 60);
+  const mids: [number, ResourceKind][] = [[7, 'alloy'], [8, 'coolant'], [9, 'crystal'], [10, 'alloy']];
   for (const [i, kind] of mids) {                                  // frontier sites
     const s = NODE_SITES[i];
-    spawnResourceField(kind, s.x + jit(), s.y + jit(), 5, 3200, 60);
+    spawnResourceField(kind, s.x + jit(), s.y + jit(), 5, 3200, 58);
   }
 }

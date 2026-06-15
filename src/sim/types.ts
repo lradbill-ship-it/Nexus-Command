@@ -47,6 +47,7 @@ export interface Unit {
   finalDest?: Vec;
   repathT: number;
   stuckT: number;
+  acqT?: number;     // target-reacquisition throttle (don't scan every frame)
   lx: number; ly: number;
   cooldown: number;
   disabledUntil: number;
