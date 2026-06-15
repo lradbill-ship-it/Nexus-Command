@@ -1,6 +1,8 @@
 export interface Vec { x: number; y: number; }
 
-export interface CrystalNode {
+export type ResourceKind = 'crystal' | 'coolant';
+export interface ResourceNode {
+  kind: ResourceKind;
   x: number; y: number;
   amount: number; max: number;
   pulse: number; shards: number;
@@ -49,7 +51,7 @@ export interface Unit {
   cooldown: number;
   disabledUntil: number;
   cargo: number;
-  hNode: CrystalNode | null;
+  hNode: ResourceNode | null;
   hState: 'find' | 'go' | 'mine' | 'return' | 'idlewait';
   facing: number;
   aim: number;
@@ -107,7 +109,7 @@ export interface GameState {
   units: Unit[];
   shots: Shot[];
   parts: Particle[];
-  nodes: CrystalNode[];
+  nodes: ResourceNode[];
   trees: Tree[];
   waterTiles: { x: number; y: number }[];
   terr: Uint8Array;

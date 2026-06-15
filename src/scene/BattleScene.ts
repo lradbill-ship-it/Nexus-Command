@@ -309,8 +309,9 @@ export class BattleScene extends Phaser.Scene {
       live.add(n);
       let c = this.crystals.get(n);
       if (!c) {
-        const glow = this.add.image(n.x, n.y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(0x9bd4ff).setDepth(-51);
-        const spr = this.add.image(n.x, n.y, 'crystal').setDepth(-50);
+        const coolant = n.kind === 'coolant';
+        const glow = this.add.image(n.x, n.y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(coolant ? 0x7fe6f0 : 0x9bd4ff).setDepth(-51);
+        const spr = this.add.image(n.x, n.y, coolant ? 'coolant' : 'crystal').setDepth(-50);
         c = { spr, glow }; this.crystals.set(n, c);
       }
       const p = 0.6 + 0.4 * Math.sin(game.t * 2 + n.pulse);
@@ -396,9 +397,9 @@ export class BattleScene extends Phaser.Scene {
       const d = U[u.type], col = Phaser.Display.Color.HexStringToColor(FAC[u.team].col).color;
       if (sel.has(u)) drawBr(u.x, u.y, d.radius + 7);
       if (u.hp < u.hpMax || sel.has(u)) drawHp(u.x, u.y - d.radius - 9, 22, u.hp / u.hpMax, col);
-      if (u.type === 'harvester' && u.cargo > 0) {
-        const f = u.cargo / U.harvester.cargo!;
-        g.fillStyle(0x9bd4ff, 0.85); g.fillRect(u.x - 6, u.y + d.radius + 2, 12 * f, 2);
+      if (d.harvests && u.cargo > 0) {
+        const f = u.cargo / d.cargo!;
+        g.fillStyle(d.harvests === 'coolant' ? 0x7fe6f0 : 0x9bd4ff, 0.85); g.fillRect(u.x - 6, u.y + d.radius + 2, 12 * f, 2);
       }
     }
     // placement ghost
@@ -442,8 +443,10 @@ export class BattleScene extends Phaser.Scene {
     ctx.fillStyle = '#04070c'; ctx.fillRect(0, 0, this.mm.width, this.mm.height);
     ctx.fillStyle = '#1a2b1e';
     for (let y = 0; y < MAPH; y++) for (let x = 0; x < MAPW; x++) if (game.explored[idx(x, y)]) ctx.fillRect(x * s, y * s, s + 0.5, s + 0.5);
-    ctx.fillStyle = '#9bd4ff';
-    for (const nd of game.nodes) if (nd.amount > 0 && game.explored[idx(nd.x / TILE | 0, nd.y / TILE | 0)]) ctx.fillRect(nd.x / TILE * s - 1, nd.y / TILE * s - 1, 3, 3);
+    for (const nd of game.nodes) if (nd.amount > 0 && game.explored[idx(nd.x / TILE | 0, nd.y / TILE | 0)]) {
+      ctx.fillStyle = nd.kind === 'coolant' ? '#7fe6f0' : '#9bd4ff';
+      ctx.fillRect(nd.x / TILE * s - 1, nd.y / TILE * s - 1, 3, 3);
+    }
     for (const b of game.buildings) { if (!canSee(b)) continue; ctx.fillStyle = FAC[b.team].col; ctx.fillRect(b.tx * s, b.ty * s, B[b.type].w * s, B[b.type].h * s); }
     for (const u of game.units) { if (!canSee(u)) continue; ctx.fillStyle = FAC[u.team].col; ctx.fillRect(u.x / TILE * s - 1, u.y / TILE * s - 1, 2.4, 2.4); }
     // camera viewport box

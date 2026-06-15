@@ -54,6 +54,26 @@ export function buildCrystal(scene: Phaser.Scene) {
   addCanvas(scene, 'crystal', c, 20, 22);
 }
 
+// ── Coolant well (teal liquid pool + condensate spires) ──────────────────────
+export function buildCoolant(scene: Phaser.Scene) {
+  const [c, g] = mk(40, 40);
+  const cx = 20, cy = 24;
+  // liquid pool
+  const pool = g.createRadialGradient(cx, cy, 1, cx, cy, 14);
+  pool.addColorStop(0, 'rgba(150,235,245,.95)'); pool.addColorStop(0.6, 'rgba(40,150,180,.85)'); pool.addColorStop(1, 'rgba(18,70,95,.5)');
+  g.fillStyle = pool; g.beginPath(); g.ellipse(cx, cy, 14, 8, 0, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(190,245,255,.7)'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(cx, cy, 14, 8, 0, 0, 7); g.stroke();
+  // frozen condensate spires rising from the pool
+  for (const [dx, h] of [[-6, 13], [2, 17], [8, 11]]) {
+    const x = cx + dx;
+    g.fillStyle = 'rgba(120,205,225,.9)';
+    g.beginPath(); g.moveTo(x, cy - h); g.lineTo(x + 3.5, cy - 1); g.lineTo(x - 3.5, cy - 1); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(225,250,255,.85)';
+    g.beginPath(); g.moveTo(x, cy - h); g.lineTo(x + 1.4, cy - h * 0.4); g.lineTo(x - 1.4, cy - h * 0.4); g.closePath(); g.fill();
+  }
+  addCanvas(scene, 'coolant', c, 20, 24);
+}
+
 // ── Buildings (pseudo-3D, faction-trimmed) ───────────────────────────────────
 const PAD = 10;
 function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number, number] {
@@ -164,6 +184,15 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.strokeStyle = 'rgba(155,212,255,.5)'; g.strokeRect(cx - 6, cy - 7, 12, 13);
     g.fillStyle = `rgba(${rgb},.8)`; g.fillRect(cx - 12, cy + 4, 2.5, 5); g.fillRect(cx + 9.5, cy + 4, 2.5, 5);
     g.fillStyle = '#9fb6c8'; g.fillRect(cx - 7, cy - 16, 14, 4);
+  } else if (type === 'tanker') {
+    // coolant tanker: rounded hull + cylindrical teal tank drum
+    rr(g, cx - 10, cy - 13, 20, 26, 6); g.fill(); g.stroke();
+    const tank = g.createLinearGradient(cx - 8, 0, cx + 8, 0);
+    tank.addColorStop(0, 'rgba(40,120,150,.95)'); tank.addColorStop(0.5, 'rgba(140,225,240,.95)'); tank.addColorStop(1, 'rgba(40,120,150,.95)');
+    g.fillStyle = tank; rr(g, cx - 8, cy - 9, 16, 18, 7); g.fill();
+    g.strokeStyle = 'rgba(210,250,255,.7)'; g.lineWidth = 1; g.beginPath(); g.moveTo(cx - 8, cy); g.lineTo(cx + 8, cy); g.stroke();
+    g.fillStyle = `rgba(${rgb},.8)`; g.fillRect(cx - 12, cy + 4, 2.5, 5); g.fillRect(cx + 9.5, cy + 4, 2.5, 5);
+    g.fillStyle = '#7fd6ea'; g.fillRect(cx - 6, cy - 16, 12, 4);
   } else if (type === 'recon') {
     // quadcopter: 4 rotor rings + slim core
     g.strokeStyle = 'rgba(200,225,235,.5)'; g.lineWidth = 1.4;
@@ -273,7 +302,7 @@ function buildSpinners(scene: Phaser.Scene) {
 
 /** Build every entity texture for all four factions. Call once after the scene boots. */
 export function buildAllTextures(scene: Phaser.Scene) {
-  buildGlow(scene); buildCrystal(scene); buildSpinners(scene);
+  buildGlow(scene); buildCrystal(scene); buildCoolant(scene); buildSpinners(scene);
   for (const team of ALL_TEAMS) {
     for (const type of Object.keys(B)) {
       const [c, cx, cy] = buildingCanvas(type, team); addCanvas(scene, `b_${type}_${team}`, c, cx, cy);

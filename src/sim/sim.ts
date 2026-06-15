@@ -8,7 +8,7 @@ import {
 } from './state';
 import type { Building, Unit, Entity, Vec, Particle } from './types';
 import { findPath, passable } from './pathfind';
-import { spawnCrystalField } from './mapgen';
+import { spawnResourceField } from './mapgen';
 import { sfx } from '../audio';
 
 // ── Renderer / UI hooks (sim never imports the renderer or DOM directly) ──────
@@ -187,8 +187,9 @@ function regenCrystals(dt: number) {
     if (!passable(tx, ty)) continue;
     if (!farFromBuildings(wx, wy, 6)) continue;
     if (game.nodes.some(n => n.amount > 0 && dist(n, { x: wx, y: wy }) < 5 * TILE)) continue;
-    spawnCrystalField(tx, ty, 3 + (Math.random() * 3 | 0), 2400 + Math.random() * 1200, 46);
-    logMsg('New data-crystal formation detected on the grid', 'good');
+    const kind = Math.random() < 0.5 ? 'crystal' : 'coolant';
+    spawnResourceField(kind, tx, ty, 3 + (Math.random() * 3 | 0), 2400 + Math.random() * 1200, 46);
+    logMsg('New ' + (kind === 'crystal' ? 'data-crystal' : 'coolant') + ' formation detected on the grid', 'good');
     sfx('chime');
     return;
   }
@@ -307,9 +308,11 @@ function separation() {
   }
 }
 
-// ── Harvesting ───────────────────────────────────────────────────────────────
+// ── Harvesting (resource-typed: harvester=crystal, tanker=coolant) ────────────
+const resOf = (u: Unit) => U[u.type].harvests!;
 function nearestNodePathable(u: Unit) {
-  const sorted = [...game.nodes].filter(n => n.amount > 0).sort((a, b) => dist(u, a) - dist(u, b));
+  const kind = resOf(u);
+  const sorted = game.nodes.filter(n => n.amount > 0 && n.kind === kind).sort((a, b) => dist(u, a) - dist(u, b));
   for (let i = 0; i < Math.min(4, sorted.length); i++) {
     const p = findPath(u.x, u.y, sorted[i].x, sorted[i].y);
     if (p) return { node: sorted[i], path: p };
@@ -317,16 +320,18 @@ function nearestNodePathable(u: Unit) {
   return null;
 }
 function nearestDepot(u: Unit): Building | null {
+  const kind = resOf(u);
   let best: Building | null = null, bd = 1e9;
   for (const b of game.buildings) {
     if (b.team !== u.team || b.progress < 1) continue;
-    if (b.type !== 'refinery' && b.type !== 'hq') continue;
+    if (b.type !== 'hq' && B[b.type].accepts !== kind) continue;   // HQ takes any resource
     const d = dist(u, b); if (d < bd) { bd = d; best = b; }
   }
   return best;
 }
 function updateHarvester(u: Unit, dt: number) {
-  const cap = U.harvester.cargo!;
+  const cap = U[u.type].cargo!;
+  const kind = resOf(u);
   if (u.hState === 'find') {
     const got = nearestNodePathable(u);
     if (got) { u.hNode = got.node; u.path = got.path; u.finalDest = { x: got.node.x, y: got.node.y }; u.hState = 'go'; }
@@ -342,7 +347,7 @@ function updateHarvester(u: Unit, dt: number) {
     if (!u.hNode || u.hNode.amount <= 0) { u.hState = 'find'; return; }
     const take = Math.min(62 * dt, u.hNode.amount, cap - u.cargo);
     u.hNode.amount -= take; u.cargo += take;
-    if (Math.random() < dt * 6) spawnParts('spark', u.hNode.x, u.hNode.y - 4, 1, '255,220,120');
+    if (Math.random() < dt * 6) spawnParts('spark', u.hNode.x, u.hNode.y - 4, 1, kind === 'crystal' ? '255,220,120' : '150,220,235');
     if (u.cargo >= cap - 0.5) {
       u.hState = 'return';
       const dep = nearestDepot(u);
@@ -352,7 +357,9 @@ function updateHarvester(u: Unit, dt: number) {
     const dep = nearestDepot(u);
     if (!dep) { u.hState = 'idlewait'; return; }
     if (dist(u, dep) < Math.max(dep.w, dep.h) / 2 + 26) {
-      game.money[u.team] += Math.round(u.cargo); u.cargo = 0; u.hState = 'find';
+      if (kind === 'crystal') game.money[u.team] += Math.round(u.cargo);
+      else game.water[u.team] = clamp((game.water[u.team] || 0) + u.cargo, 0, WATER_CAP);
+      u.cargo = 0; u.hState = 'find';
       dep.unloadFx = game.t; u.moving = false; u.path = null;
       if (u.team === PLAYER) sfx('cash', dep.x);
     } else followPath(u, dt);
@@ -369,7 +376,7 @@ function updateUnit(u: Unit, dt: number) {
   if (u.target && !u.target.dead) want = Math.atan2(u.target.y - u.y, u.target.x - u.x);
   const da = ((want - u.aim + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
   u.aim += clamp(da, -7 * dt, 7 * dt);
-  if (u.type === 'harvester') {
+  if (U[u.type].harvests) {
     if (u.order === 'move' && u.dest) {
       if (followPath(u, dt)) { u.order = 'idle'; u.hState = 'find'; u.dest = null; }
       return;
@@ -423,10 +430,10 @@ function updateBuilding(b: Building, dt: number) {
     if (b.progress >= 1) {
       b.hp = d.hp;
       if (b.team === PLAYER) { logMsg(d.name + ' online', 'good'); sfx('place', b.x); }
-      if (b.type === 'refinery') {
+      if (d.freeUnit) {
         const s = freeSpotNear(b.x, b.y + b.h);
-        addUnit('harvester', s.x, s.y, b.team);
-        if (b.team === PLAYER) logMsg('Harvester deployed', 'good');
+        addUnit(d.freeUnit, s.x, s.y, b.team);
+        if (b.team === PLAYER) logMsg(U[d.freeUnit].name + ' deployed', 'good');
       }
     }
     return;
@@ -681,11 +688,14 @@ function aiUpdate(team: number, dt: number) {
   if (game.t > 320) game.money[team] += 6 * dt;
   if (FAC[team].persona === 'merchant') game.money[team] += 4 * dt;
   const harv = game.units.filter(u => u.team === team && u.type === 'harvester').length;
+  const tankers = game.units.filter(u => u.team === team && u.type === 'tanker').length;
+  const hasCoolantDepot = game.buildings.some(b => b.team === team && b.type === 'pump' && b.progress >= 1);
   const foundries = game.buildings.filter(b => b.team === team && b.type === 'foundry' && b.progress >= 1);
-  if (harv < 2 && game.money[team] > 700 && foundries.length && foundries[0].queue.length === 0) {
-    foundries[0].queue.push('harvester'); game.money[team] -= U.harvester.cost;
+  if (foundries.length && foundries[0].queue.length === 0) {
+    if (harv < 2 && game.money[team] > 700) { foundries[0].queue.push('harvester'); game.money[team] -= U.harvester.cost; }
+    else if (hasCoolantDepot && tankers < 2 && game.money[team] > 800) { foundries[0].queue.push('tanker'); game.money[team] -= U.tanker.cost; }
   }
-  const army = game.units.filter(u => u.team === team && u.type !== 'harvester');
+  const army = game.units.filter(u => u.team === team && !U[u.type].harvests);
   const countType = (t: string) => game.units.reduce((s, u) => s + (u.team === team && u.type === t ? 1 : 0), 0);
   if (foundries.length && game.money[team] > 900) {
     const f = foundries.find(fo => fo.queue.length < 2);
@@ -780,13 +790,14 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
   }
   let i = 0;
   for (const u of sel) {
-    if (tgt && u.type !== 'harvester' && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; setPath(u, tgt.x, tgt.y); }
-    else if (node && u.type === 'harvester') { u.hNode = node; u.hState = 'go'; u.order = 'idle'; setPath(u, node.x, node.y); }
+    const harvester = !!U[u.type].harvests;
+    if (tgt && !harvester && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; setPath(u, tgt.x, tgt.y); }
+    else if (node && harvester && node.kind === U[u.type].harvests) { u.hNode = node; u.hState = 'go'; u.order = 'idle'; setPath(u, node.x, node.y); }
     else {
       const a = (i / sel.length) * Math.PI * 2, r = i === 0 ? 0 : 14 + 8 * Math.sqrt(i);
       const dx = wx + Math.cos(a) * r, dy = wy + Math.sin(a) * r;
       u.dest = { x: dx, y: dy };
-      u.order = fromAmove && u.type !== 'harvester' ? 'amove' : 'move'; u.target = null;
+      u.order = fromAmove && !harvester ? 'amove' : 'move'; u.target = null;
       setPath(u, dx, dy);
     }
     i++;
@@ -846,6 +857,12 @@ export function stepWorld(dt: number) {
   for (const k in game.covCd) game.covCd[k] = Math.max(0, game.covCd[k] - dt);
   game.money[PLAYER] += tradeIncome(PLAYER) * dt;
   for (const f of AIS) if (!game.eliminated[f]) game.money[f] += tradeIncome(f) * dt;
+  // coolant also flows across trade pacts (all resources are tradeable)
+  for (const team of ALL_TEAMS) {
+    if (game.eliminated[team]) continue;
+    let partners = 0; for (const f of ALL_TEAMS) if (f !== team && dip.trade[rk(team, f)] && !game.eliminated[f]) partners++;
+    if (partners) game.water[team] = clamp((game.water[team] || 0) + partners * 6 * dt, 0, WATER_CAP);
+  }
   for (const u of game.units) updateUnit(u, dt);
   for (const u of game.units) postAttackCleanup(u);
   separation();

@@ -1,9 +1,12 @@
 import {
   TILE, MAPW, MAPH, idx, inMap, clamp,
   T_GRASS, T_DIRT, T_WATER, T_ROCK, T_FOREST, T_BRIDGE, T_ROAD, PASSABLE,
-  BASE_INFO, NODE_SITES,
+  BASE_INFO, NODE_SITES, HOME_RES,
 } from './constants';
 import { game } from './state';
+import type { ResourceKind } from './types';
+
+const OTHER: Record<ResourceKind, ResourceKind> = { crystal: 'coolant', coolant: 'crystal' };
 
 /** Seeded-ish value-noise generator (fresh permutation each call). */
 export function makeNoise() {
@@ -37,8 +40,8 @@ function blob(T: Uint8Array, cx: number, cy: number, r: number, t: number, n: (x
   }
 }
 
-/** Place one data-crystal field around (cx,cy) in tile space. Shared by mapgen + live regen. */
-export function spawnCrystalField(cx: number, cy: number, count: number, amount: number, spread = 62) {
+/** Place one resource field of `kind` around (cx,cy) in tile space. Shared by mapgen + live regen. */
+export function spawnResourceField(kind: ResourceKind, cx: number, cy: number, count: number, amount: number, spread = 62) {
   for (let i = 0; i < count; i++) {
     let nx = cx * TILE, ny = cy * TILE, tries = 0;
     do {
@@ -46,7 +49,7 @@ export function spawnCrystalField(cx: number, cy: number, count: number, amount:
       nx = cx * TILE + Math.cos(a) * r; ny = cy * TILE + Math.sin(a) * r;
     } while (!tPassable(nx / TILE | 0, ny / TILE | 0) && ++tries < 20);
     game.nodes.push({
-      x: nx, y: ny, amount, max: amount,
+      kind, x: nx, y: ny, amount, max: amount,
       pulse: Math.random() * 6, shards: 2 + (Math.random() * 4 | 0),
     });
   }
@@ -141,11 +144,21 @@ export function generateMap() {
       });
     } else if (t === T_WATER) game.waterTiles.push({ x, y });
   }
-  // data crystal fields — centers jittered slightly each match (still inside the cleared ring)
+  // resource fields — biased so each base is rich in its home resource and poor in
+  // the other, the centre is contested-rich in both, and frontier sites alternate.
   game.nodes.length = 0;
-  for (const s of NODE_SITES) {
-    const big = (s.x === 42 && s.y === 42);
-    const jx = s.x + (Math.random() * 3 - 1.5), jy = s.y + (Math.random() * 3 - 1.5);
-    spawnCrystalField(jx, jy, big ? 8 : 5, big ? 4600 : 3300, big ? 90 : 62);
+  const jit = () => Math.random() * 3 - 1.5;
+  for (let i = 0; i < 4; i++) {                                    // corner sites → bases 1..4
+    const s = NODE_SITES[i], home = HOME_RES[i + 1], off = OTHER[home];
+    spawnResourceField(home, s.x + jit(), s.y + jit(), 6, 3600, 64);            // rich home field
+    const ox = s.x + (center.x - s.x) * 0.3, oy = s.y + (center.y - s.y) * 0.3;
+    spawnResourceField(off, ox + jit(), oy + jit(), 2, 1300, 32);              // scarce off-resource starter
+  }
+  spawnResourceField('crystal', center.x - 2, center.y - 1, 7, 4200, 70);      // contested centre…
+  spawnResourceField('coolant', center.x + 2, center.y + 1, 7, 4200, 70);      // …rich in both
+  const mids: [number, ResourceKind][] = [[5, 'coolant'], [6, 'crystal'], [7, 'coolant'], [8, 'crystal']];
+  for (const [i, kind] of mids) {                                  // frontier sites, alternating
+    const s = NODE_SITES[i];
+    spawnResourceField(kind, s.x + jit(), s.y + jit(), 5, 3200, 60);
   }
 }
