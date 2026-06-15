@@ -4,10 +4,10 @@ import {
 import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, setHintHook } from '../sim/state';
 import {
   startPlacing, trainUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
-  hasCyber, powerOf, tradeIncome, waterOf,
+  hasCyber, powerOf, tradeIncome, waterOf, conscript, housingCap,
 } from '../sim/sim';
 
-const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'smelter', 'aaturret', 'cyber'];
+const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'smelter', 'habitat', 'market', 'aaturret', 'cyber'];
 const unitOrder = ['harvester', 'tanker', 'hauler', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'aircraft'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
@@ -23,6 +23,8 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'turret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 9, cy - 5); g.stroke(); }
     else if (type === 'pump') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(127,214,234,.5)'; g.fill(); g.strokeStyle = '#7fd6ea'; g.stroke(); g.beginPath(); g.arc(cx, cy, 4, 0, 7); g.stroke(); }
     else if (type === 'smelter') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(224,161,85,.55)'; g.fill(); g.strokeStyle = '#e0a155'; g.stroke(); g.fillStyle = '#2a2018'; g.fillRect(cx + 5, cy - 9, 3, 7); }
+    else if (type === 'habitat') { g.fillStyle = '#3a4f63'; g.fillRect(13, 11, 14, 9); g.strokeRect(13, 11, 14, 9); g.fillStyle = '#9fd9cc'; g.beginPath(); g.moveTo(12, 11); g.lineTo(20, 5); g.lineTo(28, 11); g.closePath(); g.stroke(); g.fillStyle = '#69d84f'; g.fillRect(18, 15, 4, 5); }
+    else if (type === 'market') { g.fillStyle = '#caa05a'; for (let i = 0; i < 4; i++) { g.fillRect(12 + i * 4, 8, 3, 4); } g.strokeStyle = '#e0c089'; g.strokeRect(12, 12, 16, 8); g.fillStyle = '#9fd9cc'; g.fillRect(14, 14, 3, 4); g.fillRect(23, 14, 3, 4); }
     else if (type === 'aaturret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - 2, cy); g.lineTo(cx + 5, cy - 8); g.moveTo(cx + 2, cy); g.lineTo(cx + 9, cy - 6); g.stroke(); }
     else if (type === 'cyber') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(155,111,232,.5)'; g.fill(); g.strokeStyle = '#b07dff'; g.stroke(); }
   } else {
@@ -117,6 +119,7 @@ export function makeUI() {
       for (const [tb2, pn2] of tabs) { $(tb2).classList.toggle('on', tb2 === tb); $(pn2).classList.toggle('on', pn2 === pn); }
     };
   }
+  ($('conscriptBtn') as HTMLButtonElement).onclick = () => conscript(PLAYER);
   ($('restartBtn') as HTMLButtonElement).onclick = () => restartHook();
   ($('startBtn') as HTMLButtonElement).onclick = () => { $('introOverlay').style.display = 'none'; startHook(); };
   ($('endBtn') as HTMLButtonElement).onclick = () => { $('endOverlay').style.display = 'none'; restartHook(); };
@@ -155,6 +158,12 @@ export function refresh() {
   $('uiWater').textContent = Math.floor(w.stored) + (w.net >= 0 ? ' +' + w.net : ' ' + w.net) + '/s';
   $('uiWaterWrap').className = 'stat' + (game.overheat[PLAYER] ? ' hot' : '');
   $('uiAlloy').textContent = String(Math.floor(game.alloy[PLAYER] || 0));
+  const pop = Math.floor(game.pop[PLAYER] || 0), cap = housingCap(PLAYER), hap = Math.round(game.happy[PLAYER] ?? 60);
+  $('uiPop').textContent = String(pop);
+  $('uiPopCap').textContent = String(cap);
+  $('uiHappyFill').style.width = hap + '%';
+  $('uiHappyTxt').textContent = hap > 70 ? 'thriving' : hap > 45 ? 'content' : hap > 25 ? 'restless' : 'in revolt';
+  ($('conscriptBtn') as HTMLButtonElement).disabled = pop < 15;
   const m = Math.floor(game.t / 60), s = Math.floor(game.t % 60);
   $('uiTime').textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   if (game.t - lastHint > 5) $('uiHint').textContent = '';

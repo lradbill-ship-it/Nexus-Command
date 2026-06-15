@@ -190,6 +190,21 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     g.strokeStyle = '#e0a155'; g.lineWidth = 2; g.beginPath(); g.arc(rcx, rcy, fw * 0.28, 0, 7); g.stroke();
     g.fillStyle = '#2a2018'; g.fillRect(rcx + fw * 0.18, rcy - fh * 0.42, 7, fh * 0.34);   // chimney
     g.fillStyle = 'rgba(255,180,90,.5)'; g.beginPath(); g.arc(rcx, rcy, 4, 0, 7); g.fill();
+  } else if (type === 'habitat') {
+    // residential block: grid of lit apartment windows
+    g.fillStyle = '#1b2430'; rr(g, rcx - fw * 0.32, rcy - fh * 0.3, fw * 0.64, fh * 0.6, 3); g.fill();
+    for (let wy = -1; wy <= 1; wy++) for (let wx = -2; wx <= 2; wx++) {
+      g.fillStyle = Math.random() < 0.6 ? 'rgba(159,217,204,.85)' : 'rgba(40,52,64,.9)';
+      g.fillRect(rcx + wx * 6 - 1.5, rcy + wy * 7 - 1.5, 3.5, 4);
+    }
+    g.fillStyle = '#69d84f'; g.fillRect(rcx - 2, rcy + fh * 0.28, 4, 4);   // green courtyard
+  } else if (type === 'market') {
+    // civic market: striped awning stalls
+    for (let i = -1; i <= 1; i++) {
+      g.fillStyle = i === 0 ? '#caa05a' : '#9fd9cc';
+      g.beginPath(); g.moveTo(rcx + i * 11 - 6, rcy - 2); g.lineTo(rcx + i * 11, rcy - 9); g.lineTo(rcx + i * 11 + 6, rcy - 2); g.closePath(); g.fill();
+      g.fillStyle = '#2a2018'; g.fillRect(rcx + i * 11 - 5, rcy - 2, 10, 8);
+    }
   } else if (type === 'aaturret') {
     // flak base ring with quad missile cells
     g.fillStyle = '#2a3340'; g.beginPath(); g.arc(rcx, rcy, fw * 0.4, 0, 7); g.fill();

@@ -102,6 +102,17 @@
   .chips button{flex:1;font:inherit;font-size:8.5px;padding:6px 2px;cursor:pointer;letter-spacing:.04em;
     background:linear-gradient(180deg,#2d3540,#1b212a);border:1px solid #424a56;color:var(--dim);border-radius:2px;}
   .chips button.on{color:#fff;box-shadow:0 0 7px currentColor;}
+  /* society panel */
+  #society{display:flex;flex-direction:column;gap:5px;}
+  .socRow{display:flex;align-items:center;justify-content:space-between;font-size:10px;letter-spacing:.06em;color:#c8d4dc;}
+  .socRow b{color:#9fd9cc;font-weight:600;}
+  .socRow .dim{color:var(--dim);}
+  .happyBar{height:7px;background:#0a0d11;border:1px solid #3a414d;border-radius:2px;overflow:hidden;}
+  .happyBar .hfill{height:100%;width:60%;background:linear-gradient(90deg,#e8483a,#e9a93d 45%,#69d84f);transition:width .3s;}
+  #conscriptBtn{font:inherit;font-size:9.5px;font-weight:700;letter-spacing:.1em;padding:7px;cursor:pointer;color:#16191f;
+    background:linear-gradient(180deg,#9fd9cc,#5fae9f);border:1px solid #2a463f;border-radius:2px;}
+  #conscriptBtn:hover:not(:disabled){filter:brightness(1.12);}
+  #conscriptBtn:disabled{opacity:.35;cursor:default;filter:grayscale(.5);}
   #log{font-size:9.6px;color:#93a2ae;line-height:1.6;padding:5px 8px;min-height:74px;max-height:104px;overflow:hidden;}
   #log .hot{color:var(--gold);} #log .war{color:#ff7d70;} #log .good{color:var(--green);}
   /* overlays */
@@ -194,6 +205,13 @@
         <div class="btnGrid" id="buildBtns"></div>
         <h3 class="sec">FABRICATE</h3>
         <div class="btnGrid" id="unitBtns"></div>
+        <h3 class="sec">SOCIETY</h3>
+        <div id="society">
+          <div class="socRow"><span>POP <b id="uiPop">0</b><span class="dim">/<span id="uiPopCap">0</span></span></span>
+            <span id="uiHappyTxt" class="dim">content</span></div>
+          <div class="happyBar"><div class="hfill" id="uiHappyFill"></div></div>
+          <button id="conscriptBtn" title="Turn 15 citizens into a Rifle Trooper (costs happiness)">⤒ CONSCRIPT TROOPER</button>
+        </div>
       </div>
       <div class="tab" id="paneOps">
         <h3 class="sec">CYBER WARFARE</h3>

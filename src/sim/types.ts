@@ -106,6 +106,9 @@ export interface GameState {
   water: Record<number, number>;          // stored coolant reserve per team
   alloy: Record<number, number>;          // stored alloy stockpile per team (build-cost resource)
   overheat: Record<number, boolean>;      // true when a team's reserve is dry & in deficit
+  pop: Record<number, number>;            // civilian population per faction (labor + conscription pool)
+  happy: Record<number, number>;          // population happiness 0..100 per faction
+  conscriptPenalty: Record<number, number>; // transient happiness hit from recent conscription
   cam: { x: number; y: number };
   buildings: Building[];
   units: Unit[];

@@ -164,6 +164,77 @@ function waterStep(dt: number) {
   }
 }
 
+// ── Society: civilian population & happiness (DESIGN_SPEC_v4 §3) ──────────────
+// Population is FLAVOUR/ECONOMY + leverage, never a win condition. A happy,
+// well-housed populace works faster (labor) and can be conscripted; an unhappy
+// one strikes (slow economy) and, if neglected, revolts (citizens flee, troops desert).
+export function housingCap(team: number) {
+  let c = 0; for (const b of game.buildings) if (b.team === team && b.progress >= 1) c += B[b.type].house || 0;
+  return c;
+}
+export function civicOf(team: number) {
+  let c = 0; for (const b of game.buildings) if (b.team === team && b.progress >= 1) c += B[b.type].civic || 0;
+  return c;
+}
+function warCount(team: number) {
+  let n = 0; for (const f of ALL_TEAMS) if (f !== team && !game.eliminated[f] && isWar(team, f)) n++;
+  return n;
+}
+/** Happiness target a faction is drifting toward, from housing, economy, civics & war stress. */
+export function happyTarget(team: number) {
+  const cap = housingCap(team), pop = game.pop[team] || 0;
+  let t = 46;
+  t += pop < cap ? 14 : -18;                         // room to grow vs overcrowding
+  t += game.money[team] > 400 ? 10 : (game.money[team] < 80 ? -16 : 0);   // prosperity vs poverty
+  t += Math.min(24, civicOf(team));                  // civic needs met (markets, HQ)
+  t -= warCount(team) * 5;                            // the stress of war
+  t -= game.conscriptPenalty[team] || 0;             // recent forced levies
+  return clamp(t, 0, 100);
+}
+/** Labor multiplier on harvest & build speed — thriving societies out-produce miserable ones. */
+export function laborFactor(team: number) {
+  const h = game.happy[team] ?? 60;
+  const base = clamp(0.7 + h / 100 * 0.5, 0.7, 1.2);  // 0.7 (revolt) … 1.2 (utopia)
+  return (game.pop[team] || 0) < 4 ? Math.min(base, 0.9) : base;   // a ghost town can't fully staff
+}
+function societyTick(dt: number) {
+  for (const team of ALL_TEAMS) {
+    if (game.eliminated[team]) continue;
+    // happiness drifts toward its target
+    const tgt = happyTarget(team);
+    game.happy[team] = clamp((game.happy[team] ?? 60) + clamp(tgt - game.happy[team], -8 * dt, 8 * dt), 0, 100);
+    game.conscriptPenalty[team] = Math.max(0, (game.conscriptPenalty[team] || 0) - 3 * dt);
+    // population grows toward housing when content; emigrates when overcrowded or miserable
+    const cap = housingCap(team), h = game.happy[team];
+    let p = game.pop[team] || 0;
+    if (h > 40 && p < cap) p += (0.6 + h / 100 * 1.4) * dt;        // births / immigration
+    if (p > cap) p -= (p - cap) * 0.06 * dt;                        // overcrowding emigration
+    if (h < 20) p -= (20 - h) * 0.05 * dt;                          // unrest: citizens flee
+    game.pop[team] = Math.max(0, p);
+    // revolt: sustained misery makes troops desert (recoverable, never an instant loss).
+    // Probability scales with how miserable they are, so neglect compounds.
+    if (h < 18 && Math.random() < dt * 0.14 * ((18 - h) / 18)) {
+      const army = game.units.filter(u => u.team === team && !U[u.type].harvests);
+      if (army.length > 3) {
+        const u = army[Math.random() * army.length | 0]; destroy(u, 0);
+        if (team === PLAYER) { logMsg('UNREST — a unit has deserted. Calm your population!', 'war'); sfx('war'); }
+      }
+    }
+  }
+}
+/** Turn civilians into a soldier instantly — the population as a military reserve. */
+export function conscript(team: number) {
+  const COST = 15;
+  if ((game.pop[team] || 0) < COST) { if (team === PLAYER) hint('Not enough population to conscript'); return; }
+  const hq = game.buildings.find(b => b.team === team && b.type === 'hq') || game.buildings.find(b => b.team === team);
+  if (!hq) return;
+  game.pop[team] -= COST;
+  game.conscriptPenalty[team] = Math.min(30, (game.conscriptPenalty[team] || 0) + 5);   // forced levy stings
+  const s = freeSpotNear(hq.x, hq.y + hq.h * 0.6 + 18);
+  addUnit('infantry', s.x, s.y, team);
+  if (team === PLAYER) { logMsg('Conscripted a Rifle Trooper from the population', 'hot'); sfx('place', hq.x); }
+}
+
 // ── Crystal regeneration ──────────────────────────────────────────────────────
 // Living fields slowly regrow, and fresh formations crystallize at random sites
 // over the course of a match so the economy never permanently dries up.
@@ -370,7 +441,7 @@ function updateHarvester(u: Unit, dt: number) {
   } else if (u.hState === 'mine') {
     u.moving = false;
     if (!u.hNode || u.hNode.amount <= 0) { u.hState = 'find'; return; }
-    const take = Math.min(62 * dt, u.hNode.amount, cap - u.cargo);
+    const take = Math.min(62 * laborFactor(u.team) * dt, u.hNode.amount, cap - u.cargo);
     u.hNode.amount -= take; u.cargo += take;
     if (Math.random() < dt * 6) spawnParts('spark', u.hNode.x, u.hNode.y - 4, 1, kind === 'crystal' ? '255,220,120' : '150,220,235');
     if (u.cargo >= cap - 0.5) {
@@ -459,7 +530,7 @@ function updateBuilding(b: Building, dt: number) {
   const d = B[b.type], pw = powerOf(b.team);
   b.anim += dt;
   if (b.progress < 1) {
-    b.progress = Math.min(1, b.progress + dt / (d.buildTime || 1) * pw.factor);
+    b.progress = Math.min(1, b.progress + dt / (d.buildTime || 1) * pw.factor * laborFactor(b.team));
     b.hp = Math.max(b.hp, d.hp * b.progress * 0.999);
     if (b.progress >= 1) {
       b.hp = d.hp;
@@ -487,7 +558,7 @@ function updateBuilding(b: Building, dt: number) {
   if (b.type === 'power' && Math.random() < dt * 1.6)
     spawnParts('steam', b.x - b.w * 0.18, b.y - b.h / 2 - d.hgt, 1, '200,205,210');
   if (b.type === 'foundry' && b.queue.length) {
-    b.queueT += dt * pw.factor;
+    b.queueT += dt * pw.factor * laborFactor(b.team);
     if (Math.random() < dt * 5) spawnParts('spark', b.x + (Math.random() * 30 - 15), b.y + 6, 1, '255,210,120');
     const ut = U[b.queue[0]];
     if (b.queueT >= ut.buildTime) {
@@ -725,6 +796,8 @@ function aiUpdate(team: number, dt: number) {
   if (game.t > 320) game.money[team] += 6 * dt;
   if (persona === 'merchant') game.money[team] += 4 * dt;
   if (persona === 'industrial') game.money[team] += 6 * dt;   // builder economy: steady production edge
+  // conscript from a surplus population when short on crystals (the people as a reserve)
+  if ((game.pop[team] || 0) > 34 && game.money[team] < 500 && Math.random() < dt * 0.25) conscript(team);
   const harv = game.units.filter(u => u.team === team && u.type === 'harvester').length;
   const tankers = game.units.filter(u => u.team === team && u.type === 'tanker').length;
   const haulers = game.units.filter(u => u.team === team && u.type === 'hauler').length;
@@ -926,6 +999,7 @@ export function stepWorld(dt: number) {
   if (dipTickT >= 5) { dipTickT = 0; diplomacyTick(); }
   regenCrystals(dt);
   waterStep(dt);
+  societyTick(dt);
   computeVision();
   checkEnd();
 }
