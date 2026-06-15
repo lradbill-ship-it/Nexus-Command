@@ -4,9 +4,9 @@ import type { GameState, DipState } from './types';
 function createGame(): GameState {
   return {
     started: false, over: false, won: false, t: 0,
-    money: { 1: 1500, 2: 2200, 3: 2400, 4: 2200 },
-    water: { 1: 60, 2: 60, 3: 60, 4: 60 },
-    alloy: { 1: 120, 2: 160, 3: 160, 4: 160 },
+    money: { 1: 1500, 2: 2200, 3: 2200, 4: 2200, 5: 2200, 6: 2200 },
+    water: { 1: 60, 2: 60, 3: 60, 4: 60, 5: 60, 6: 60 },
+    alloy: { 1: 120, 2: 160, 3: 160, 4: 160, 5: 160, 6: 160 },
     overheat: {},
     cam: { x: 0, y: 0 },
     buildings: [], units: [], shots: [], parts: [], nodes: [], trees: [], waterTiles: [],
@@ -40,8 +40,13 @@ export const stateOf = (a: number, b: number) =>
   game.eliminated[b] ? 'GONE' : (isAllied(a, b) ? 'ALLIED' : (isWar(a, b) ? 'WAR' : 'NEUTRAL'));
 
 function applyStartingRelations() {
-  setRel(1, 2, -20); setRel(1, 3, 10); setRel(1, 4, 0);
-  setRel(2, 3, -12); setRel(2, 4, -15); setRel(3, 4, 5);
+  // 15 pairwise relations across the 6 coalitions — a web of warm & cold ties,
+  // none below the −30 war line at start (DESIGN_SPEC_v4 §6).
+  setRel(1, 2, -5); setRel(1, 3, 8); setRel(1, 4, -10); setRel(1, 5, -22); setRel(1, 6, 5);
+  setRel(2, 3, 6); setRel(2, 4, -8); setRel(2, 5, -14); setRel(2, 6, 4);
+  setRel(3, 4, -6); setRel(3, 5, -10); setRel(3, 6, 10);
+  setRel(4, 5, 8); setRel(4, 6, -12);
+  setRel(5, 6, -8);
 }
 applyStartingRelations();
 

@@ -2,16 +2,16 @@ import type { ResourceKind } from './types';
 
 // ── Core grid ────────────────────────────────────────────────────────────────
 export const TILE = 32;
-export const MAPW = 84;
-export const MAPH = 84;
+export const MAPW = 112;
+export const MAPH = 112;
 export const WORLD_W = MAPW * TILE;
 export const WORLD_H = MAPH * TILE;
 
 export const PLAYER = 1;
-export const AIS = [2, 3, 4] as const;
-export const ALL_TEAMS = [1, 2, 3, 4] as const;
+export const AIS = [2, 3, 4, 5, 6] as const;
+export const ALL_TEAMS = [1, 2, 3, 4, 5, 6] as const;
 
-export type Persona = 'player' | 'warlord' | 'merchant' | 'covert';
+export type Persona = 'player' | 'warlord' | 'merchant' | 'covert' | 'industrial';
 
 export interface Faction {
   name: string;
@@ -20,12 +20,15 @@ export interface Faction {
   persona: Persona;
 }
 
-// Colors & personas per DESIGN_SPEC §1
+// 6 regional coalitions (DESIGN_SPEC_v4 §6). Names are geopolitical coalitions;
+// AI persona is a GAMEPLAY archetype, deliberately not a cultural stereotype.
 export const FAC: Record<number, Faction> = {
-  1: { name: 'NEXUS', col: '#3ec8b4', rgb: '62,200,180', persona: 'player' },
-  2: { name: 'HELIX COMBINE', col: '#e8483a', rgb: '232,72,58', persona: 'warlord' },
-  3: { name: 'AURUM SYNDICATE', col: '#e9a93d', rgb: '233,169,61', persona: 'merchant' },
-  4: { name: 'VANTA CELL', col: '#9b6fe8', rgb: '155,111,232', persona: 'covert' },
+  1: { name: 'AMERICAN FEDERATION', col: '#3e7cd8', rgb: '62,124,216', persona: 'player' },
+  2: { name: 'EUROPEAN CONCORD', col: '#cdd6e4', rgb: '205,214,228', persona: 'merchant' },
+  3: { name: 'PAN-AFRICAN UNION', col: '#4faf5a', rgb: '79,175,90', persona: 'industrial' },
+  4: { name: 'GULF COALITION', col: '#e0a83d', rgb: '224,168,61', persona: 'merchant' },
+  5: { name: 'EASTERN BLOC', col: '#e8483a', rgb: '232,72,58', persona: 'warlord' },
+  6: { name: 'OCEANIC LEAGUE', col: '#2fc6c0', rgb: '47,198,192', persona: 'covert' },
 };
 
 // ── Terrain ──────────────────────────────────────────────────────────────────
@@ -108,7 +111,7 @@ export const U: Record<string, UnitDef> = {
   strike: { name: 'Hover Tank', cost: 300, hp: 155, speed: 96, radius: 10, sight: 7, buildTime: 9, dmg: 11, range: 124, rof: 0.8, desc: 'Backbone main battle tank.' },
   artillery: { name: 'Siege Artillery', cost: 850, hp: 200, speed: 50, radius: 12, sight: 6, buildTime: 18, dmg: 58, range: 256, rof: 3.0, splash: 58, coolant: 3, alloy: 350, desc: 'Long-range splash siege. Fragile; needs coolant + alloy.' },
   walker: { name: 'Railgun Walker', cost: 700, hp: 440, speed: 56, radius: 13, sight: 7, buildTime: 16, dmg: 48, range: 182, rof: 2.2, coolant: 4, alloy: 300, desc: 'Quad-legged siege platform. Runs hot; needs alloy.' },
-  aircraft: { name: 'Wraith Gunship', cost: 600, hp: 175, speed: 150, radius: 10, sight: 9, buildTime: 14, dmg: 14, range: 132, rof: 0.7, air: true, antiAir: true, coolant: 5, alloy: 250, desc: 'VTOL gunship. Flies over terrain; needs heavy coolant + alloy.' },
+  aircraft: { name: 'Wraith Gunship', cost: 760, hp: 240, speed: 158, radius: 10, sight: 10, buildTime: 16, dmg: 24, range: 150, rof: 0.6, splash: 26, air: true, antiAir: true, coolant: 6, alloy: 300, desc: 'VTOL gunship. Devastating splash strafes; flies over terrain; heavy coolant + alloy upkeep.' },
 };
 
 export interface AbilityDef { name: string; cost: number; cd: number; key: string; desc: string; }
@@ -125,24 +128,29 @@ export const COVERT: Record<string, CovertDef> = {
   incite: { name: 'Incite War', cost: 700, cd: 120, chance: 0.55, desc: 'Poison relations between the target and another faction (−40). Detection: −25.' },
 };
 
-// ── Base anchors & crystal sites (per DESIGN_SPEC §6) ─────────────────────────
+// ── Base anchors (6 factions around the perimeter of the 112² map) ───────────
 export interface BaseInfo { tx: number; ty: number; sx: number; sy: number; }
 export const BASE_INFO: Record<number, BaseInfo> = {
-  1: { tx: 7, ty: 74, sx: +1, sy: -1 }, // NEXUS  (SW)
-  2: { tx: 74, ty: 7, sx: -1, sy: +1 }, // HELIX  (NE)
-  3: { tx: 74, ty: 74, sx: -1, sy: -1 }, // AURUM  (SE)
-  4: { tx: 7, ty: 7, sx: +1, sy: +1 }, // VANTA  (NW)
+  1: { tx: 14, ty: 78, sx: +1, sy: -1 }, // AMERICAN FEDERATION (SW, player)
+  2: { tx: 14, ty: 30, sx: +1, sy: +1 }, // EUROPEAN CONCORD     (NW)
+  3: { tx: 54, ty: 8,  sx: +1, sy: +1 }, // PAN-AFRICAN UNION    (N)
+  4: { tx: 95, ty: 30, sx: -1, sy: +1 }, // GULF COALITION       (NE)
+  5: { tx: 95, ty: 78, sx: -1, sy: -1 }, // EASTERN BLOC         (SE)
+  6: { tx: 54, ty: 99, sx: +1, sy: -1 }, // OCEANIC LEAGUE       (S)
 };
 
+// Indices 0-5 sit just inside each base toward centre; 6 = centre; 7-10 = frontier.
 export const NODE_SITES = [
-  { x: 17, y: 66 }, { x: 66, y: 17 }, { x: 66, y: 66 }, { x: 17, y: 17 },
-  { x: 42, y: 42 }, { x: 42, y: 13 }, { x: 42, y: 71 }, { x: 13, y: 42 }, { x: 71, y: 42 },
+  { x: 26, y: 70 }, { x: 26, y: 40 }, { x: 56, y: 22 }, { x: 86, y: 40 }, { x: 86, y: 70 }, { x: 56, y: 88 },
+  { x: 56, y: 56 },
+  { x: 38, y: 56 }, { x: 74, y: 56 }, { x: 56, y: 36 }, { x: 56, y: 76 },
 ];
 
-// Each base is RICH in its home resource and POOR in the other → forces expansion
-// toward the contested centre/frontier to balance an economy (DESIGN_SPEC_v4 §2.3).
+// Each base is RICH in its home resource and scarce in the other two → forces
+// expansion toward the contested centre/frontier (DESIGN_SPEC_v4 §2.3). Two
+// factions per resource; alloy split across Europe & the Gulf.
 export const HOME_RES: Record<number, ResourceKind> = {
-  1: 'crystal', 2: 'crystal', 3: 'coolant', 4: 'coolant',
+  1: 'crystal', 2: 'alloy', 3: 'coolant', 4: 'alloy', 5: 'crystal', 6: 'coolant',
 };
 
 export interface AIScriptStep { t: number; type: string; dx: number; dy: number; }

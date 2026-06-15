@@ -80,7 +80,7 @@ function aiPlace(team: number, type: string, dx: number, dy: number, instant: bo
   return false;
 }
 export function setupBases() {
-  for (const team of [1, 2, 3, 4]) {
+  for (const team of ALL_TEAMS) {
     const bi = BASE_INFO[team];
     addBuilding('hq', bi.tx, bi.ty, team, true);
     if (team === PLAYER) {
@@ -133,7 +133,7 @@ export function powerOf(team: number) {
   return { prod, use, ok: prod >= use, factor: prod >= use ? 1 : 0.5 };
 }
 export function tradeIncome(team: number) {
-  let n = 0; for (const f of [1, 2, 3, 4]) if (f !== team && dip.trade[rk(team, f)] && !game.eliminated[f]) n++;
+  let n = 0; for (const f of ALL_TEAMS) if (f !== team && dip.trade[rk(team, f)] && !game.eliminated[f]) n++;
   return n * 9;
 }
 
@@ -242,14 +242,36 @@ function checkElimination(team: number) {
     logMsg(FAC[team].name + ' has been wiped from the battlefield', 'war'); sfx('war');
   }
 }
+// ── Spatial grid — keeps separation & target-acquisition near O(n) at scale ───
+// (the 112² / 6-faction map can field hundreds of units; the old O(n²) scans
+//  spiked frame time in big battles).
+const GCELL = 64;
+const GW = Math.ceil(WORLD_W / GCELL), GH = Math.ceil(WORLD_H / GCELL);
+let unitGrid: Unit[][] = [];
+function rebuildUnitGrid() {
+  unitGrid = new Array(GW * GH);
+  for (let i = 0; i < unitGrid.length; i++) unitGrid[i] = [];
+  for (const u of game.units) {
+    const gx = clamp(u.x / GCELL | 0, 0, GW - 1), gy = clamp(u.y / GCELL | 0, 0, GH - 1);
+    unitGrid[gy * GW + gx].push(u);
+  }
+}
+function forNearbyUnits(x: number, y: number, r: number, fn: (u: Unit) => void) {
+  const cx = clamp(x / GCELL | 0, 0, GW - 1), cy = clamp(y / GCELL | 0, 0, GH - 1);
+  const r0 = Math.ceil(r / GCELL);
+  for (let gy = Math.max(0, cy - r0); gy <= Math.min(GH - 1, cy + r0); gy++)
+    for (let gx = Math.max(0, cx - r0); gx <= Math.min(GW - 1, cx + r0); gx++)
+      for (const u of unitGrid[gy * GW + gx]) fn(u);
+}
+
 function nearestHostile(e: Entity, range: number, team: number, playerVisOnly: boolean): Entity | null {
   let best: Entity | null = null, bd = range;
-  for (const u of game.units) {
-    if (!isWar(team, u.team)) continue;
-    if (!eligibleTarget(e, u)) continue;
-    if (playerVisOnly && !tileVisible(u.x, u.y)) continue;
+  forNearbyUnits(e.x, e.y, range, (u) => {
+    if (!isWar(team, u.team)) return;
+    if (!eligibleTarget(e, u)) return;
+    if (playerVisOnly && !tileVisible(u.x, u.y)) return;
     const d = dist(e, u) - U[u.type].radius; if (d < bd) { bd = d; best = u; }
-  }
+  });
   if (canHitGround(e)) for (const b of game.buildings) {   // flak (airOnly) ignores structures
     if (!isWar(team, b.team)) continue;
     if (playerVisOnly && !tileVisible(b.x, b.y)) continue;
@@ -294,17 +316,20 @@ function followPath(u: Unit, dt: number) {
   return false;
 }
 function separation() {
-  const us = game.units;
-  for (let i = 0; i < us.length; i++) for (let j = i + 1; j < us.length; j++) {
-    const a = us[i], b = us[j];
-    if (U[a.type].air || U[b.type].air) continue;          // air & ground occupy separate layers
-    const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
-    const min = U[a.type].radius + U[b.type].radius;
-    if (d > 0 && d < min) {
-      const push = (min - d) / 2, ux = dx / d, uy = dy / d;
-      if (!unitBlocked(a.x - ux * push, a.y - uy * push)) { a.x -= ux * push; a.y -= uy * push; }
-      if (!unitBlocked(b.x + ux * push, b.y + uy * push)) { b.x += ux * push; b.y += uy * push; }
-    }
+  rebuildUnitGrid();                                       // fresh buckets from post-movement positions
+  for (const a of game.units) {
+    if (U[a.type].air) continue;                           // air & ground occupy separate layers
+    const ar = U[a.type].radius;
+    forNearbyUnits(a.x, a.y, GCELL, (b) => {
+      if (a.id >= b.id || U[b.type].air) return;           // each ground pair resolved once
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+      const min = ar + U[b.type].radius;
+      if (d > 0 && d < min) {
+        const push = (min - d) / 2, ux = dx / d, uy = dy / d;
+        if (!unitBlocked(a.x - ux * push, a.y - uy * push)) { a.x -= ux * push; a.y -= uy * push; }
+        if (!unitBlocked(b.x + ux * push, b.y + uy * push)) { b.x += ux * push; b.y += uy * push; }
+      }
+    });
   }
 }
 
@@ -401,8 +426,12 @@ function updateUnit(u: Unit, dt: number) {
   }
   if ((u.order === 'move' || u.order === 'amove') && u.dest) {
     if (u.order === 'amove') {
-      const t = nearestHostile(u, 210, u.team, u.team === PLAYER);
-      if (t) { u.target = t; u.savedDest = u.dest; u.order = 'attack'; u.resume = 'amove'; return; }
+      u.acqT = (u.acqT || 0) - dt;                         // throttle target scans (~4×/s, not per-frame)
+      if (u.acqT <= 0) {
+        u.acqT = 0.25;
+        const t = nearestHostile(u, 210, u.team, u.team === PLAYER);
+        if (t) { u.target = t; u.savedDest = u.dest; u.order = 'attack'; u.resume = 'amove'; return; }
+      }
     }
     if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; }
     return;
@@ -413,8 +442,12 @@ function updateUnit(u: Unit, dt: number) {
       u.order = 'amove'; u.dest = u.savedDest; setPath(u, u.dest.x, u.dest.y);
       u.resume = null; u.savedDest = null; return;
     }
-    const t = nearestHostile(u, (d.range || 0) + 52, u.team, u.team === PLAYER);
-    if (t) { u.target = t; u.order = 'attack'; }
+    u.acqT = (u.acqT || 0) - dt;                           // throttle idle target scans
+    if (u.acqT <= 0) {
+      u.acqT = 0.3;
+      const t = nearestHostile(u, (d.range || 0) + 52, u.team, u.team === PLAYER);
+      if (t) { u.target = t; u.order = 'attack'; }
+    }
   }
 }
 function postAttackCleanup(u: Unit) {
@@ -623,7 +656,7 @@ export function dipAlly(f: number) {
     logMsg('Alliance with ' + FAC[f].name + ' dissolved', 'war'); sfx('war'); return;
   }
   if (isWar(PLAYER, f)) { hint('They are at war with you'); return; }
-  const need = ({ warlord: 75, merchant: 40, covert: 55 } as Record<string, number>)[FAC[f].persona];
+  const need = ({ warlord: 75, merchant: 40, covert: 55, industrial: 45 } as Record<string, number>)[FAC[f].persona];
   if (getRel(PLAYER, f) >= need) {
     dip.alliance[k] = true; delete dip.trade[k]; addRel(PLAYER, f, 10);
     logMsg('ALLIANCE forged with ' + FAC[f].name + ' — shared vision active', 'good'); sfx('chime');
@@ -639,10 +672,11 @@ export function dipWar(f: number) {
 function diplomacyTick() {
   const targets: Record<string, { 1: number; def: number }> = {
     warlord: { 1: -55, def: -28 }, merchant: { 1: 18, def: 14 }, covert: { 1: -2, def: -2 },
+    industrial: { 1: 6, def: 8 },   // a builder: wary of no one, mildly cooperative
   };
   for (const a of AIS) {
     if (game.eliminated[a]) continue;
-    for (const b of [1, 2, 3, 4]) {
+    for (const b of ALL_TEAMS) {
       if (b === a || game.eliminated[b]) continue;
       const tg2 = targets[FAC[a].persona];
       const want = (b === 1 ? tg2[1] : tg2.def), cur = getRel(a, b);
@@ -652,7 +686,7 @@ function diplomacyTick() {
   for (const k in dip.trade) { const [a, b] = k.split('-').map(Number); addRel(a, b, 1); }
   for (const k in dip.alliance) {
     const [a, b] = k.split('-').map(Number);
-    for (const c of [1, 2, 3, 4]) {
+    for (const c of ALL_TEAMS) {
       if (c === a || c === b) continue;
       if (isWar(a, c)) addRel(b, c, -2.2);
       if (isWar(b, c)) addRel(a, c, -2.2);
@@ -669,7 +703,7 @@ function diplomacyTick() {
       logMsg(FAC[a].name + ' and ' + FAC[b].name + ' have formed an alliance', 'hot');
     }
   }
-  for (const a of [1, 2, 3, 4]) for (const b of [1, 2, 3, 4]) {
+  for (const a of ALL_TEAMS) for (const b of ALL_TEAMS) {
     if (a >= b) continue;
     const k = rk(a, b), st = stateOf(a, b);
     if (lastStates[k] && lastStates[k] !== 'WAR' && st === 'WAR') { logMsg('WAR: ' + FAC[a].name + ' ⚔ ' + FAC[b].name, 'war'); sfx('war'); }
@@ -679,7 +713,8 @@ function diplomacyTick() {
 function aiUpdate(team: number, dt: number) {
   if (game.eliminated[team]) return;
   const ai = game.ai[team];
-  const tShift = FAC[team].persona === 'warlord' ? -25 : (FAC[team].persona === 'merchant' ? 30 : 0);
+  const persona = FAC[team].persona;
+  const tShift = persona === 'warlord' ? -25 : (persona === 'merchant' ? 30 : persona === 'industrial' ? -10 : 0);
   while (ai.builtIdx < AI_SCRIPT.length && game.t >= AI_SCRIPT[ai.builtIdx].t + tShift) {
     const step = AI_SCRIPT[ai.builtIdx]; ai.builtIdx++;
     const ba = B[step.type].alloy || 0;
@@ -688,7 +723,8 @@ function aiUpdate(team: number, dt: number) {
     }
   }
   if (game.t > 320) game.money[team] += 6 * dt;
-  if (FAC[team].persona === 'merchant') game.money[team] += 4 * dt;
+  if (persona === 'merchant') game.money[team] += 4 * dt;
+  if (persona === 'industrial') game.money[team] += 6 * dt;   // builder economy: steady production edge
   const harv = game.units.filter(u => u.team === team && u.type === 'harvester').length;
   const tankers = game.units.filter(u => u.team === team && u.type === 'tanker').length;
   const haulers = game.units.filter(u => u.team === team && u.type === 'hauler').length;
@@ -729,7 +765,7 @@ function aiUpdate(team: number, dt: number) {
     }
   }
   if (game.t >= ai.nextWave) {
-    const enemies = [1, 2, 3, 4].filter(f => f !== team && !game.eliminated[f] && isWar(team, f) && game.buildings.some(b => b.team === f));
+    const enemies = ALL_TEAMS.filter(f => f !== team && !game.eliminated[f] && isWar(team, f) && game.buildings.some(b => b.team === f));
     if (enemies.length) {
       enemies.sort((a, b) => getRel(team, a) - getRel(team, b));
       const tgtTeam = enemies[0];
@@ -751,7 +787,7 @@ function aiUpdate(team: number, dt: number) {
   }
   if (FAC[team].persona === 'covert' && game.t >= ai.covertT) {
     ai.covertT = game.t + 80 + Math.random() * 50;
-    const victims = [1, 2, 3, 4].filter(f => f !== team && !game.eliminated[f] && !isAllied(team, f));
+    const victims = ALL_TEAMS.filter(f => f !== team && !game.eliminated[f] && !isAllied(team, f));
     if (victims.length) {
       victims.sort((a, b) => game.money[b] - game.money[a]);
       const v = victims[0];
@@ -879,9 +915,10 @@ export function stepWorld(dt: number) {
       game.alloy[team] = (game.alloy[team] || 0) + partners * 5 * dt;
     }
   }
+  rebuildUnitGrid();                          // grid for target acquisition this step
   for (const u of game.units) updateUnit(u, dt);
   for (const u of game.units) postAttackCleanup(u);
-  separation();
+  separation();                               // rebuilds the grid from post-movement positions
   for (const b of game.buildings) updateBuilding(b, dt);
   updateShots(dt);
   for (const f of AIS) aiUpdate(f, dt);

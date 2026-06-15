@@ -32,6 +32,26 @@ Build **NEXUS COMMAND**: a real-time strategy game in the spirit of Command & Co
 - **Combat**: turret-aim smoothing, waves that scale with time, fog of war (player + allies' vision), win = every surviving faction is you or your ally; lose = all your buildings destroyed.
 - **Slow build-up pacing**: first AI attack ~2.5–3.5 min, escalating size/frequency.
 
+## v4 Phase 2b — 6 factions + larger map + scarier aircraft (IMPLEMENTED, branch `feature/v4-phase2b-factions`)
+
+Lane round-2 answer #1 (6 factions, world regions) + larger maps + scarier aircraft (D₁).
+
+- **6 regional coalitions** (`FAC`): American Federation (player/balanced), European Concord (merchant),
+  Pan-African Union (industrial), Gulf Coalition (merchant), Eastern Bloc (warlord), Oceanic League (covert).
+  Dignified coalition names; AI persona = gameplay archetype, NOT ethnic stereotype. New `industrial` persona
+  (builder: +economy, wired into diplomacyTick/dipAlly/aiUpdate). `AIS`/`ALL_TEAMS` now 6; all `[1,2,3,4]`
+  literals → `ALL_TEAMS`. 15 pairwise starting relations in `state.ts`.
+- **Larger map**: `MAPW/MAPH` 84→112; 6 perimeter `BASE_INFO` anchors; `NODE_SITES` (0-5 per base, 6 centre,
+  7-10 frontier); `HOME_RES` spreads 3 resources across 6 factions (2 each). mapgen places **crystal at every
+  base** (currency stays viable) + rich home secondary + scarce off-secondaries.
+- **Scarier aircraft**: dmg 14→24, hp 175→240, +splash 26, costlier (760 + 300 alloy).
+- **PERF (important)**: the bigger map + 6 factions field hundreds of units; the old O(n²) `separation` &
+  `nearestHostile` spiked frame time. Added a **uniform spatial grid** (`GCELL=64`, `rebuildUnitGrid`/
+  `forNearbyUnits`) + **throttled target acquisition** (`Unit.acqT`, ~4×/s not per-frame). Headless: ~3.2 ms/step
+  at 171 units (natural economy), game resolves with eliminations. Watch big late-game battles; may want unit caps.
+- Intro overlay updated to 6 factions + 3 resources. Sidebar diplomacy/covert auto-scale via `AIS`.
+- **Next: Phase 3** — population & society (DESIGN_SPEC_v4 §3).
+
 ## v4 Phase 2a — Alloy, the 3rd harvested resource (IMPLEMENTED, branch `feature/v4-phase2-alloy`)
 
 Lane round-2 answer #2 ("3 resources, all harvested"). Mirrors the coolant pipeline.
