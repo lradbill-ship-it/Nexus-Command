@@ -35,11 +35,13 @@ Three pillars: **Conquer the resources → Grow & exploit your people → Lead t
 
 Today: one harvested resource (Data Crystals) + Power (a grid utility) + v3.1 coolant (passively generated). v4 turns this into a **resource map you fight over.**
 
-### 2.1 Resources
-- **Data Crystals** — primary currency (buildings, units). *Harvested* (existing).
-- **Coolant** — now a **harvested liquid** (per **C**), required to run/produce heavy units (walkers, artillery, gunships, flak) and advanced buildings. Overheat penalty stays.
+### 2.1 Resources — THREE, all harvested (Lane: "3, make all of them require harvesting")
+- **Data Crystals** — primary currency (everything costs crystals). *Harvested* (Phase 1 ✓).
+- **Coolant** — *harvested* (Phase 1 ✓); upkeep for heavy units (walkers, artillery, gunships, flak). Overheat penalty stays.
+- **Alloy** — *harvested* (Phase 2). **Secondary build-cost** for advanced units (walker, artillery, aircraft) and key
+  buildings (flak, cyber): they cost crystals **+ alloy**, so a high-tech army requires securing alloy. New **Alloy Hauler**
+  unit + **Smelter** drop-off, mirroring the coolant pipeline.
 - **Power** — unchanged grid utility (produced/consumed, not stockpiled, not traded).
-- ❓ **Optional 3rd resource ("Alloy")** for top-tier units — keeps "rich/poor spawn" interesting with more texture. *Default: ship with 2 harvested resources (Crystals + Coolant); the system is written generically so a 3rd is a data change.*
 
 ### 2.2 Harvesting (generalize the existing pipeline)
 - Refactor the harvester/refinery loop to be **resource-typed**, not crystal-specific:
@@ -84,11 +86,14 @@ Today: one harvested resource (Data Crystals) + Power (a grid utility) + v3.1 co
 
 ## 4. Government & leadership (per **A**, item 9 — a buff/risk layer)
 
-- **Leader + style** chosen at match start (and changeable via election/coup). Style = faction-wide modifier set, e.g.:
-  - **Militarist** (+combat, −economy), **Industrialist** (+production/harvest), **Populist** (+happiness, cheaper recruiting), **Technocrat** (+research/advanced unlocks), **Mercantile** (+trade rates).
-- **Elections** — periodic; **population happiness sways the result**; you can **campaign** (spend resources for influence) or **rig** (covert, risky). Losing an election can swap your style → you adapt.
-- **Coups** — sustained low happiness or a rival's ambition can trigger a **coup attempt** (mini-event you defend against); you can also **launch coups vs AI** as a Cyber-Ops extension to flip their leader/destabilize them. Outcome changes leadership, never an instant game-over (per Lane).
-- ❓ How much **player control vs randomness** in elections/coups, and frequency. *Default: elections every ~12–15 min; coups only when happiness is critically low or via enemy ops.*
+- **Leader + style chosen at match start** (Lane confirmed: pick at game start), changeable later via election/coup. **All
+  five styles ship** (Lane: "all of the above"): **Militarist** (+combat, −economy), **Industrialist** (+production/harvest),
+  **Populist** (+happiness, cheaper recruiting), **Technocrat** (+research/advanced unlocks), **Mercantile** (+trade rates).
+- **Elections** — periodic; **population happiness sways the result**; you can **campaign** (spend resources) or **rig** (covert, risky).
+- **Coups** — low happiness or a rival's ambition triggers a **coup attempt** (defend against it); you can **launch coups vs AI**.
+- **Balance of control vs risk** (Lane: "balance this"): the player gets **meaningful levers** (campaign spend, rig, defend
+  a coup, pick succession) but outcomes stay **uncertain** — a strong campaign improves odds without guaranteeing them, and a
+  neglected population can still revolt against your wishes. Never an instant game-over. *Default cadence: elections ~12–15 min.*
 
 ---
 
@@ -100,17 +105,27 @@ Today: one harvested resource (Data Crystals) + Power (a grid utility) + v3.1 co
 - **Missions / objectives (per B & A's "missions"):** optional map objectives that fill the hour and reward expansion:
   - Capture & hold neutral settlements / central resource sites (victory points or economic bonuses).
   - Destroy map landmarks; defend events; escalating AI assault waves.
-  - ❓ **Scripted campaign missions** vs **emergent skirmish objectives**? *Default: emergent skirmish objectives first (replayable, fits random maps); scripted campaign later.*
+  - **Both** (Lane): **emergent skirmish objectives** (capture/hold, fits random maps) ship first for replayability; a
+    **scripted campaign** layer follows in Phase 5.
 
 ---
 
-## 6. Factions & maps (per **E**)
+## 6. Factions & maps (per **E**; Lane: 6 factions based on world regions)
 
-- **Larger maps:** bump `MAPW/MAPH` (e.g., 84 → 120+), more node fields, more base anchors, longer pathing already supported by A*.
-- **More factions — proposed 6** ❓ (add 2 to the current NEXUS/HELIX/AURUM/VANTA):
-  - **VERDANT PACT** (green) — agrarian/population-focused; big happy populations, recruits cheaply.
-  - **OBSIDIAN LEGION** (steel/orange) — industrial juggernaut; heavy armor & artillery, weak diplomacy.
-  - *(Identities are placeholders — Lane to confirm count, names, vibes.)*
+- **Larger maps:** bump `MAPW/MAPH` (84 → ~110), 6 base anchors around the perimeter, more node fields. A* already scales.
+- **6 factions — regional coalitions** (Lane: America, Europe, Africa, Middle East, Asia, Islanders). Rendered as
+  **geopolitical coalitions, not ethnic caricatures**; AI temperament is a **gameplay archetype**, deliberately
+  *not* a cultural stereotype. Proposed roster (names/colors adjustable):
+
+  | # | Faction | Region | Color | Home resource | AI archetype |
+  |---|---|---|---|---|---|
+  | 1 | **AMERICAN FEDERATION** (player) | America | blue | crystal | balanced |
+  | 2 | **EUROPEAN CONCORD** | Europe | steel/white | alloy | merchant/diplomatic |
+  | 3 | **PAN-AFRICAN UNION** | Africa | green-gold | coolant | industrial |
+  | 4 | **GULF COALITION** | Middle East | amber | alloy | merchant |
+  | 5 | **EASTERN BLOC** | Asia | red | crystal | warlord |
+  | 6 | **OCEANIC LEAGUE** | Islanders | teal | coolant | covert |
+
 - Win condition stays "last alliance standing," with an **optional victory-point path** from objectives so an hour-long game can end decisively without total annihilation.
 
 ---
@@ -144,13 +159,14 @@ Each phase ships runnable, committed, and headless-verified (same method as v3.1
 
 ---
 
-## 10. Open questions for Lane (before/while building)
+## 10. Open questions for Lane — ANSWERED (2026-06-15, round 2)
 
-1. **Factions:** 6 confirmed? Names/identities for the 2 new ones — or give me a vibe and I'll design them.
-2. **Resources:** two harvested (Crystals + Coolant), or add a third (Alloy) for top-tier units?
-3. **Leader styles:** which archetypes appeal (Militarist / Industrialist / Populist / Technocrat / Mercantile / other)?
-4. **Missions:** emergent skirmish objectives (capture/hold), scripted campaign, or both?
-5. **Elections/coups:** how much should the player *control* vs how much is *political risk* outside their hands?
-6. **More units:** any specific dream units (naval, super-units, engineers)?
+1. **Factions:** ✅ 6, based on world regions — America, Europe, Africa, Middle East, Asia, Islanders (roster in §6).
+2. **Resources:** ✅ **three**, all harvested (Alloy added — §2.1).
+3. **Leader styles:** ✅ **all five**, selected at game start (§4).
+4. **Missions:** ✅ **both** — emergent objectives first, scripted campaign later (§5).
+5. **Elections/coups:** ✅ **balanced** — real player levers, uncertain outcomes (§4).
+6. **More units:** still open — any dream units (naval, super-units, engineers)? Not blocking.
 
-None of these block **Phase 1** — the economy foundation is unambiguous and everything else builds on it.
+**Build status:** Phase 1 ✅ shipped. Phase 2 in progress — **Alloy (3rd resource) first**, then the 6-faction + larger-map
+expansion (pending a glance at the §6 roster, since the factions are named after real-world regions).
