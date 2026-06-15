@@ -51,15 +51,21 @@ export interface BuildingDef {
   dmg?: number;
   range?: number;
   rof?: number;
+  antiAir?: boolean;       // can engage airborne units
+  airOnly?: boolean;       // engages ONLY airborne units (flak)
+  water?: number;          // +coolant produced per second
+  coolant?: number;        // coolant consumed per second while active
   desc: string;
 }
 
 export const B: Record<string, BuildingDef> = {
-  hq: { name: 'Command HQ', w: 3, h: 3, hp: 1700, cost: 0, power: +20, buildTime: 0, sight: 8, hgt: 26, desc: 'Primary structure. Accepts crystal deliveries.' },
+  hq: { name: 'Command HQ', w: 3, h: 3, hp: 1700, cost: 0, power: +20, buildTime: 0, sight: 8, hgt: 26, water: 8, desc: 'Primary structure. Accepts crystal deliveries. Trickles coolant.' },
   power: { name: 'Power Plant', w: 2, h: 2, hp: 430, cost: 300, power: +50, buildTime: 8, sight: 4, hgt: 20, desc: '+50 power.' },
   refinery: { name: 'Crystal Refinery', w: 3, h: 2, hp: 700, cost: 600, power: -10, buildTime: 12, sight: 5, hgt: 20, desc: 'Harvester drop-off. Free Harvester on completion.' },
-  foundry: { name: 'War Foundry', w: 3, h: 2, hp: 900, cost: 500, power: -15, buildTime: 12, sight: 5, hgt: 22, desc: 'Fabricates all vehicles and drones.' },
-  turret: { name: 'Sentinel Turret', w: 1, h: 1, hp: 520, cost: 400, power: -10, buildTime: 8, sight: 7, hgt: 8, dmg: 13, range: 188, rof: 0.65, desc: 'Automated point defense.' },
+  foundry: { name: 'War Foundry', w: 3, h: 2, hp: 900, cost: 500, power: -15, buildTime: 12, sight: 5, hgt: 22, desc: 'Fabricates all vehicles, drones, infantry & aircraft.' },
+  turret: { name: 'Sentinel Turret', w: 1, h: 1, hp: 520, cost: 400, power: -10, buildTime: 8, sight: 7, hgt: 8, dmg: 13, range: 188, rof: 0.65, desc: 'Automated ground point-defense.' },
+  pump: { name: 'Coolant Plant', w: 2, h: 2, hp: 380, cost: 450, power: -15, buildTime: 10, sight: 4, hgt: 18, water: 22, desc: '+22 coolant/s. Cools aircraft, walkers, artillery & flak.' },
+  aaturret: { name: 'Flak Cannon', w: 1, h: 1, hp: 460, cost: 500, power: -10, buildTime: 9, sight: 8, hgt: 8, dmg: 9, range: 210, rof: 0.42, antiAir: true, airOnly: true, coolant: 3, desc: 'Anti-air flak. Engages aircraft only.' },
   cyber: { name: 'Cyber Ops Center', w: 2, h: 2, hp: 740, cost: 800, power: -20, buildTime: 14, sight: 6, hgt: 20, desc: 'Unlocks cyber abilities & covert missions.' },
 };
 
@@ -76,14 +82,23 @@ export interface UnitDef {
   dmg?: number;
   range?: number;
   rof?: number;
+  air?: boolean;           // flies — ignores terrain, only AA/aircraft can hit it
+  antiAir?: boolean;       // can engage airborne targets
+  splash?: number;         // area-of-effect blast radius on impact
+  coolant?: number;        // coolant consumed per second while alive
+  infantry?: boolean;      // soft target rendered small; trained from the Foundry
   desc: string;
 }
 
 export const U: Record<string, UnitDef> = {
   harvester: { name: 'Harvester', cost: 400, hp: 310, speed: 74, radius: 11, sight: 5, buildTime: 10, cargo: 200, desc: 'Gathers data crystals. Your economy.' },
   recon: { name: 'Recon Drone', cost: 150, hp: 78, speed: 140, radius: 8, sight: 9, buildTime: 6, dmg: 4, range: 96, rof: 0.4, desc: 'Fast scout quadcopter.' },
+  infantry: { name: 'Rifle Trooper', cost: 90, hp: 70, speed: 70, radius: 7, sight: 6, buildTime: 4, dmg: 5, range: 98, rof: 0.5, infantry: true, desc: 'Cheap massable foot soldier.' },
+  rocket: { name: 'Rocket Trooper', cost: 180, hp: 90, speed: 62, radius: 7, sight: 7, buildTime: 7, dmg: 17, range: 152, rof: 1.5, antiAir: true, infantry: true, desc: 'Anti-armor & anti-air infantry.' },
   strike: { name: 'Hover Tank', cost: 300, hp: 155, speed: 96, radius: 10, sight: 7, buildTime: 9, dmg: 11, range: 124, rof: 0.8, desc: 'Backbone main battle tank.' },
-  walker: { name: 'Railgun Walker', cost: 700, hp: 440, speed: 56, radius: 13, sight: 7, buildTime: 16, dmg: 48, range: 182, rof: 2.2, desc: 'Quad-legged siege platform.' },
+  artillery: { name: 'Siege Artillery', cost: 850, hp: 200, speed: 50, radius: 12, sight: 6, buildTime: 18, dmg: 58, range: 256, rof: 3.0, splash: 58, coolant: 3, desc: 'Long-range splash siege. Fragile; needs coolant.' },
+  walker: { name: 'Railgun Walker', cost: 700, hp: 440, speed: 56, radius: 13, sight: 7, buildTime: 16, dmg: 48, range: 182, rof: 2.2, coolant: 4, desc: 'Quad-legged siege platform. Runs hot.' },
+  aircraft: { name: 'Wraith Gunship', cost: 600, hp: 175, speed: 150, radius: 10, sight: 9, buildTime: 14, dmg: 14, range: 132, rof: 0.7, air: true, antiAir: true, coolant: 5, desc: 'VTOL gunship. Flies over terrain; needs heavy coolant.' },
 };
 
 export interface AbilityDef { name: string; cost: number; cd: number; key: string; desc: string; }
@@ -118,8 +133,10 @@ export interface AIScriptStep { t: number; type: string; dx: number; dy: number;
 export const AI_SCRIPT: AIScriptStep[] = [
   { t: 20, type: 'power', dx: -2, dy: 7 }, { t: 60, type: 'foundry', dx: 5, dy: 5 },
   { t: 100, type: 'turret', dx: 8, dy: 6 }, { t: 135, type: 'turret', dx: 6, dy: 9 },
-  { t: 210, type: 'refinery', dx: 0, dy: 10 }, { t: 310, type: 'foundry', dx: 9, dy: 2 },
-  { t: 390, type: 'power', dx: 2, dy: 12 }, { t: 500, type: 'turret', dx: 10, dy: 9 },
+  { t: 185, type: 'pump', dx: -3, dy: 9 }, { t: 230, type: 'refinery', dx: 0, dy: 10 },
+  { t: 290, type: 'aaturret', dx: 7, dy: 4 }, { t: 340, type: 'foundry', dx: 9, dy: 2 },
+  { t: 410, type: 'power', dx: 2, dy: 12 }, { t: 470, type: 'aaturret', dx: 4, dy: 10 },
+  { t: 540, type: 'turret', dx: 10, dy: 9 }, { t: 620, type: 'pump', dx: 6, dy: 12 },
 ];
 
 // ── Shared math helpers ──────────────────────────────────────────────────────

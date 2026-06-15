@@ -32,6 +32,34 @@ Build **NEXUS COMMAND**: a real-time strategy game in the spirit of Command & Co
 - **Combat**: turret-aim smoothing, waves that scale with time, fog of war (player + allies' vision), win = every surviving faction is you or your ally; lose = all your buildings destroyed.
 - **Slow build-up pacing**: first AI attack ~2.5–3.5 min, escalating size/frequency.
 
+## v3.1 — Lane wishlist Tranche A+B (IMPLEMENTED, branch `feature/lane-wishlist-a-b`)
+
+Addresses 6 of Lane's 11 requests. The other 5 (society/government layer: recruitable
+civilians, in-faction population w/ happiness, government/coups/elections; the 2nd-resource
+*economy* depth; longer-game pacing tuning) are **deferred pending a design conversation** —
+they reshape the game from C&C-skirmish to nation-builder. Do NOT build them without Lane sign-off.
+
+- **Complex maps** (`mapgen.ts`): 2–3 meandering rivers, organic lakes (`blob`), ridge-noise rock
+  spines, denser forest clumps, scattered boulders/dirt, jittered crystal-field centers, 2-tile border.
+- **Crystal regeneration** (`sim.ts regenCrystals`): living fields slowly regrow; new formations
+  crystallize at random passable sites on a 70–120s cadence, capped at 60 active fields. Shared
+  `spawnCrystalField()` lives in `mapgen.ts`.
+- **Secondary resource = coolant/water** (`sim.ts waterStep/waterOf`, `game.water/overheat`): Coolant
+  Plant (`pump`) + HQ produce it; walkers, artillery, gunships, flak consume it. Dry + in-deficit ⇒
+  OVERHEAT ⇒ those weapons fire at half rate. HUD meter `#uiWater` (cyan→red when hot).
+- **New units** (`constants.ts U`): `infantry` (cheap massable), `rocket` (AA+anti-armor infantry),
+  `artillery` (long-range splash, fragile, needs coolant), `aircraft` (flying VTOL gunship).
+- **Flight layer**: `air` units skip A*/terrain (`setPath`/`stepToward`), render at altitude `ALT`
+  with a ground shadow + spinning rotor, draw above ground entities. Engagement rules in `sim.ts`:
+  `isAir`/`canHitAir`/`eligibleTarget` — only `antiAir` shooters hit fliers; `airOnly` flak hits only fliers.
+- **Air defense** (`constants.ts B`): `aaturret` Flak Cannon (airOnly). Rocket Trooper = mobile AA.
+- **Building detail + unit polish** (`textures.ts`): lit window strips, panel seams, rivets; richer
+  unit cores w/ faction halo; new art for all new units/buildings; animated HQ radar dish + rotor discs
+  (`buildSpinners`, wired in `BattleScene` SpriteRec.dish/rotor/shadow).
+- AI fields a combined-arms force (late-game guarantee in `aiUpdate`) + builds pumps/flak (`AI_SCRIPT`).
+- Verified by driving the headless sim via Vite dev modules (WebGL canvas can't screenshot in CI preview):
+  build clean, crystal regen fires, overheat triggers, flak kills aircraft, full roster fabricates.
+
 ## What exists in `wip-v3/` (the interrupted canvas rewrite — mine it for logic)
 
 - `p1-core.html`: complete HTML/CSS C&C-style metal sidebar skin, stereo WebAudio engine, value-noise **procedural map generator** (rivers, bridges, forests, rock, roads carved to guarantee base/resource connectivity, border walls, crystal field placement).

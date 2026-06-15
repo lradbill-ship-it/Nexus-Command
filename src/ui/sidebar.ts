@@ -4,11 +4,11 @@ import {
 import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, setHintHook } from '../sim/state';
 import {
   startPlacing, trainUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
-  hasCyber, powerOf, tradeIncome,
+  hasCyber, powerOf, tradeIncome, waterOf,
 } from '../sim/sim';
 
-const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'cyber'];
-const unitOrder = ['harvester', 'recon', 'strike', 'walker'];
+const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'aaturret', 'cyber'];
+const unitOrder = ['harvester', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'aircraft'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -21,12 +21,18 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'refinery') { g.fillRect(9, 7, 22, 12); g.strokeRect(9, 7, 22, 12); g.fillStyle = '#9bd4ff'; g.beginPath(); g.arc(24, 13, 4, 0, 7); g.fill(); }
     else if (type === 'foundry') { g.fillRect(9, 6, 22, 14); g.strokeRect(9, 6, 22, 14); g.fillStyle = '#0a0f15'; g.fillRect(14, 12, 12, 8); }
     else if (type === 'turret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 9, cy - 5); g.stroke(); }
+    else if (type === 'pump') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(127,214,234,.5)'; g.fill(); g.strokeStyle = '#7fd6ea'; g.stroke(); g.beginPath(); g.arc(cx, cy, 4, 0, 7); g.stroke(); }
+    else if (type === 'aaturret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - 2, cy); g.lineTo(cx + 5, cy - 8); g.moveTo(cx + 2, cy); g.lineTo(cx + 9, cy - 6); g.stroke(); }
     else if (type === 'cyber') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(155,111,232,.5)'; g.fill(); g.strokeStyle = '#b07dff'; g.stroke(); }
   } else {
     if (type === 'harvester') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#9bd4ff'; g.fillRect(16, 9, 8, 6); }
     else if (type === 'recon') { g.strokeStyle = '#cfe6ee'; for (const [rx, ry] of [[-6, -4], [6, -4], [-6, 4], [6, 4]]) { g.beginPath(); g.arc(cx + rx, cy + ry, 3, 0, 7); g.stroke(); } }
+    else if (type === 'infantry') { g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill(); g.fillStyle = '#2c3744'; g.fillRect(cx - 3, cy - 1, 6, 8); g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 7, cy - 6); g.stroke(); }
+    else if (type === 'rocket') { g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill(); g.fillStyle = '#2c3744'; g.fillRect(cx - 3, cy - 1, 6, 8); g.strokeStyle = '#e8a33d'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 4, cy - 1); g.lineTo(cx + 8, cy - 7); g.stroke(); }
     else if (type === 'strike') { g.fillRect(12, 6, 16, 14); g.strokeRect(12, 6, 16, 14); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 10, cy - 4); g.stroke(); }
+    else if (type === 'artillery') { g.fillStyle = '#1a232e'; g.fillRect(10, 6, 3, 14); g.fillRect(27, 6, 3, 14); g.fillStyle = '#1a2735'; g.fillRect(13, 7, 14, 12); g.strokeRect(13, 7, 14, 12); g.strokeStyle = '#aebcc8'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 12, cy - 7); g.stroke(); }
     else if (type === 'walker') { g.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * 7 + 0.5; const px = cx + Math.cos(a) * 8, py = cy + Math.sin(a) * 8; if (i) g.lineTo(px, py); else g.moveTo(px, py); } g.closePath(); g.fill(); g.stroke(); }
+    else if (type === 'aircraft') { g.fillStyle = '#1a2735'; g.beginPath(); g.moveTo(cx, cy - 8); g.lineTo(cx + 4, cy + 6); g.lineTo(cx - 4, cy + 6); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = '#cfe6ee'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(cx - 9, cy); g.lineTo(cx + 9, cy); g.stroke(); }
   }
   return c;
 }
@@ -142,6 +148,9 @@ export function refresh() {
   const ti = tradeIncome(PLAYER);
   $('uiTradeWrap').style.display = ti > 0 ? '' : 'none';
   $('uiTrade').textContent = '+' + ti + '/s';
+  const w = waterOf(PLAYER);
+  $('uiWater').textContent = Math.floor(w.stored) + (w.net >= 0 ? ' +' + w.net : ' ' + w.net) + '/s';
+  $('uiWaterWrap').className = 'stat' + (game.overheat[PLAYER] ? ' hot' : '');
   const m = Math.floor(game.t / 60), s = Math.floor(game.t % 60);
   $('uiTime').textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   if (game.t - lastHint > 5) $('uiHint').textContent = '';

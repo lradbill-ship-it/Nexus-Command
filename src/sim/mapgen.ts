@@ -26,36 +26,69 @@ export function makeNoise() {
   };
 }
 
-const tPassable = (tx: number, ty: number) => inMap(tx, ty) && PASSABLE[game.terr[idx(tx, ty)]] === 1;
+export const tPassable = (tx: number, ty: number) => inMap(tx, ty) && PASSABLE[game.terr[idx(tx, ty)]] === 1;
+
+/** Carve a roughly-circular blob of one terrain type (used for lakes & glades). */
+function blob(T: Uint8Array, cx: number, cy: number, r: number, t: number, n: (x: number, y: number) => number) {
+  for (let y = cy - r - 1; y <= cy + r + 1; y++) for (let x = cx - r - 1; x <= cx + r + 1; x++) {
+    if (!inMap(x, y)) continue;
+    const wob = (n(x * 0.3, y * 0.3) - 0.5) * r * 0.9;   // organic, non-circular edge
+    if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= (r + wob) * (r + wob)) T[idx(x, y)] = t;
+  }
+}
+
+/** Place one data-crystal field around (cx,cy) in tile space. Shared by mapgen + live regen. */
+export function spawnCrystalField(cx: number, cy: number, count: number, amount: number, spread = 62) {
+  for (let i = 0; i < count; i++) {
+    let nx = cx * TILE, ny = cy * TILE, tries = 0;
+    do {
+      const a = Math.random() * Math.PI * 2, r = Math.random() * spread;
+      nx = cx * TILE + Math.cos(a) * r; ny = cy * TILE + Math.sin(a) * r;
+    } while (!tPassable(nx / TILE | 0, ny / TILE | 0) && ++tries < 20);
+    game.nodes.push({
+      x: nx, y: ny, amount, max: amount,
+      pulse: Math.random() * 6, shards: 2 + (Math.random() * 4 | 0),
+    });
+  }
+}
 
 /** Build a fresh battlefield into game.terr and populate trees, water, crystals. */
 export function generateMap() {
   const T = game.terr;
-  const nE = makeNoise(), nM = makeNoise(), nD = makeNoise();
+  const nE = makeNoise(), nM = makeNoise(), nD = makeNoise(), nR = makeNoise();
   for (let y = 0; y < MAPH; y++) for (let x = 0; x < MAPW; x++) {
     const e = nE(x * 0.055, y * 0.055), m = nM(x * 0.07, y * 0.07), d = nD(x * 0.11, y * 0.11);
+    // ridge noise: |2v-1| inverted forms long connected rock spines, not blobs
+    const ridge = 1 - Math.abs(2 * nR(x * 0.045, y * 0.045) - 1);
     let t = T_GRASS;
-    if (e > 0.70) t = T_ROCK;
-    else if (m > 0.635) t = T_FOREST;
+    if (e > 0.72 || ridge > 0.86) t = T_ROCK;          // peaks + ridge lines
+    else if (m > 0.60) t = T_FOREST;                   // denser forest clumps
     else if (d > 0.66) t = T_DIRT;
+    else if (e < 0.30 && d < 0.32) t = T_DIRT;          // low scrub basins
     T[idx(x, y)] = t;
   }
-  // rivers (1-2 random walks across the map)
-  const nRivers = 1 + (Math.random() < 0.65 ? 1 : 0);
+  // rivers (2-3 meandering walks across the map, variable width)
+  const nRivers = 2 + (Math.random() < 0.6 ? 1 : 0);
   for (let r = 0; r < nRivers; r++) {
     const vert = Math.random() < 0.5;
-    let x = vert ? 10 + Math.random() * (MAPW - 20) : 0;
-    let y = vert ? 0 : 10 + Math.random() * (MAPH - 20);
+    let x = vert ? 8 + Math.random() * (MAPW - 16) : 0;
+    let y = vert ? 0 : 8 + Math.random() * (MAPH - 16);
     let drift = 0;
     while (vert ? y < MAPH : x < MAPW) {
-      drift += (Math.random() - 0.5) * 0.9; drift = clamp(drift, -1.4, 1.4);
+      drift += (Math.random() - 0.5) * 1.0; drift = clamp(drift, -1.6, 1.6);
       if (vert) { x += drift; y += 1; } else { y += drift; x += 1; }
-      const w = Math.random() < 0.18 ? 2 : 1;
+      const w = Math.random() < 0.22 ? 2 : 1;
       for (let oy = -w; oy <= w; oy++) for (let ox = -w; ox <= w; ox++) {
         const tx = Math.round(x) + ox, ty = Math.round(y) + oy;
         if (inMap(tx, ty) && ox * ox + oy * oy <= w * w) T[idx(tx, ty)] = T_WATER;
       }
     }
+  }
+  // lakes (1-3 organic ponds in the open field)
+  const nLakes = 1 + (Math.random() * 3 | 0);
+  for (let i = 0; i < nLakes; i++) {
+    const lx = 16 + Math.random() * (MAPW - 32), ly = 16 + Math.random() * (MAPH - 32);
+    blob(T, lx | 0, ly | 0, 3 + Math.random() * 4, T_WATER, nD);
   }
   // roads: each base -> center, each node site -> center (guarantees connectivity)
   const center = { x: 42, y: 42 };
@@ -86,9 +119,16 @@ export function generateMap() {
   for (const f of [1, 2, 3, 4]) { const bi = BASE_INFO[f]; clear(bi.tx + 1, bi.ty + 1, 9); }
   for (const s of NODE_SITES) clear(s.x, s.y, 4);
   clear(center.x, center.y, 6);
-  // map border = rock wall
-  for (let i = 0; i < MAPW; i++) { T[idx(i, 0)] = T_ROCK; T[idx(i, MAPH - 1)] = T_ROCK; }
-  for (let i = 0; i < MAPH; i++) { T[idx(0, i)] = T_ROCK; T[idx(MAPW - 1, i)] = T_ROCK; }
+  // scattered single-tile boulders & dirt patches for visual texture (open grass only)
+  for (let i = 0; i < 90; i++) {
+    const x = 2 + (Math.random() * (MAPW - 4) | 0), y = 2 + (Math.random() * (MAPH - 4) | 0);
+    const i0 = idx(x, y);
+    if (T[i0] !== T_GRASS) continue;
+    T[i0] = Math.random() < 0.4 ? T_ROCK : T_DIRT;
+  }
+  // map border = rock wall (2 tiles thick for a chunkier frame)
+  for (let i = 0; i < MAPW; i++) { T[idx(i, 0)] = T_ROCK; T[idx(i, 1)] = T_ROCK; T[idx(i, MAPH - 1)] = T_ROCK; T[idx(i, MAPH - 2)] = T_ROCK; }
+  for (let i = 0; i < MAPH; i++) { T[idx(0, i)] = T_ROCK; T[idx(1, i)] = T_ROCK; T[idx(MAPW - 1, i)] = T_ROCK; T[idx(MAPW - 2, i)] = T_ROCK; }
   // trees & water tile lists
   game.trees.length = 0; game.waterTiles.length = 0;
   for (let y = 0; y < MAPH; y++) for (let x = 0; x < MAPW; x++) {
@@ -101,21 +141,11 @@ export function generateMap() {
       });
     } else if (t === T_WATER) game.waterTiles.push({ x, y });
   }
-  // data crystal fields
+  // data crystal fields — centers jittered slightly each match (still inside the cleared ring)
   game.nodes.length = 0;
   for (const s of NODE_SITES) {
     const big = (s.x === 42 && s.y === 42);
-    const count = big ? 8 : 5;
-    for (let i = 0; i < count; i++) {
-      let nx = 0, ny = 0, tries = 0;
-      do {
-        const a = Math.random() * Math.PI * 2, r = Math.random() * (big ? 90 : 62);
-        nx = s.x * TILE + Math.cos(a) * r; ny = s.y * TILE + Math.sin(a) * r;
-      } while (!tPassable(nx / TILE | 0, ny / TILE | 0) && ++tries < 20);
-      game.nodes.push({
-        x: nx, y: ny, amount: big ? 4600 : 3300, max: big ? 4600 : 3300,
-        pulse: Math.random() * 6, shards: 2 + (Math.random() * 4 | 0),
-      });
-    }
+    const jx = s.x + (Math.random() * 3 - 1.5), jy = s.y + (Math.random() * 3 - 1.5);
+    spawnCrystalField(jx, jy, big ? 8 : 5, big ? 4600 : 3300, big ? 90 : 62);
   }
 }

@@ -81,8 +81,17 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
   // bevel highlight on top edge
   g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = 1.5;
   g.beginPath(); g.moveTo(fx + 5, roofY + 3); g.lineTo(fx + fw - 5, roofY + 3); g.stroke();
-  // side-wall faction stripe
+  // panel seams across the roof slab (subtle prefab look)
+  g.strokeStyle = 'rgba(0,0,0,.28)'; g.lineWidth = 1;
+  for (let sx = fx + 10; sx < fx + fw - 6; sx += 12) { g.beginPath(); g.moveTo(sx, roofY + 4); g.lineTo(sx, roofY + fh - 4); g.stroke(); }
+  // lit window strip along the front edge of the slab (faction-tinted glow)
+  for (let wx = fx + 6; wx < fx + fw - 7; wx += 7) {
+    g.fillStyle = Math.random() < 0.78 ? `rgba(${FAC[team].rgb},.85)` : 'rgba(20,28,38,.9)';
+    g.fillRect(wx, fy - 5, 4, 3);
+  }
+  // weathered side-wall faction stripe + rivets
   g.fillStyle = col; g.globalAlpha = 0.5; g.fillRect(fx, fy + fh - 5, fw, 4); g.globalAlpha = 1;
+  g.fillStyle = 'rgba(0,0,0,.4)'; for (let rx = fx + 4; rx < fx + fw - 2; rx += 9) g.fillRect(rx, fy + fh - 3, 1.5, 1.5);
 
   const rcx = fx + fw / 2, rcy = roofY + fh / 2;
   g.lineWidth = 2; g.strokeStyle = col; g.fillStyle = col;
@@ -123,6 +132,20 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     dg.addColorStop(0, 'rgba(170,140,255,.7)'); dg.addColorStop(1, 'rgba(80,60,150,.15)');
     g.fillStyle = dg; g.beginPath(); g.arc(rcx, rcy, fw * 0.3, 0, 7); g.fill();
     g.strokeStyle = col; g.beginPath(); g.ellipse(rcx, rcy, fw * 0.3, fw * 0.18, 0, 0, 7); g.stroke();
+  } else if (type === 'pump') {
+    // coolant plant: water reservoir + condenser coils
+    const wg = g.createRadialGradient(rcx, rcy, 2, rcx, rcy, fw * 0.32);
+    wg.addColorStop(0, 'rgba(120,210,235,.9)'); wg.addColorStop(1, 'rgba(30,90,120,.4)');
+    g.fillStyle = wg; g.beginPath(); g.arc(rcx, rcy, fw * 0.3, 0, 7); g.fill();
+    g.strokeStyle = '#7fd6ea'; g.lineWidth = 1.5;
+    for (let rr2 = 5; rr2 < fw * 0.3; rr2 += 4) { g.beginPath(); g.arc(rcx, rcy, rr2, 0, 7); g.stroke(); }
+    g.fillStyle = '#3a4650'; g.fillRect(rcx - 3, rcy - fh * 0.42, 6, fh * 0.3);  // intake pipe
+  } else if (type === 'aaturret') {
+    // flak base ring with quad missile cells
+    g.fillStyle = '#2a3340'; g.beginPath(); g.arc(rcx, rcy, fw * 0.4, 0, 7); g.fill();
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(rcx, rcy, fw * 0.4, 0, 7); g.stroke();
+    g.fillStyle = '#11161d'; g.beginPath(); g.arc(rcx, rcy, fw * 0.2, 0, 7); g.fill();
+    g.fillStyle = '#c9d6e0'; for (const [ox, oy] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) g.fillRect(rcx + ox - 1, rcy + oy - 1, 2, 2);
   }
   return [c, cx, cy];
 }
@@ -160,9 +183,38 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.beginPath();
     for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; const px = cx + Math.cos(a) * 11, py = cy + Math.sin(a) * 11; if (i) g.lineTo(px, py); else g.moveTo(px, py); }
     g.closePath(); g.fill(); g.stroke();
+  } else if (type === 'infantry') {
+    // foot trooper: helmet, torso, slung rifle (small)
+    g.fillStyle = '#3a4654'; g.beginPath(); g.ellipse(cx, cy + 1, 4.5, 5.5, 0, 0, 7); g.fill();
+    g.strokeStyle = col; g.lineWidth = 1.2; g.stroke();
+    g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill();   // helmet
+    g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx + 1, cy); g.lineTo(cx + 6, cy - 6); g.stroke(); // rifle
+    g.fillStyle = `rgba(${rgb},.9)`; g.fillRect(cx - 4, cy + 4, 8, 1.5);
+  } else if (type === 'rocket') {
+    // rocket trooper: trooper + shoulder launcher tube
+    g.fillStyle = '#3a4654'; g.beginPath(); g.ellipse(cx, cy + 1, 4.5, 5.5, 0, 0, 7); g.fill();
+    g.strokeStyle = col; g.lineWidth = 1.2; g.stroke();
+    g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill();
+    g.strokeStyle = '#e8a33d'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 4, cy - 1); g.lineTo(cx + 7, cy - 7); g.stroke(); // launcher
+    g.fillStyle = '#ffd27a'; g.beginPath(); g.arc(cx + 7, cy - 7, 1.6, 0, 7); g.fill();
+  } else if (type === 'artillery') {
+    // tracked siege hull (long barrel is a separate sprite)
+    g.fillStyle = '#1a232e'; g.fillRect(cx - 12, cy - 9, 4, 18); g.fillRect(cx + 8, cy - 9, 4, 18); // tracks
+    g.strokeStyle = 'rgba(120,140,165,.6)'; g.lineWidth = 1; for (let i = -8; i <= 8; i += 4) { g.beginPath(); g.moveTo(cx - 12, cy + i); g.lineTo(cx - 8, cy + i); g.moveTo(cx + 8, cy + i); g.lineTo(cx + 12, cy + i); g.stroke(); }
+    g.fillStyle = body; g.strokeStyle = col; g.lineWidth = 1.6; rr(g, cx - 8, cy - 8, 16, 16, 3); g.fill(); g.stroke();
+    g.fillStyle = '#1a2530'; g.beginPath(); g.arc(cx, cy, 5, 0, 7); g.fill();
+  } else if (type === 'aircraft') {
+    // VTOL gunship: swept fuselage + twin rotor nacelles (rotor discs spin in-scene)
+    g.fillStyle = body; g.strokeStyle = col; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(cx, cy - 13); g.lineTo(cx + 5, cy + 6); g.lineTo(cx, cy + 11); g.lineTo(cx - 5, cy + 6); g.closePath(); g.fill(); g.stroke(); // fuselage
+    g.fillStyle = '#2c3a48';
+    for (const sx of [-1, 1]) { g.save(); g.translate(cx + sx * 9, cy - 1); rr(g, -2.5, -5, 5, 10, 2); g.fill(); g.strokeStyle = col; g.stroke(); g.restore(); } // nacelles
+    g.fillStyle = '#cdd9e3'; g.beginPath(); g.moveTo(cx, cy - 13); g.lineTo(cx - 2, cy - 7); g.lineTo(cx + 2, cy - 7); g.closePath(); g.fill(); // canopy
   }
-  // core light
+  // core light + faction halo (polish)
+  g.fillStyle = `rgba(${rgb},.45)`; g.beginPath(); g.arc(cx, cy, 4.5, 0, 7); g.fill();
   g.fillStyle = col; g.beginPath(); g.arc(cx, cy, 2.2, 0, 7); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.arc(cx, cy, 1, 0, 7); g.fill();
   return [c, cx, cy];
 }
 
@@ -181,13 +233,47 @@ function barrelCanvas(type: string, team: number): [HTMLCanvasElement, number, n
   } else if (type === 'walker') {
     g.strokeStyle = 'rgba(200,230,255,.9)'; g.lineWidth = 2.4;
     g.beginPath(); g.moveTo(cx - 3, cy); g.lineTo(cx - 3, cy - 20); g.moveTo(cx + 3, cy); g.lineTo(cx + 3, cy - 20); g.stroke();
+  } else if (type === 'artillery') {
+    g.fillStyle = '#26323f'; g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill();
+    g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.stroke();
+    g.strokeStyle = '#aebcc8'; g.lineWidth = 4; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx, cy - 21); g.stroke();
+    g.fillStyle = '#1a2129'; g.fillRect(cx - 2.5, cy - 22, 5, 3);   // muzzle brake
+  } else if (type === 'aaturret') {
+    g.fillStyle = '#323d4b'; g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill();
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.stroke();
+    g.strokeStyle = '#c9d6e0'; g.lineWidth = 2.4;   // twin flak barrels, slightly splayed
+    g.beginPath(); g.moveTo(cx - 2, cy); g.lineTo(cx - 4, cy - 16); g.moveTo(cx + 2, cy); g.lineTo(cx + 4, cy - 16); g.stroke();
   }
   return [c, cx, cy];
 }
 
+// Generic faction-tintable spinning parts (rotated each frame by the scene).
+function buildSpinners(scene: Phaser.Scene) {
+  // radar dish — an asymmetric paddle so its rotation reads
+  const [c, g] = mk(34, 34); const cx = 17, cy = 17;
+  g.strokeStyle = 'rgba(210,230,240,.9)'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 12, cy - 4); g.stroke();
+  g.fillStyle = 'rgba(180,210,230,.55)'; g.beginPath(); g.ellipse(cx + 12, cy - 4, 5, 8, -0.5, 0, 7); g.fill();
+  g.fillStyle = '#d8e6ee'; g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fill();
+  addCanvas(scene, 'radardish', c, cx, cy);
+  // rotor blur disc for fliers
+  const [c2, g2] = mk(40, 40);
+  const rg = g2.createRadialGradient(20, 20, 4, 20, 20, 19);
+  rg.addColorStop(0, 'rgba(220,235,245,.0)'); rg.addColorStop(0.7, 'rgba(200,225,240,.18)'); rg.addColorStop(1, 'rgba(200,225,240,.04)');
+  g2.fillStyle = rg; g2.beginPath(); g2.arc(20, 20, 19, 0, 7); g2.fill();
+  g2.strokeStyle = 'rgba(230,240,250,.5)'; g2.lineWidth = 2;
+  g2.beginPath(); g2.moveTo(3, 20); g2.lineTo(37, 20); g2.moveTo(20, 3); g2.lineTo(20, 37); g2.stroke();
+  addCanvas(scene, 'rotor', c2, 20, 20);
+  // soft ground shadow for airborne units
+  const [c3, g3] = mk(40, 24);
+  const sg = g3.createRadialGradient(20, 12, 1, 20, 12, 18);
+  sg.addColorStop(0, 'rgba(0,0,0,.5)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+  g3.fillStyle = sg; g3.beginPath(); g3.ellipse(20, 12, 18, 10, 0, 0, 7); g3.fill();
+  addCanvas(scene, 'airshadow', c3, 20, 12);
+}
+
 /** Build every entity texture for all four factions. Call once after the scene boots. */
 export function buildAllTextures(scene: Phaser.Scene) {
-  buildGlow(scene); buildCrystal(scene);
+  buildGlow(scene); buildCrystal(scene); buildSpinners(scene);
   for (const team of ALL_TEAMS) {
     for (const type of Object.keys(B)) {
       const [c, cx, cy] = buildingCanvas(type, team); addCanvas(scene, `b_${type}_${team}`, c, cx, cy);
@@ -195,7 +281,7 @@ export function buildAllTextures(scene: Phaser.Scene) {
     for (const type of Object.keys(U)) {
       const [c, cx, cy] = unitCanvas(type, team); addCanvas(scene, `u_${type}_${team}`, c, cx, cy);
     }
-    for (const type of ['turret', 'strike', 'walker']) {
+    for (const type of ['turret', 'strike', 'walker', 'artillery', 'aaturret']) {
       const [c, cx, cy] = barrelCanvas(type, team); addCanvas(scene, `t_${type}_${team}`, c, cx, cy);
     }
   }

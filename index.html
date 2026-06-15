@@ -25,6 +25,8 @@
   #topbar .stat b{color:var(--gold);font-weight:600;}
   #topbar .stat.bad b{color:var(--p2);}
   #topbar .stat.trade b{color:var(--green);}
+  #uiWaterWrap b{color:#7fd6ea;text-shadow:0 0 6px rgba(127,214,234,.4);}
+  #uiWaterWrap.hot b{color:var(--p2);text-shadow:0 0 6px rgba(232,72,58,.5);}
   #topbar .spacer{flex:1;}
   #uiHint{color:var(--gold);}
   #restartBtn{pointer-events:auto;background:linear-gradient(180deg,var(--steel),var(--steel-lo));
@@ -130,6 +132,7 @@
     <!-- Phaser injects its WebGL canvas here -->
     <div id="topbar">
       <div class="stat">▣ DATA <b id="uiData">0</b></div>
+      <div class="stat" id="uiWaterWrap">❄ COOLANT <b id="uiWater">0</b></div>
       <div class="stat" id="uiTradeWrap" style="display:none">TRADE <b id="uiTrade">+0/s</b></div>
       <div class="stat">UPTIME <b id="uiTime">00:00</b></div>
       <div class="spacer"></div>

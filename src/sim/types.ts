@@ -72,6 +72,7 @@ export interface Shot {
   speed: number;
   col: string;
   rail: boolean;
+  splash?: number;
   dead?: boolean;
 }
 
@@ -99,6 +100,8 @@ export interface GameState {
   won: boolean;
   t: number;
   money: Record<number, number>;
+  water: Record<number, number>;          // stored coolant reserve per team
+  overheat: Record<number, boolean>;      // true when a team's reserve is dry & in deficit
   cam: { x: number; y: number };
   buildings: Building[];
   units: Unit[];
