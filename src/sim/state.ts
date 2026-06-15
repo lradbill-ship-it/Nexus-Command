@@ -6,6 +6,7 @@ function createGame(): GameState {
     started: false, over: false, won: false, t: 0,
     money: { 1: 1500, 2: 2200, 3: 2400, 4: 2200 },
     water: { 1: 60, 2: 60, 3: 60, 4: 60 },
+    alloy: { 1: 120, 2: 160, 3: 160, 4: 160 },
     overheat: {},
     cam: { x: 0, y: 0 },
     buildings: [], units: [], shots: [], parts: [], nodes: [], trees: [], waterTiles: [],

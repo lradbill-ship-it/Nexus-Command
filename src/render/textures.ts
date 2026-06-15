@@ -74,6 +74,28 @@ export function buildCoolant(scene: Phaser.Scene) {
   addCanvas(scene, 'coolant', c, 20, 24);
 }
 
+// ── Alloy ore (stacked metallic ingots / raw ore chunks) ─────────────────────
+export function buildAlloy(scene: Phaser.Scene) {
+  const [c, g] = mk(40, 40);
+  const cx = 20, cy = 24;
+  // ground ore scatter
+  g.fillStyle = 'rgba(70,52,34,.55)'; g.beginPath(); g.ellipse(cx, cy + 4, 15, 7, 0, 0, 7); g.fill();
+  // stacked ingots
+  const ingot = (x: number, y: number, w: number, h: number) => {
+    const grd = g.createLinearGradient(x - w, y, x + w, y);
+    grd.addColorStop(0, '#7a4a22'); grd.addColorStop(0.5, '#e0a155'); grd.addColorStop(1, '#9a5e2c');
+    g.fillStyle = grd; g.beginPath();
+    g.moveTo(x - w, y); g.lineTo(x - w + 3, y - h); g.lineTo(x + w - 3, y - h); g.lineTo(x + w, y); g.lineTo(x + w - 3, y + 3); g.lineTo(x - w + 3, y + 3); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,225,180,.5)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x - w + 3, y - h); g.lineTo(x + w - 3, y - h); g.stroke();
+  };
+  ingot(cx - 5, cy + 2, 9, 5); ingot(cx + 6, cy + 1, 8, 5);
+  ingot(cx, cy - 5, 9, 6);
+  // raw ore nugget with sheen
+  g.fillStyle = '#c98a44'; g.beginPath(); g.arc(cx - 9, cy - 4, 4, 0, 7); g.fill();
+  g.fillStyle = 'rgba(255,235,200,.6)'; g.beginPath(); g.arc(cx - 10, cy - 5, 1.5, 0, 7); g.fill();
+  addCanvas(scene, 'alloy', c, 20, 24);
+}
+
 // ── Buildings (pseudo-3D, faction-trimmed) ───────────────────────────────────
 const PAD = 10;
 function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number, number] {
@@ -160,6 +182,14 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     g.strokeStyle = '#7fd6ea'; g.lineWidth = 1.5;
     for (let rr2 = 5; rr2 < fw * 0.3; rr2 += 4) { g.beginPath(); g.arc(rcx, rcy, rr2, 0, 7); g.stroke(); }
     g.fillStyle = '#3a4650'; g.fillRect(rcx - 3, rcy - fh * 0.42, 6, fh * 0.3);  // intake pipe
+  } else if (type === 'smelter') {
+    // alloy smelter: glowing crucible + chimney
+    const cr = g.createRadialGradient(rcx, rcy, 1, rcx, rcy, fw * 0.3);
+    cr.addColorStop(0, 'rgba(255,210,120,.95)'); cr.addColorStop(0.6, 'rgba(220,120,40,.8)'); cr.addColorStop(1, 'rgba(90,40,16,.5)');
+    g.fillStyle = cr; g.beginPath(); g.arc(rcx, rcy, fw * 0.28, 0, 7); g.fill();
+    g.strokeStyle = '#e0a155'; g.lineWidth = 2; g.beginPath(); g.arc(rcx, rcy, fw * 0.28, 0, 7); g.stroke();
+    g.fillStyle = '#2a2018'; g.fillRect(rcx + fw * 0.18, rcy - fh * 0.42, 7, fh * 0.34);   // chimney
+    g.fillStyle = 'rgba(255,180,90,.5)'; g.beginPath(); g.arc(rcx, rcy, 4, 0, 7); g.fill();
   } else if (type === 'aaturret') {
     // flak base ring with quad missile cells
     g.fillStyle = '#2a3340'; g.beginPath(); g.arc(rcx, rcy, fw * 0.4, 0, 7); g.fill();
@@ -193,6 +223,15 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.strokeStyle = 'rgba(210,250,255,.7)'; g.lineWidth = 1; g.beginPath(); g.moveTo(cx - 8, cy); g.lineTo(cx + 8, cy); g.stroke();
     g.fillStyle = `rgba(${rgb},.8)`; g.fillRect(cx - 12, cy + 4, 2.5, 5); g.fillRect(cx + 9.5, cy + 4, 2.5, 5);
     g.fillStyle = '#7fd6ea'; g.fillRect(cx - 6, cy - 16, 12, 4);
+  } else if (type === 'hauler') {
+    // alloy hauler: flatbed with an ore hopper
+    rr(g, cx - 10, cy - 13, 20, 26, 5); g.fill(); g.stroke();
+    const ore = g.createLinearGradient(cx - 8, 0, cx + 8, 0);
+    ore.addColorStop(0, 'rgba(122,74,34,.95)'); ore.addColorStop(0.5, 'rgba(224,161,85,.95)'); ore.addColorStop(1, 'rgba(122,74,34,.95)');
+    g.fillStyle = ore; rr(g, cx - 8, cy - 9, 16, 17, 2); g.fill();
+    g.fillStyle = '#caa05a'; for (const [ox, oy] of [[-4, -4], [3, -5], [-1, 0], [4, 2]]) { g.beginPath(); g.arc(cx + ox, cy + oy, 1.8, 0, 7); g.fill(); }
+    g.fillStyle = `rgba(${rgb},.8)`; g.fillRect(cx - 12, cy + 4, 2.5, 5); g.fillRect(cx + 9.5, cy + 4, 2.5, 5);
+    g.fillStyle = '#e0a155'; g.fillRect(cx - 6, cy - 16, 12, 4);
   } else if (type === 'recon') {
     // quadcopter: 4 rotor rings + slim core
     g.strokeStyle = 'rgba(200,225,235,.5)'; g.lineWidth = 1.4;
@@ -302,7 +341,7 @@ function buildSpinners(scene: Phaser.Scene) {
 
 /** Build every entity texture for all four factions. Call once after the scene boots. */
 export function buildAllTextures(scene: Phaser.Scene) {
-  buildGlow(scene); buildCrystal(scene); buildCoolant(scene); buildSpinners(scene);
+  buildGlow(scene); buildCrystal(scene); buildCoolant(scene); buildAlloy(scene); buildSpinners(scene);
   for (const team of ALL_TEAMS) {
     for (const type of Object.keys(B)) {
       const [c, cx, cy] = buildingCanvas(type, team); addCanvas(scene, `b_${type}_${team}`, c, cx, cy);

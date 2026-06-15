@@ -7,8 +7,8 @@ import {
   hasCyber, powerOf, tradeIncome, waterOf,
 } from '../sim/sim';
 
-const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'aaturret', 'cyber'];
-const unitOrder = ['harvester', 'tanker', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'aircraft'];
+const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'smelter', 'aaturret', 'cyber'];
+const unitOrder = ['harvester', 'tanker', 'hauler', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'aircraft'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -22,11 +22,13 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'foundry') { g.fillRect(9, 6, 22, 14); g.strokeRect(9, 6, 22, 14); g.fillStyle = '#0a0f15'; g.fillRect(14, 12, 12, 8); }
     else if (type === 'turret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 9, cy - 5); g.stroke(); }
     else if (type === 'pump') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(127,214,234,.5)'; g.fill(); g.strokeStyle = '#7fd6ea'; g.stroke(); g.beginPath(); g.arc(cx, cy, 4, 0, 7); g.stroke(); }
+    else if (type === 'smelter') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(224,161,85,.55)'; g.fill(); g.strokeStyle = '#e0a155'; g.stroke(); g.fillStyle = '#2a2018'; g.fillRect(cx + 5, cy - 9, 3, 7); }
     else if (type === 'aaturret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - 2, cy); g.lineTo(cx + 5, cy - 8); g.moveTo(cx + 2, cy); g.lineTo(cx + 9, cy - 6); g.stroke(); }
     else if (type === 'cyber') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(155,111,232,.5)'; g.fill(); g.strokeStyle = '#b07dff'; g.stroke(); }
   } else {
     if (type === 'harvester') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#9bd4ff'; g.fillRect(16, 9, 8, 6); }
     else if (type === 'tanker') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#7fd6ea'; g.beginPath(); g.arc(20, 13, 5, 0, 7); g.fill(); g.strokeStyle = '#cfeef5'; g.beginPath(); g.moveTo(15, 13); g.lineTo(25, 13); g.stroke(); }
+    else if (type === 'hauler') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#e0a155'; g.fillRect(15, 9, 10, 8); g.fillStyle = '#caa05a'; g.fillRect(16, 8, 3, 2); g.fillRect(21, 8, 3, 2); }
     else if (type === 'recon') { g.strokeStyle = '#cfe6ee'; for (const [rx, ry] of [[-6, -4], [6, -4], [-6, 4], [6, 4]]) { g.beginPath(); g.arc(cx + rx, cy + ry, 3, 0, 7); g.stroke(); } }
     else if (type === 'infantry') { g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill(); g.fillStyle = '#2c3744'; g.fillRect(cx - 3, cy - 1, 6, 8); g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 7, cy - 6); g.stroke(); }
     else if (type === 'rocket') { g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill(); g.fillStyle = '#2c3744'; g.fillRect(cx - 3, cy - 1, 6, 8); g.strokeStyle = '#e8a33d'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 4, cy - 1); g.lineTo(cx + 8, cy - 7); g.stroke(); }
@@ -59,13 +61,13 @@ export function makeUI() {
   const bg = $('buildBtns');
   for (const t of buildOrder) {
     const d = B[t];
-    const btn = cmdButton('b_' + t, iconCanvas('b', t), d.name, '▣' + d.cost);
+    const btn = cmdButton('b_' + t, iconCanvas('b', t), d.name, '▣' + d.cost + (d.alloy ? ' ⬡' + d.alloy : ''));
     btn.title = d.desc; btn.onclick = () => startPlacing(t); bg.appendChild(btn);
   }
   const ug = $('unitBtns');
   for (const t of unitOrder) {
     const d = U[t];
-    const btn = cmdButton('u_' + t, iconCanvas('u', t), d.name, '▣' + d.cost);
+    const btn = cmdButton('u_' + t, iconCanvas('u', t), d.name, '▣' + d.cost + (d.alloy ? ' ⬡' + d.alloy : ''));
     btn.title = d.desc; btn.onclick = () => trainUnit(t); ug.appendChild(btn);
   }
   const ag = $('abilityBtns');
@@ -152,18 +154,20 @@ export function refresh() {
   const w = waterOf(PLAYER);
   $('uiWater').textContent = Math.floor(w.stored) + (w.net >= 0 ? ' +' + w.net : ' ' + w.net) + '/s';
   $('uiWaterWrap').className = 'stat' + (game.overheat[PLAYER] ? ' hot' : '');
+  $('uiAlloy').textContent = String(Math.floor(game.alloy[PLAYER] || 0));
   const m = Math.floor(game.t / 60), s = Math.floor(game.t % 60);
   $('uiTime').textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   if (game.t - lastHint > 5) $('uiHint').textContent = '';
 
   const hasF = game.buildings.some(b => b.team === PLAYER && b.type === 'foundry' && b.progress >= 1);
   const hc = hasCyber();
+  const alloyHave = game.alloy[PLAYER] || 0;
   for (const t of buildOrder) {
     const btn = $('b_' + t) as HTMLButtonElement;
-    btn.disabled = game.money[PLAYER] < B[t].cost;
+    btn.disabled = game.money[PLAYER] < B[t].cost || (B[t].alloy || 0) > alloyHave;
     btn.classList.toggle('armed', game.placing === t);
   }
-  for (const t of unitOrder) ($('u_' + t) as HTMLButtonElement).disabled = !hasF || game.money[PLAYER] < U[t].cost;
+  for (const t of unitOrder) ($('u_' + t) as HTMLButtonElement).disabled = !hasF || game.money[PLAYER] < U[t].cost || (U[t].alloy || 0) > alloyHave;
   for (const k of Object.keys(ABILITIES)) {
     const btn = $('a_' + k) as HTMLButtonElement;
     btn.disabled = !hc || game.money[PLAYER] < ABILITIES[k].cost || game.cooldowns[k] > 0;

@@ -6,7 +6,8 @@ import {
 import { game } from './state';
 import type { ResourceKind } from './types';
 
-const OTHER: Record<ResourceKind, ResourceKind> = { crystal: 'coolant', coolant: 'crystal' };
+// the "scarce other" home-resource pairing (alloy is no faction's home yet → unused)
+const OTHER: Record<ResourceKind, ResourceKind> = { crystal: 'coolant', coolant: 'crystal', alloy: 'crystal' };
 
 /** Seeded-ish value-noise generator (fresh permutation each call). */
 export function makeNoise() {
@@ -144,20 +145,24 @@ export function generateMap() {
       });
     } else if (t === T_WATER) game.waterTiles.push({ x, y });
   }
-  // resource fields — biased so each base is rich in its home resource and poor in
-  // the other, the centre is contested-rich in both, and frontier sites alternate.
+  // resource fields — each base rich in its home resource, with scarce caches of the
+  // other two further out; the centre & frontier are contested-rich. Alloy is nobody's
+  // home → it must always be fought for (DESIGN_SPEC_v4 §2.3).
   game.nodes.length = 0;
   const jit = () => Math.random() * 3 - 1.5;
   for (let i = 0; i < 4; i++) {                                    // corner sites → bases 1..4
     const s = NODE_SITES[i], home = HOME_RES[i + 1], off = OTHER[home];
     spawnResourceField(home, s.x + jit(), s.y + jit(), 6, 3600, 64);            // rich home field
     const ox = s.x + (center.x - s.x) * 0.3, oy = s.y + (center.y - s.y) * 0.3;
-    spawnResourceField(off, ox + jit(), oy + jit(), 2, 1300, 32);              // scarce off-resource starter
+    spawnResourceField(off, ox + jit(), oy + jit(), 2, 1200, 30);              // scarce off-resource starter
+    const ax = s.x + (center.x - s.x) * 0.5, ay = s.y + (center.y - s.y) * 0.5;
+    spawnResourceField('alloy', ax + jit(), ay + jit(), 2, 1200, 30);          // scarce alloy starter (mid-field)
   }
-  spawnResourceField('crystal', center.x - 2, center.y - 1, 7, 4200, 70);      // contested centre…
-  spawnResourceField('coolant', center.x + 2, center.y + 1, 7, 4200, 70);      // …rich in both
-  const mids: [number, ResourceKind][] = [[5, 'coolant'], [6, 'crystal'], [7, 'coolant'], [8, 'crystal']];
-  for (const [i, kind] of mids) {                                  // frontier sites, alternating
+  spawnResourceField('crystal', center.x - 3, center.y - 1, 6, 4000, 66);      // contested centre…
+  spawnResourceField('coolant', center.x + 3, center.y + 1, 6, 4000, 66);      // …rich in all three…
+  spawnResourceField('alloy', center.x, center.y - 3, 6, 4000, 60);            // …including alloy
+  const mids: [number, ResourceKind][] = [[5, 'alloy'], [6, 'crystal'], [7, 'alloy'], [8, 'coolant']];
+  for (const [i, kind] of mids) {                                  // frontier sites
     const s = NODE_SITES[i];
     spawnResourceField(kind, s.x + jit(), s.y + jit(), 5, 3200, 60);
   }
