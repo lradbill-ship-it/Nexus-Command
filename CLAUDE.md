@@ -32,6 +32,23 @@ Build **NEXUS COMMAND**: a real-time strategy game in the spirit of Command & Co
 - **Combat**: turret-aim smoothing, waves that scale with time, fog of war (player + allies' vision), win = every surviving faction is you or your ally; lose = all your buildings destroyed.
 - **Slow build-up pacing**: first AI attack ~2.5–3.5 min, escalating size/frequency.
 
+## v4 Phase 2a — Alloy, the 3rd harvested resource (IMPLEMENTED, branch `feature/v4-phase2-alloy`)
+
+Lane round-2 answer #2 ("3 resources, all harvested"). Mirrors the coolant pipeline.
+
+- **Alloy** = 3rd `ResourceKind`; `game.alloy` stockpile (uncapped, like money). New **Alloy Hauler** unit
+  (`harvests:'alloy'`) → **Alloy Smelter** depot (`accepts:'alloy'`, `freeUnit:'hauler'`).
+- **Purpose:** secondary **build-cost** on advanced units (walker 300, artillery 350, aircraft 250) and
+  buildings (flak 150, cyber 300) — `UnitDef.alloy`/`BuildingDef.alloy`. Gated + spent in `trainUnit`,
+  `startPlacing`/`tryPlace`, and AI (script-build + unit-pick; alloy-starved AI falls back to basic `strike`).
+- **Map:** alloy is **no faction's home** — scarce starter near each base, rich at centre + 2 frontier sites →
+  always contested. Trade pacts flow alloy too (+5/s/partner). Regen can spawn any of the 3 kinds.
+- Art/UI: alloy ore sprite, hauler + smelter art, sidebar buttons/icons, `⬡ ALLOY` HUD meter, alloy cost
+  labels (`⬡N`), kind-tinted nodes/minimap/cargo (alloy = `#e0a155`). AI keeps haulers when it has a Smelter.
+- Verified headlessly: 3 kinds spawn, alloy gating blocks/permits + spends correctly, haulers harvest,
+  advanced units become a deliberate investment. `tsc + vite` clean.
+- **Next: Phase 2b** — 6 regional factions + larger map + scarier aircraft (spec §6; roster proposed, awaiting a glance).
+
 ## v4 Phase 1 — Multi-resource economy (IMPLEMENTED, branch `feature/v4-phase1-economy`)
 
 First slice of the v4 "Living World" plan (`docs/DESIGN_SPEC_v4.md`). Green-lit by Lane.

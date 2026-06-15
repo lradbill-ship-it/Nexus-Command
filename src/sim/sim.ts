@@ -187,9 +187,9 @@ function regenCrystals(dt: number) {
     if (!passable(tx, ty)) continue;
     if (!farFromBuildings(wx, wy, 6)) continue;
     if (game.nodes.some(n => n.amount > 0 && dist(n, { x: wx, y: wy }) < 5 * TILE)) continue;
-    const kind = Math.random() < 0.5 ? 'crystal' : 'coolant';
+    const kind = (['crystal', 'coolant', 'alloy'] as const)[Math.random() * 3 | 0];
     spawnResourceField(kind, tx, ty, 3 + (Math.random() * 3 | 0), 2400 + Math.random() * 1200, 46);
-    logMsg('New ' + (kind === 'crystal' ? 'data-crystal' : 'coolant') + ' formation detected on the grid', 'good');
+    logMsg('New ' + (kind === 'crystal' ? 'data-crystal' : kind) + ' formation detected on the grid', 'good');
     sfx('chime');
     return;
   }
@@ -358,7 +358,8 @@ function updateHarvester(u: Unit, dt: number) {
     if (!dep) { u.hState = 'idlewait'; return; }
     if (dist(u, dep) < Math.max(dep.w, dep.h) / 2 + 26) {
       if (kind === 'crystal') game.money[u.team] += Math.round(u.cargo);
-      else game.water[u.team] = clamp((game.water[u.team] || 0) + u.cargo, 0, WATER_CAP);
+      else if (kind === 'coolant') game.water[u.team] = clamp((game.water[u.team] || 0) + u.cargo, 0, WATER_CAP);
+      else game.alloy[u.team] = (game.alloy[u.team] || 0) + Math.round(u.cargo);
       u.cargo = 0; u.hState = 'find';
       dep.unloadFx = game.t; u.moving = false; u.path = null;
       if (u.team === PLAYER) sfx('cash', dep.x);
@@ -681,19 +682,23 @@ function aiUpdate(team: number, dt: number) {
   const tShift = FAC[team].persona === 'warlord' ? -25 : (FAC[team].persona === 'merchant' ? 30 : 0);
   while (ai.builtIdx < AI_SCRIPT.length && game.t >= AI_SCRIPT[ai.builtIdx].t + tShift) {
     const step = AI_SCRIPT[ai.builtIdx]; ai.builtIdx++;
-    if (game.money[team] >= B[step.type].cost) {
-      if (aiPlace(team, step.type, step.dx, step.dy, false)) game.money[team] -= B[step.type].cost;
+    const ba = B[step.type].alloy || 0;
+    if (game.money[team] >= B[step.type].cost && ba <= (game.alloy[team] || 0)) {
+      if (aiPlace(team, step.type, step.dx, step.dy, false)) { game.money[team] -= B[step.type].cost; game.alloy[team] -= ba; }
     }
   }
   if (game.t > 320) game.money[team] += 6 * dt;
   if (FAC[team].persona === 'merchant') game.money[team] += 4 * dt;
   const harv = game.units.filter(u => u.team === team && u.type === 'harvester').length;
   const tankers = game.units.filter(u => u.team === team && u.type === 'tanker').length;
+  const haulers = game.units.filter(u => u.team === team && u.type === 'hauler').length;
   const hasCoolantDepot = game.buildings.some(b => b.team === team && b.type === 'pump' && b.progress >= 1);
+  const hasAlloyDepot = game.buildings.some(b => b.team === team && b.type === 'smelter' && b.progress >= 1);
   const foundries = game.buildings.filter(b => b.team === team && b.type === 'foundry' && b.progress >= 1);
   if (foundries.length && foundries[0].queue.length === 0) {
     if (harv < 2 && game.money[team] > 700) { foundries[0].queue.push('harvester'); game.money[team] -= U.harvester.cost; }
     else if (hasCoolantDepot && tankers < 2 && game.money[team] > 800) { foundries[0].queue.push('tanker'); game.money[team] -= U.tanker.cost; }
+    else if (hasAlloyDepot && haulers < 2 && game.money[team] > 800) { foundries[0].queue.push('hauler'); game.money[team] -= U.hauler.cost; }
   }
   const army = game.units.filter(u => u.team === team && !U[u.type].harvests);
   const countType = (t: string) => game.units.reduce((s, u) => s + (u.team === team && u.type === t ? 1 : 0), 0);
@@ -715,7 +720,12 @@ function aiUpdate(team: number, dt: number) {
           : ['strike', 'walker', 'rocket', 'infantry', 'artillery', 'aircraft'];
         pick = pool[Math.random() * pool.length | 0];
       }
-      if (pick && game.money[team] >= U[pick].cost) { f.queue.push(pick); game.money[team] -= U[pick].cost; }
+      if (pick) {
+        if ((U[pick].alloy || 0) > (game.alloy[team] || 0)) pick = 'strike';   // alloy-starved → basic armor
+        if (game.money[team] >= U[pick].cost && (U[pick].alloy || 0) <= (game.alloy[team] || 0)) {
+          f.queue.push(pick); game.money[team] -= U[pick].cost; game.alloy[team] -= (U[pick].alloy || 0);
+        }
+      }
     }
   }
   if (game.t >= ai.nextWave) {
@@ -806,6 +816,7 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
 }
 export function startPlacing(type: string) {
   if (game.money[PLAYER] < B[type].cost) { hint('Insufficient crystals'); return; }
+  if ((B[type].alloy || 0) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy'); return; }
   game.placing = type; game.armed = null;
   hint('Place ' + B[type].name + ' — right-click to cancel');
 }
@@ -821,7 +832,8 @@ export function tryPlace(wx: number, wy: number) {
   const tx = Math.round(wx / TILE - d.w / 2), ty = Math.round(wy / TILE - d.h / 2);
   if (!canPlaceHere(type, tx, ty)) { hint('Cannot deploy here — needs clear, scouted ground near your base'); return; }
   if (game.money[PLAYER] < d.cost) { hint('Insufficient crystals'); game.placing = null; return; }
-  game.money[PLAYER] -= d.cost;
+  if ((d.alloy || 0) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy'); game.placing = null; return; }
+  game.money[PLAYER] -= d.cost; game.alloy[PLAYER] -= (d.alloy || 0);
   addBuilding(type, tx, ty, PLAYER, false);
   sfx('place', wx); game.placing = null; hint('');
 }
@@ -829,8 +841,9 @@ export function trainUnit(t: string) {
   const fs = game.buildings.filter(b => b.team === PLAYER && b.type === 'foundry' && b.progress >= 1);
   if (!fs.length) { hint('Build a War Foundry first'); return; }
   if (game.money[PLAYER] < U[t].cost) { hint('Insufficient crystals'); return; }
+  if ((U[t].alloy || 0) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy — build an Alloy Smelter'); return; }
   fs.sort((a, b) => a.queue.length - b.queue.length);
-  game.money[PLAYER] -= U[t].cost; fs[0].queue.push(t); sfx('click');
+  game.money[PLAYER] -= U[t].cost; game.alloy[PLAYER] -= (U[t].alloy || 0); fs[0].queue.push(t); sfx('click');
 }
 
 // ── Win / lose ───────────────────────────────────────────────────────────────
@@ -857,11 +870,14 @@ export function stepWorld(dt: number) {
   for (const k in game.covCd) game.covCd[k] = Math.max(0, game.covCd[k] - dt);
   game.money[PLAYER] += tradeIncome(PLAYER) * dt;
   for (const f of AIS) if (!game.eliminated[f]) game.money[f] += tradeIncome(f) * dt;
-  // coolant also flows across trade pacts (all resources are tradeable)
+  // coolant & alloy also flow across trade pacts (all resources are tradeable)
   for (const team of ALL_TEAMS) {
     if (game.eliminated[team]) continue;
     let partners = 0; for (const f of ALL_TEAMS) if (f !== team && dip.trade[rk(team, f)] && !game.eliminated[f]) partners++;
-    if (partners) game.water[team] = clamp((game.water[team] || 0) + partners * 6 * dt, 0, WATER_CAP);
+    if (partners) {
+      game.water[team] = clamp((game.water[team] || 0) + partners * 6 * dt, 0, WATER_CAP);
+      game.alloy[team] = (game.alloy[team] || 0) + partners * 5 * dt;
+    }
   }
   for (const u of game.units) updateUnit(u, dt);
   for (const u of game.units) postAttackCleanup(u);

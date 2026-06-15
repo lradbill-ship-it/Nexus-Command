@@ -1,6 +1,6 @@
 export interface Vec { x: number; y: number; }
 
-export type ResourceKind = 'crystal' | 'coolant';
+export type ResourceKind = 'crystal' | 'coolant' | 'alloy';
 export interface ResourceNode {
   kind: ResourceKind;
   x: number; y: number;
@@ -103,6 +103,7 @@ export interface GameState {
   t: number;
   money: Record<number, number>;
   water: Record<number, number>;          // stored coolant reserve per team
+  alloy: Record<number, number>;          // stored alloy stockpile per team (build-cost resource)
   overheat: Record<number, boolean>;      // true when a team's reserve is dry & in deficit
   cam: { x: number; y: number };
   buildings: Building[];
