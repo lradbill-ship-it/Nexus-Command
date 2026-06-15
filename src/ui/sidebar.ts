@@ -8,7 +8,7 @@ import {
 } from '../sim/sim';
 
 const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'aaturret', 'cyber'];
-const unitOrder = ['harvester', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'aircraft'];
+const unitOrder = ['harvester', 'tanker', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'aircraft'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -26,6 +26,7 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'cyber') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(155,111,232,.5)'; g.fill(); g.strokeStyle = '#b07dff'; g.stroke(); }
   } else {
     if (type === 'harvester') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#9bd4ff'; g.fillRect(16, 9, 8, 6); }
+    else if (type === 'tanker') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#7fd6ea'; g.beginPath(); g.arc(20, 13, 5, 0, 7); g.fill(); g.strokeStyle = '#cfeef5'; g.beginPath(); g.moveTo(15, 13); g.lineTo(25, 13); g.stroke(); }
     else if (type === 'recon') { g.strokeStyle = '#cfe6ee'; for (const [rx, ry] of [[-6, -4], [6, -4], [-6, 4], [6, 4]]) { g.beginPath(); g.arc(cx + rx, cy + ry, 3, 0, 7); g.stroke(); } }
     else if (type === 'infantry') { g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill(); g.fillStyle = '#2c3744'; g.fillRect(cx - 3, cy - 1, 6, 8); g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 7, cy - 6); g.stroke(); }
     else if (type === 'rocket') { g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill(); g.fillStyle = '#2c3744'; g.fillRect(cx - 3, cy - 1, 6, 8); g.strokeStyle = '#e8a33d'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 4, cy - 1); g.lineTo(cx + 8, cy - 7); g.stroke(); }
@@ -205,7 +206,7 @@ function refreshSel() {
     let extra = '';
     if (sObj.kind === 'b' && (sObj as any).progress < 1) extra = `<br>Constructing ${Math.round((sObj as any).progress * 100)}%`;
     if (sObj.kind === 'b' && (sObj as any).type === 'foundry' && (sObj as any).queue.length) extra = `<br>Queue: ${(sObj as any).queue.length} (${U[(sObj as any).queue[0]].name})`;
-    if (sObj.kind === 'u' && (sObj as any).type === 'harvester') extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${U.harvester.cargo}`;
+    if (sObj.kind === 'u' && U[(sObj as any).type].harvests) extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${d.cargo} ${d.harvests}`;
     el.innerHTML = `<span class="nm">${d.name}</span><br>HP ${Math.ceil(sObj.hp)}/${sObj.hpMax}${extra}`;
   } else el.innerHTML = `<span class="nm">${game.selection.length} units</span> in command group`;
 }

@@ -32,6 +32,27 @@ Build **NEXUS COMMAND**: a real-time strategy game in the spirit of Command & Co
 - **Combat**: turret-aim smoothing, waves that scale with time, fog of war (player + allies' vision), win = every surviving faction is you or your ally; lose = all your buildings destroyed.
 - **Slow build-up pacing**: first AI attack ~2.5–3.5 min, escalating size/frequency.
 
+## v4 Phase 1 — Multi-resource economy (IMPLEMENTED, branch `feature/v4-phase1-economy`)
+
+First slice of the v4 "Living World" plan (`docs/DESIGN_SPEC_v4.md`). Green-lit by Lane.
+
+- **Typed resources** (`types.ts ResourceNode{kind:'crystal'|'coolant'}`): `CrystalNode` generalized;
+  `game.nodes` carry a `kind`. Harvesting is resource-typed throughout (`resOf`, `nearestNodePathable`,
+  `nearestDepot` filter by kind; deliver crystal→`money`, coolant→`water`).
+- **Coolant is now HARVESTED** (was passively generated in v3.1): new **Coolant Tanker** unit
+  (`U.tanker`, `harvests:'coolant'`) draws from **coolant wells** → **Coolant Refinery** (the old
+  `pump`/Coolant Plant, now `accepts:'coolant'`, `freeUnit:'tanker'`, small trickle). Building-completion
+  free-unit is generic via `BuildingDef.freeUnit`. HQ accepts all resources.
+- **Resource-biased spawns** (`mapgen.ts` + `constants.HOME_RES`): each base RICH in its home resource,
+  ~0 in the other; contested centre rich in both; frontier sites alternate → forces explore/conquer.
+  Verified: corner mass 21,600 home / 0 off. `spawnCrystalField`→`spawnResourceField(kind,...)`.
+- **All resources tradeable** (`stepWorld`): trade pacts now flow coolant (+6/s per partner) as well as crystals.
+- Art/UI: coolant-well sprite + tanker art (`textures.ts`), kind-tinted node sprites/minimap/cargo bars,
+  tanker sidebar button/icon, resource-typed cargo readout. AI maintains tankers when it has a Coolant Refinery.
+- Verified headlessly: typed harvest both resources, exact spawn bias, tankers deliver, overheat tension
+  per team, full combat roster still fabricates. `tsc + vite` clean.
+- **Next: Phase 2** (larger maps + 6 factions + scarier aircraft) per spec §9.
+
 ## v3.1 — Lane wishlist Tranche A+B (IMPLEMENTED, branch `feature/lane-wishlist-a-b`)
 
 Addresses 6 of Lane's 11 requests. The other 5 (society/government layer: recruitable
