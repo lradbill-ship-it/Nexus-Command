@@ -11,7 +11,16 @@ import { buildAllTextures, originOf } from '../render/textures';
 import { initAudio, sfx, setViewWidth, toggleMute } from '../audio';
 import type { Building, Unit, Entity } from '../sim/types';
 
-interface SpriteRec { body: Phaser.GameObjects.Image; barrel?: Phaser.GameObjects.Image; glow?: Phaser.GameObjects.Image; }
+interface SpriteRec {
+  body: Phaser.GameObjects.Image;
+  barrel?: Phaser.GameObjects.Image;
+  glow?: Phaser.GameObjects.Image;
+  dish?: Phaser.GameObjects.Image;     // spinning HQ radar
+  rotor?: Phaser.GameObjects.Image;    // spinning rotor disc (aircraft / drone)
+  shadow?: Phaser.GameObjects.Image;   // ground shadow for airborne units
+}
+const ALT = 17;                        // render altitude (px) for flying units
+const hasRotor = (t: string) => t === 'aircraft' || t === 'recon';
 
 export class BattleScene extends Phaser.Scene {
   private terrainImg!: Phaser.GameObjects.Image;
@@ -77,7 +86,7 @@ export class BattleScene extends Phaser.Scene {
   /** Regenerate a fresh battlefield. start=true skips the intro (used by restart). */
   newMatch(start: boolean) {
     // wipe sprites
-    for (const r of this.recs.values()) { r.body.destroy(); r.barrel?.destroy(); r.glow?.destroy(); }
+    for (const r of this.recs.values()) { r.body.destroy(); r.barrel?.destroy(); r.glow?.destroy(); r.dish?.destroy(); r.rotor?.destroy(); r.shadow?.destroy(); }
     this.recs.clear();
     for (const c of this.crystals.values()) { c.spr.destroy(); c.glow.destroy(); }
     this.crystals.clear();
@@ -231,7 +240,7 @@ export class BattleScene extends Phaser.Scene {
     const live = new Set<number>();
     for (const b of game.buildings) { live.add(b.id); this.syncBuilding(b); }
     for (const u of game.units) { live.add(u.id); this.syncUnit(u); }
-    for (const [id, r] of this.recs) if (!live.has(id)) { r.body.destroy(); r.barrel?.destroy(); r.glow?.destroy(); this.recs.delete(id); }
+    for (const [id, r] of this.recs) if (!live.has(id)) { r.body.destroy(); r.barrel?.destroy(); r.glow?.destroy(); r.dish?.destroy(); r.rotor?.destroy(); r.shadow?.destroy(); this.recs.delete(id); }
   }
   private syncBuilding(b: Building) {
     let r = this.recs.get(b.id);
@@ -240,7 +249,8 @@ export class BattleScene extends Phaser.Scene {
       const body = this.add.image(b.x, b.y, key); this.setOrigin(body, key);
       const glow = this.add.image(b.x, b.y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(Phaser.Display.Color.HexStringToColor(FAC[b.team].col).color);
       r = { body, glow };
-      if (b.type === 'turret') { r.barrel = this.add.image(b.x, b.y, `t_turret_${b.team}`); this.setOrigin(r.barrel, `t_turret_${b.team}`); }
+      if (b.type === 'turret' || b.type === 'aaturret') { const bk = `t_${b.type}_${b.team}`; r.barrel = this.add.image(b.x, b.y, bk); this.setOrigin(r.barrel, bk); }
+      if (b.type === 'hq') { r.dish = this.add.image(b.x, b.y, 'radardish').setTint(Phaser.Display.Color.HexStringToColor(FAC[b.team].col).color); }
       this.recs.set(b.id, r);
     }
     const vis = canSee(b);
@@ -254,6 +264,10 @@ export class BattleScene extends Phaser.Scene {
         .setAlpha(0.12 + pulse * 0.16).setDisplaySize(b.w * 0.9, b.h * 0.9)
         .setPosition(b.x, b.y - B[b.type].hgt * 0.3);
     }
+    if (r.dish) {
+      r.dish.setVisible(vis && built).setDepth(b.y + 0.5)
+        .setPosition(b.x, b.y - B[b.type].hgt * 0.55).setRotation(game.t * 0.9);
+    }
     if (r.barrel) {
       r.barrel.setVisible(vis && built).setDepth(b.y + 0.4)
         .setPosition(b.x, b.y - B[b.type].hgt * 0.5).setRotation(b.aim + Math.PI / 2);
@@ -262,21 +276,30 @@ export class BattleScene extends Phaser.Scene {
   private syncUnit(u: Unit) {
     let r = this.recs.get(u.id);
     const key = `u_${u.type}_${u.team}`;
+    const hasBarrel = u.type === 'strike' || u.type === 'walker' || u.type === 'artillery';
     if (!r) {
       const body = this.add.image(u.x, u.y, key); this.setOrigin(body, key);
       r = { body };
-      if (u.type === 'strike' || u.type === 'walker') { const bk = `t_${u.type}_${u.team}`; r.barrel = this.add.image(u.x, u.y, bk); this.setOrigin(r.barrel, bk); }
+      if (hasBarrel) { const bk = `t_${u.type}_${u.team}`; r.barrel = this.add.image(u.x, u.y, bk); this.setOrigin(r.barrel, bk); }
+      if (hasRotor(u.type)) r.rotor = this.add.image(u.x, u.y, 'rotor').setBlendMode(Phaser.BlendModes.ADD);
+      if (U[u.type].air) r.shadow = this.add.image(u.x, u.y, 'airshadow');
       this.recs.set(u.id, r);
     } else if (r.body.texture.key !== key) {
       // team changed (hijack) — reskin
       r.body.setTexture(key); this.setOrigin(r.body, key);
-      if (r.barrel && (u.type === 'strike' || u.type === 'walker')) { const bk = `t_${u.type}_${u.team}`; r.barrel.setTexture(bk); this.setOrigin(r.barrel, bk); }
+      if (r.barrel && hasBarrel) { const bk = `t_${u.type}_${u.team}`; r.barrel.setTexture(bk); this.setOrigin(r.barrel, bk); }
     }
     const vis = canSee(u);
-    const bob = Math.sin(game.t * 3 + u.bob) * 1.5;
-    r.body.setVisible(vis).setDepth(u.y).setPosition(u.x, u.y + bob).setRotation(u.facing + Math.PI / 2)
+    const air = !!U[u.type].air;
+    const bob = Math.sin(game.t * 3 + u.bob) * (air ? 2.5 : 1.5);
+    const dy = u.y - (air ? ALT : 0) + bob;       // airborne units float above the deck
+    const depth = air ? u.y + 4000 : u.y;         // …and draw above ground entities
+    r.body.setVisible(vis).setDepth(depth).setPosition(u.x, dy).setRotation(u.facing + Math.PI / 2)
       .setAlpha(u.disabledUntil > game.t ? 0.6 : 1);
-    if (r.barrel) r.barrel.setVisible(vis).setDepth(u.y + 0.5).setPosition(u.x, u.y + bob).setRotation(u.aim + Math.PI / 2);
+    if (r.shadow) r.shadow.setVisible(vis).setDepth(u.y - 1).setPosition(u.x, u.y).setScale(0.8).setAlpha(0.45);
+    if (r.barrel) r.barrel.setVisible(vis).setDepth(depth + 0.5).setPosition(u.x, dy).setRotation(u.aim + Math.PI / 2);
+    if (r.rotor) r.rotor.setVisible(vis).setDepth(depth + 0.6).setPosition(u.x, dy).setRotation(game.t * 22)
+      .setScale(u.type === 'aircraft' ? 1 : 0.6).setAlpha(0.5);
   }
 
   private syncCrystals() {

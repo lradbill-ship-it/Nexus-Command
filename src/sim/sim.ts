@@ -1,5 +1,5 @@
 import {
-  TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, AIS, FAC, B, U, ABILITIES, COVERT,
+  TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, AIS, ALL_TEAMS, FAC, B, U, ABILITIES, COVERT,
   BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD,
   idx, inMap, clamp, dist,
 } from './constants';
@@ -8,6 +8,7 @@ import {
 } from './state';
 import type { Building, Unit, Entity, Vec, Particle } from './types';
 import { findPath, passable } from './pathfind';
+import { spawnCrystalField } from './mapgen';
 import { sfx } from '../audio';
 
 // ── Renderer / UI hooks (sim never imports the renderer or DOM directly) ──────
@@ -21,7 +22,8 @@ let nextId = 1;
 let dipTickT = 0;
 let lastStates: Record<string, string> = {};
 let lastHintT = 0;
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; }
+let crystalT = 55;   // first new formation seeds ~55s in
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -135,9 +137,78 @@ export function tradeIncome(team: number) {
   return n * 9;
 }
 
+// ── Coolant (secondary resource) ──────────────────────────────────────────────
+// Pumps & the HQ produce coolant; walkers, artillery, gunships and flak consume
+// it. When a team's reserve runs dry in deficit it OVERHEATS — those weapons fire
+// at half rate until coolant is restored (build more Coolant Plants).
+export const WATER_CAP = 600;
+export function waterOf(team: number) {
+  let prod = 0, cons = 0;
+  for (const b of game.buildings) {
+    if (b.team !== team || b.progress < 1) continue;
+    prod += B[b.type].water || 0; cons += B[b.type].coolant || 0;
+  }
+  for (const u of game.units) if (u.team === team) cons += U[u.type].coolant || 0;
+  return { prod, cons, net: prod - cons, stored: game.water[team] || 0 };
+}
+function waterStep(dt: number) {
+  for (const team of ALL_TEAMS) {
+    if (game.eliminated[team]) continue;
+    const w = waterOf(team);
+    game.water[team] = clamp((game.water[team] || 0) + w.net * dt, 0, WATER_CAP);
+    const wasHot = game.overheat[team];
+    game.overheat[team] = game.water[team] <= 0.5 && w.net < 0;
+    if (game.overheat[team] && !wasHot && team === PLAYER) {
+      logMsg('COOLANT DEPLETED — special weapons overheating at half rate', 'war'); sfx('war');
+    }
+  }
+}
+
+// ── Crystal regeneration ──────────────────────────────────────────────────────
+// Living fields slowly regrow, and fresh formations crystallize at random sites
+// over the course of a match so the economy never permanently dries up.
+function farFromBuildings(wx: number, wy: number, tiles: number) {
+  const d2 = (tiles * TILE) * (tiles * TILE);
+  for (const b of game.buildings) { const dx = b.x - wx, dy = b.y - wy; if (dx * dx + dy * dy < d2) return false; }
+  return true;
+}
+function regenCrystals(dt: number) {
+  // slow regrowth of partially-mined fields (never past their original max)
+  for (const n of game.nodes) if (n.amount > 0 && n.amount < n.max) n.amount = Math.min(n.max, n.amount + 9 * dt);
+  // periodic brand-new formations, capped so the map can't flood with crystals
+  crystalT -= dt;
+  if (crystalT > 0) return;
+  crystalT = 70 + Math.random() * 50;
+  let active = 0; for (const n of game.nodes) if (n.amount > 0) active++;
+  if (active >= 60) return;                            // map saturated with fields; skip this cycle
+  for (let tries = 0; tries < 60; tries++) {
+    const tx = 4 + (Math.random() * (MAPW - 8) | 0), ty = 4 + (Math.random() * (MAPH - 8) | 0);
+    const wx = tx * TILE + 16, wy = ty * TILE + 16;
+    if (!passable(tx, ty)) continue;
+    if (!farFromBuildings(wx, wy, 6)) continue;
+    if (game.nodes.some(n => n.amount > 0 && dist(n, { x: wx, y: wy }) < 5 * TILE)) continue;
+    spawnCrystalField(tx, ty, 3 + (Math.random() * 3 | 0), 2400 + Math.random() * 1200, 46);
+    logMsg('New data-crystal formation detected on the grid', 'good');
+    sfx('chime');
+    return;
+  }
+}
+
 // ── Combat ───────────────────────────────────────────────────────────────────
-function fireAt(src: Entity, target: Entity, dmg: number, rail: boolean) {
-  game.shots.push({ x: src.x, y: src.y, target, dmg, team: src.team, speed: rail ? 940 : 560, col: FAC[src.team].col, rail });
+// Layer & engagement rules: fliers can only be hit by anti-air shooters; flak
+// (airOnly) can only hit fliers; everything else fights on the ground.
+export const isAir = (e: Entity) => e.kind === 'u' && !!U[(e as Unit).type].air;
+function defOf(e: Entity) { return e.kind === 'b' ? B[(e as Building).type] : U[(e as Unit).type]; }
+function canHitAir(e: Entity) { return !!defOf(e).antiAir; }
+function canHitGround(e: Entity) { return !(e.kind === 'b' && (B[(e as Building).type].airOnly)); }
+function eligibleTarget(shooter: Entity, target: Entity) {
+  return isAir(target) ? canHitAir(shooter) : canHitGround(shooter);
+}
+// Overheated teams (coolant-dependent) fire their special weapons at half rate.
+function rofMult(e: Entity) { return defOf(e).coolant && game.overheat[e.team] ? 2 : 1; }
+
+function fireAt(src: Entity, target: Entity, dmg: number, rail: boolean, splash = 0) {
+  game.shots.push({ x: src.x, y: src.y, target, dmg, team: src.team, speed: rail ? 940 : 560, col: FAC[src.team].col, rail, splash });
   src.lastShot = game.t;
   spawnParts('muzzle', src.x, src.y, 2, '255,235,180');
   sfx(rail ? 'rail' : 'shot', src.x);
@@ -174,10 +245,11 @@ function nearestHostile(e: Entity, range: number, team: number, playerVisOnly: b
   let best: Entity | null = null, bd = range;
   for (const u of game.units) {
     if (!isWar(team, u.team)) continue;
+    if (!eligibleTarget(e, u)) continue;
     if (playerVisOnly && !tileVisible(u.x, u.y)) continue;
     const d = dist(e, u) - U[u.type].radius; if (d < bd) { bd = d; best = u; }
   }
-  for (const b of game.buildings) {
+  if (canHitGround(e)) for (const b of game.buildings) {   // flak (airOnly) ignores structures
     if (!isWar(team, b.team)) continue;
     if (playerVisOnly && !tileVisible(b.x, b.y)) continue;
     const d = dist(e, b) - Math.max(b.w, b.h) / 2; if (d < bd) { bd = d; best = b; }
@@ -193,7 +265,8 @@ function stepToward(u: Unit, dx: number, dy: number, dt: number) {
   u.moving = true;
   const nx = u.x + dx / len * sp, ny = u.y + dy / len * sp;
   u.facing = Math.atan2(dy, dx);
-  if (!unitBlocked(nx, ny)) { u.x = nx; u.y = ny; }
+  if (U[u.type].air) { u.x = nx; u.y = ny; }              // fliers ignore terrain entirely
+  else if (!unitBlocked(nx, ny)) { u.x = nx; u.y = ny; }
   else if (!unitBlocked(nx, u.y)) { u.x = nx; }
   else if (!unitBlocked(u.x, ny)) { u.y = ny; }
   else { const px = u.x + (-dy / len) * sp, py = u.y + (dx / len) * sp; if (!unitBlocked(px, py)) { u.x = px; u.y = py; } }
@@ -201,7 +274,7 @@ function stepToward(u: Unit, dx: number, dy: number, dt: number) {
   return len < sp * 1.5;
 }
 export function setPath(u: Unit, wx: number, wy: number) {
-  u.path = findPath(u.x, u.y, wx, wy);
+  u.path = U[u.type].air ? [{ x: wx, y: wy }] : findPath(u.x, u.y, wx, wy);   // fliers fly straight
   u.finalDest = { x: wx, y: wy };
   u.stuckT = 0;
 }
@@ -223,6 +296,7 @@ function separation() {
   const us = game.units;
   for (let i = 0; i < us.length; i++) for (let j = i + 1; j < us.length; j++) {
     const a = us[i], b = us[j];
+    if (U[a.type].air || U[b.type].air) continue;          // air & ground occupy separate layers
     const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
     const min = U[a.type].radius + U[b.type].radius;
     if (d > 0 && d < min) {
@@ -309,7 +383,7 @@ function updateUnit(u: Unit, dt: number) {
     if (dist(u, tgt) <= r) {
       u.moving = false; u.path = null;
       u.facing = Math.atan2(tgt.y - u.y, tgt.x - u.x);
-      if (u.cooldown <= 0 && Math.abs(da) < 0.5) { fireAt(u, tgt, d.dmg!, u.type === 'walker'); u.cooldown = d.rof!; }
+      if (u.cooldown <= 0 && Math.abs(da) < 0.5) { fireAt(u, tgt, d.dmg!, u.type === 'walker', d.splash || 0); u.cooldown = d.rof! * rofMult(u); }
     } else {
       u.repathT -= dt;
       if (!u.path || u.repathT <= 0) { u.repathT = 1.0; setPath(u, tgt.x, tgt.y); }
@@ -358,15 +432,15 @@ function updateBuilding(b: Building, dt: number) {
     return;
   }
   if (b.disabledUntil > game.t) return;
-  if (b.type === 'turret') {
+  if (b.type === 'turret' || b.type === 'aaturret') {
     b.cooldown = Math.max(0, b.cooldown - dt);
-    if (b.target && (b.target.dead || dist(b, b.target) > d.range! + 30)) b.target = null;
+    if (b.target && (b.target.dead || dist(b, b.target) > d.range! + 30 || !eligibleTarget(b, b.target))) b.target = null;
     if (!b.target) b.target = nearestHostile(b, d.range!, b.team, b.team === PLAYER);
     if (b.target) {
       const want = Math.atan2(b.target.y - b.y, b.target.x - b.x);
       const da = ((want - b.aim + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
       b.aim += clamp(da, -5 * dt, 5 * dt);
-      if (b.cooldown <= 0 && Math.abs(da) < 0.4) { fireAt(b, b.target, d.dmg!, false); b.cooldown = d.rof! / pw.factor; }
+      if (b.cooldown <= 0 && Math.abs(da) < 0.4) { fireAt(b, b.target, d.dmg!, false); b.cooldown = d.rof! / pw.factor * rofMult(b); }
     } else b.aim += dt * 0.4;
   }
   if (b.type === 'power' && Math.random() < dt * 1.6)
@@ -410,8 +484,20 @@ function updateShots(dt: number) {
     if (!s.target || s.target.dead) { s.dead = true; continue; }
     const dx = s.target.x - s.x, dy = s.target.y - s.y, l = Math.hypot(dx, dy), step = s.speed * dt;
     if (l <= step) {
+      const hx = s.target.x, hy = s.target.y;
       damage(s.target, s.dmg, s.team); s.dead = true;
-      spawnParts('spark', s.target.x, s.target.y, 3, '255,240,200');
+      if (s.splash) {
+        // area blast: falls off with distance, never friendly-fires the shooter's team
+        for (const u of [...game.units]) {
+          if (u.dead || u === s.target || isAllied(s.team, u.team)) continue;
+          const dd = dist(u, { x: hx, y: hy });
+          if (dd < s.splash) damage(u, s.dmg * (1 - dd / s.splash) * 0.7, s.team);
+        }
+        spawnParts('fire', hx, hy, 9, '255,150,55');
+        game.parts.push({ type: 'ring', x: hx, y: hy, t: 0, life: 0.5, big: false });
+        game.shake = Math.min(11, game.shake + 1.5);
+      }
+      spawnParts('spark', hx, hy, 3, '255,240,200');
     } else { s.x += dx / l * step; s.y += dy / l * step; }
   }
   game.shots = game.shots.filter(s => !s.dead);
@@ -600,13 +686,26 @@ function aiUpdate(team: number, dt: number) {
     foundries[0].queue.push('harvester'); game.money[team] -= U.harvester.cost;
   }
   const army = game.units.filter(u => u.team === team && u.type !== 'harvester');
-  if (army.length < 26 && foundries.length) {
-    for (const f of foundries) {
-      if (f.queue.length < 2 && game.money[team] > 900) {
-        const pool = game.t < 320 ? ['recon', 'strike', 'strike'] : ['strike', 'strike', 'walker', 'recon'];
-        const pick = pool[Math.random() * pool.length | 0];
-        f.queue.push(pick); game.money[team] -= U[pick].cost;
+  const countType = (t: string) => game.units.reduce((s, u) => s + (u.team === team && u.type === t ? 1 : 0), 0);
+  if (foundries.length && game.money[team] > 900) {
+    const f = foundries.find(fo => fo.queue.length < 2);
+    if (f) {
+      // late-game combined-arms: guarantee a standing core of advanced units…
+      let pick: string | null = null;
+      if (game.t > 300) {
+        if (countType('aircraft') < 3) pick = 'aircraft';
+        else if (countType('artillery') < 2) pick = 'artillery';
+        else if (countType('walker') < 2) pick = 'walker';
+        else if (countType('rocket') < 4) pick = 'rocket';
       }
+      // …then fill out the line with a mixed pool up to the army cap
+      if (!pick && army.length < 34) {
+        const pool = game.t < 300
+          ? ['infantry', 'infantry', 'recon', 'strike', 'strike']
+          : ['strike', 'walker', 'rocket', 'infantry', 'artillery', 'aircraft'];
+        pick = pool[Math.random() * pool.length | 0];
+      }
+      if (pick && game.money[team] >= U[pick].cost) { f.queue.push(pick); game.money[team] -= U[pick].cost; }
     }
   }
   if (game.t >= ai.nextWave) {
@@ -681,7 +780,7 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
   }
   let i = 0;
   for (const u of sel) {
-    if (tgt && u.type !== 'harvester') { u.order = 'attack'; u.target = tgt; setPath(u, tgt.x, tgt.y); }
+    if (tgt && u.type !== 'harvester' && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; setPath(u, tgt.x, tgt.y); }
     else if (node && u.type === 'harvester') { u.hNode = node; u.hState = 'go'; u.order = 'idle'; setPath(u, node.x, node.y); }
     else {
       const a = (i / sel.length) * Math.PI * 2, r = i === 0 ? 0 : 14 + 8 * Math.sqrt(i);
@@ -755,6 +854,8 @@ export function stepWorld(dt: number) {
   for (const f of AIS) aiUpdate(f, dt);
   dipTickT += dt;
   if (dipTickT >= 5) { dipTickT = 0; diplomacyTick(); }
+  regenCrystals(dt);
+  waterStep(dt);
   computeVision();
   checkEnd();
 }
