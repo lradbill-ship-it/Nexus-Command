@@ -63,11 +63,13 @@ export interface BuildingDef {
   accepts?: ResourceKind;  // harvested resource this structure is a drop-off for
   freeUnit?: string;       // unit gifted on construction completion
   alloy?: number;          // alloy build-cost surcharge (advanced structures)
+  house?: number;          // civilian housing capacity provided
+  civic?: number;          // happiness contribution (civic needs met)
   desc: string;
 }
 
 export const B: Record<string, BuildingDef> = {
-  hq: { name: 'Command HQ', w: 3, h: 3, hp: 1700, cost: 0, power: +20, buildTime: 0, sight: 8, hgt: 26, water: 5, desc: 'Primary structure. Accepts all resource deliveries. Trickles coolant.' },
+  hq: { name: 'Command HQ', w: 3, h: 3, hp: 1700, cost: 0, power: +20, buildTime: 0, sight: 8, hgt: 26, water: 5, house: 20, civic: 6, desc: 'Primary structure. Accepts all resource deliveries. Houses your first citizens.' },
   power: { name: 'Power Plant', w: 2, h: 2, hp: 430, cost: 300, power: +50, buildTime: 8, sight: 4, hgt: 20, desc: '+50 power.' },
   refinery: { name: 'Crystal Refinery', w: 3, h: 2, hp: 700, cost: 600, power: -10, buildTime: 12, sight: 5, hgt: 20, accepts: 'crystal', freeUnit: 'harvester', desc: 'Crystal harvester drop-off. Free Harvester on completion.' },
   foundry: { name: 'War Foundry', w: 3, h: 2, hp: 900, cost: 500, power: -15, buildTime: 12, sight: 5, hgt: 22, desc: 'Fabricates all vehicles, drones, infantry & aircraft.' },
@@ -75,6 +77,8 @@ export const B: Record<string, BuildingDef> = {
   pump: { name: 'Coolant Refinery', w: 2, h: 2, hp: 420, cost: 450, power: -15, buildTime: 11, sight: 4, hgt: 18, water: 6, accepts: 'coolant', freeUnit: 'tanker', desc: 'Coolant tanker drop-off. Free Tanker on completion. Cools heavy units.' },
   smelter: { name: 'Alloy Smelter', w: 2, h: 2, hp: 440, cost: 500, power: -15, buildTime: 11, sight: 4, hgt: 19, accepts: 'alloy', freeUnit: 'hauler', desc: 'Alloy hauler drop-off. Free Hauler on completion. Alloy builds advanced war machines.' },
   aaturret: { name: 'Flak Cannon', w: 1, h: 1, hp: 460, cost: 500, power: -10, buildTime: 9, sight: 8, hgt: 8, dmg: 9, range: 210, rof: 0.42, antiAir: true, airOnly: true, coolant: 3, alloy: 150, desc: 'Anti-air flak. Engages aircraft only. Needs alloy.' },
+  habitat: { name: 'Habitat Block', w: 2, h: 2, hp: 360, cost: 250, power: -5, buildTime: 8, sight: 3, hgt: 22, house: 45, civic: 2, desc: 'Housing for +45 citizens. Population = labor & conscripts.' },
+  market: { name: 'Civic Market', w: 2, h: 2, hp: 340, cost: 350, power: -8, buildTime: 9, sight: 3, hgt: 18, civic: 16, desc: 'Meets civic needs (+happiness). Happy citizens work faster.' },
   cyber: { name: 'Cyber Ops Center', w: 2, h: 2, hp: 740, cost: 800, power: -20, buildTime: 14, sight: 6, hgt: 20, alloy: 300, desc: 'Unlocks cyber abilities & covert missions. Needs alloy.' },
 };
 
@@ -155,13 +159,15 @@ export const HOME_RES: Record<number, ResourceKind> = {
 
 export interface AIScriptStep { t: number; type: string; dx: number; dy: number; }
 export const AI_SCRIPT: AIScriptStep[] = [
-  { t: 20, type: 'power', dx: -2, dy: 7 }, { t: 60, type: 'foundry', dx: 5, dy: 5 },
-  { t: 100, type: 'turret', dx: 8, dy: 6 }, { t: 135, type: 'turret', dx: 6, dy: 9 },
-  { t: 185, type: 'pump', dx: -3, dy: 9 }, { t: 225, type: 'smelter', dx: -5, dy: 6 },
-  { t: 265, type: 'refinery', dx: 0, dy: 10 }, { t: 300, type: 'aaturret', dx: 7, dy: 4 },
-  { t: 350, type: 'foundry', dx: 9, dy: 2 }, { t: 410, type: 'power', dx: 2, dy: 12 },
-  { t: 470, type: 'aaturret', dx: 4, dy: 10 }, { t: 540, type: 'turret', dx: 10, dy: 9 },
-  { t: 600, type: 'pump', dx: 6, dy: 12 }, { t: 660, type: 'smelter', dx: 8, dy: 8 },
+  { t: 20, type: 'power', dx: -2, dy: 7 }, { t: 55, type: 'foundry', dx: 5, dy: 5 },
+  { t: 90, type: 'habitat', dx: -4, dy: 4 }, { t: 120, type: 'turret', dx: 8, dy: 6 },
+  { t: 150, type: 'turret', dx: 6, dy: 9 }, { t: 185, type: 'pump', dx: -3, dy: 9 },
+  { t: 215, type: 'market', dx: -6, dy: 3 }, { t: 245, type: 'smelter', dx: -5, dy: 6 },
+  { t: 280, type: 'refinery', dx: 0, dy: 10 }, { t: 310, type: 'aaturret', dx: 7, dy: 4 },
+  { t: 350, type: 'habitat', dx: -7, dy: 7 }, { t: 390, type: 'foundry', dx: 9, dy: 2 },
+  { t: 430, type: 'power', dx: 2, dy: 12 }, { t: 480, type: 'aaturret', dx: 4, dy: 10 },
+  { t: 540, type: 'turret', dx: 10, dy: 9 }, { t: 600, type: 'pump', dx: 6, dy: 12 },
+  { t: 650, type: 'habitat', dx: 9, dy: 5 }, { t: 700, type: 'smelter', dx: 8, dy: 8 },
 ];
 
 // ── Shared math helpers ──────────────────────────────────────────────────────

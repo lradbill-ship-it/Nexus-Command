@@ -32,6 +32,26 @@ Build **NEXUS COMMAND**: a real-time strategy game in the spirit of Command & Co
 - **Combat**: turret-aim smoothing, waves that scale with time, fog of war (player + allies' vision), win = every surviving faction is you or your ally; lose = all your buildings destroyed.
 - **Slow build-up pacing**: first AI attack ~2.5–3.5 min, escalating size/frequency.
 
+## v4 Phase 3a — Civilian population & society (IMPLEMENTED, branch `feature/v4-phase3a-population`)
+
+Lane's item 10 (in-faction population) — DESIGN_SPEC_v4 §3. Population is FLAVOUR/ECONOMY + leverage, **never a win-con**.
+
+- **State**: `game.pop` / `game.happy` (0..100) / `game.conscriptPenalty` per faction. Two new buildings:
+  **Habitat Block** (`house:45`) and **Civic Market** (`civic:16` happiness). HQ seeds housing/civics.
+- **`societyTick`** (sim): happiness drifts toward `happyTarget(team)` = f(housing headroom, prosperity, civics,
+  war stress, recent conscription). Population grows toward `housingCap` when content; emigrates when overcrowded;
+  flees under unrest.
+- **Leverage**: `laborFactor(team)` (0.7 miserable … 1.2 utopia) multiplies harvest rate + build/queue speed —
+  a thriving society out-produces a miserable one (low happiness = a *strike*). Applied in `updateHarvester`,
+  `updateBuilding` (progress + foundry queueT).
+- **Conscription**: `conscript(team)` turns 15 pop → a Rifle Trooper instantly (happiness cost). Player via
+  `⤒ CONSCRIPT` button (SOCIETY panel) or `C` key; AI conscripts from surplus pop when short on crystals.
+- **Revolt**: sustained misery (`happy<18`, scaled) makes army units desert (recoverable, never an instant loss).
+- **UI**: SOCIETY panel in Base pane — POP n/cap, happiness bar (red→green), mood text, conscript button.
+- Verified headlessly: pop grows to cap, labor 1.17 (happy) vs 0.7 (miserable), conscription works, desertion
+  fires under collapse (army 13→6). `tsc + vite` clean.
+- **Next: Phase 3b** — neutral map settlements (recruit/persuade/intimidate, item 7), then Phase 4 (government).
+
 ## v4 Phase 2b — 6 factions + larger map + scarier aircraft (IMPLEMENTED, branch `feature/v4-phase2b-factions`)
 
 Lane round-2 answer #1 (6 factions, world regions) + larger maps + scarier aircraft (D₁).
