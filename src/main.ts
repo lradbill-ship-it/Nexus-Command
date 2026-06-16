@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { BattleScene } from './scene/BattleScene';
 import { game, logMsg as stateLog } from './sim/state';
-import { makeUI, refresh, showEnd, resetOverlays, setRestartHook, setStartHook, logMsg } from './ui/sidebar';
+import { makeUI, refresh, showEnd, resetOverlays, setRestartHook, setStartHook, logMsg, getChosenLeader } from './ui/sidebar';
+import { setLeader } from './sim/sim';
+import { PLAYER } from './sim/constants';
 import { initAudio, sfx } from './audio';
 
 // Guard against duplicate boots (Vite HMR can re-run this module without a full
@@ -26,8 +28,9 @@ scene.setEndHandler((win) => { showEnd(win); sfx(win ? 'chime' : 'war'); });
 
 setStartHook(() => {
   initAudio();
+  setLeader(PLAYER, getChosenLeader());
   game.started = true;
-  logMsg('Uplink established. Three networks are watching, Commander.');
+  logMsg('Uplink established. Five rival coalitions are watching, Commander.');
   sfx('click');
 });
 
@@ -35,6 +38,7 @@ setRestartHook(() => {
   initAudio();
   resetOverlays();
   scene.newMatch(true);
+  setLeader(PLAYER, getChosenLeader());     // keep the chosen doctrine across new battlefields
   logMsg('New battlefield generated. Deploy your forces, Commander.');
   sfx('place');
 });

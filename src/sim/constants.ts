@@ -13,6 +13,32 @@ export const ALL_TEAMS = [1, 2, 3, 4, 5, 6] as const;
 
 export type Persona = 'player' | 'warlord' | 'merchant' | 'covert' | 'industrial';
 
+// ── Government: leader styles (DESIGN_SPEC_v4 §4) ─────────────────────────────
+// Faction-wide modifier sets, chosen at game start (and later swung by elections/coups).
+export type LeaderStyle = 'militarist' | 'industrialist' | 'populist' | 'technocrat' | 'mercantile';
+export interface StyleDef {
+  name: string; blurb: string; col: string;
+  combat?: number;     // ×damage dealt by this faction's units
+  econ?: number;       // ×crystal income (harvest deliveries)
+  labor?: number;      // ×labor factor (harvest & build speed)
+  happy?: number;      // +happiness target
+  alloyDisc?: number;  // ×alloy build-cost (lower = cheaper)
+  recruitDisc?: number;// ×conscription / settlement-recruit cost
+  trade?: number;      // ×resource trade flow
+  cdMul?: number;      // ×ability cooldown (lower = faster)
+}
+export const STYLES: Record<LeaderStyle, StyleDef> = {
+  militarist:    { name: 'Militarist',    col: '#e8483a', blurb: 'Hardened army, lean economy.',       combat: 1.20, econ: 0.88 },
+  industrialist: { name: 'Industrialist', col: '#e0a155', blurb: 'Factories hum; everything builds & mines faster.', labor: 1.16, econ: 1.05 },
+  populist:      { name: 'Populist',      col: '#4faf5a', blurb: 'Beloved leadership; happy, cheap to mobilise.', happy: 14, recruitDisc: 0.55, combat: 0.95 },
+  technocrat:    { name: 'Technocrat',    col: '#9b6fe8', blurb: 'High-tech edge: cheaper alloy, faster cyber.', alloyDisc: 0.68, cdMul: 0.65, econ: 0.97 },
+  mercantile:    { name: 'Mercantile',    col: '#3ec8b4', blurb: 'Wealth & trade flow; a softer military.', econ: 1.18, trade: 1.6, combat: 0.95 },
+};
+// AI factions adopt a style that fits their persona.
+export const PERSONA_STYLE: Record<Persona, LeaderStyle> = {
+  player: 'industrialist', warlord: 'militarist', merchant: 'mercantile', covert: 'technocrat', industrial: 'industrialist',
+};
+
 export interface Faction {
   name: string;
   col: string;

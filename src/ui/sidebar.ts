@@ -1,11 +1,15 @@
 import {
-  PLAYER, AIS, FAC, B, U, ABILITIES, COVERT, TILE,
+  PLAYER, AIS, FAC, B, U, ABILITIES, COVERT, TILE, STYLES,
 } from '../sim/constants';
+import type { LeaderStyle } from '../sim/constants';
 import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, setHintHook } from '../sim/state';
 import {
   startPlacing, trainUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
-  hasCyber, powerOf, tradeIncome, waterOf, conscript, housingCap,
+  hasCyber, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
 } from '../sim/sim';
+
+let chosenLeader: LeaderStyle = 'industrialist';
+export function getChosenLeader() { return chosenLeader; }
 
 const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'smelter', 'habitat', 'market', 'aaturret', 'cyber'];
 const unitOrder = ['harvester', 'tanker', 'hauler', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'aircraft'];
@@ -119,6 +123,23 @@ export function makeUI() {
       for (const [tb2, pn2] of tabs) { $(tb2).classList.toggle('on', tb2 === tb); $(pn2).classList.toggle('on', pn2 === pn); }
     };
   }
+  // leader doctrine picker (intro overlay)
+  const lp = $('leaderPick');
+  const renderPick = () => {
+    for (const k of Object.keys(STYLES) as LeaderStyle[]) {
+      ($('lead_' + k) as HTMLElement)?.classList.toggle('on', chosenLeader === k);
+    }
+  };
+  for (const k of Object.keys(STYLES) as LeaderStyle[]) {
+    const sd = STYLES[k];
+    const b = document.createElement('button'); b.className = 'lead'; b.id = 'lead_' + k;
+    b.style.borderLeftColor = sd.col;
+    b.innerHTML = `<b style="color:${sd.col}">${sd.name}</b><span>${sd.blurb}</span>`;
+    b.onclick = () => { chosenLeader = k; setLeader(PLAYER, k); renderPick(); };
+    lp.appendChild(b);
+  }
+  renderPick();
+
   ($('conscriptBtn') as HTMLButtonElement).onclick = () => conscript(PLAYER);
   ($('restartBtn') as HTMLButtonElement).onclick = () => restartHook();
   ($('startBtn') as HTMLButtonElement).onclick = () => { $('introOverlay').style.display = 'none'; startHook(); };
@@ -164,6 +185,8 @@ export function refresh() {
   $('uiHappyFill').style.width = hap + '%';
   $('uiHappyTxt').textContent = hap > 70 ? 'thriving' : hap > 45 ? 'content' : hap > 25 ? 'restless' : 'in revolt';
   ($('conscriptBtn') as HTMLButtonElement).disabled = pop < 15;
+  const ld = STYLES[game.leader[PLAYER] || 'industrialist'];
+  $('uiLeader').innerHTML = 'LEADER <b style="color:' + ld.col + '">' + ld.name + '</b>';
   const m = Math.floor(game.t / 60), s = Math.floor(game.t % 60);
   $('uiTime').textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   if (game.t - lastHint > 5) $('uiHint').textContent = '';

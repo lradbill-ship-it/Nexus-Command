@@ -1,8 +1,9 @@
 import {
   TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, AIS, ALL_TEAMS, FAC, B, U, ABILITIES, COVERT,
-  BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD,
+  BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD, STYLES,
   idx, inMap, clamp, dist,
 } from './constants';
+import type { LeaderStyle } from './constants';
 import {
   game, dip, rk, getRel, setRel, addRel, isAllied, isWar, stateOf, logMsg, hint,
 } from './state';
@@ -190,14 +191,22 @@ export function happyTarget(team: number) {
   t += Math.min(24, civicOf(team));                  // civic needs met (markets, HQ)
   t -= warCount(team) * 5;                            // the stress of war
   t -= game.conscriptPenalty[team] || 0;             // recent forced levies
+  t += styleMod(team).happy ?? 0;                    // Populist leadership lifts spirits
   return clamp(t, 0, 100);
 }
 /** Labor multiplier on harvest & build speed — thriving societies out-produce miserable ones. */
 export function laborFactor(team: number) {
   const h = game.happy[team] ?? 60;
   const base = clamp(0.7 + h / 100 * 0.5, 0.7, 1.2);  // 0.7 (revolt) … 1.2 (utopia)
-  return (game.pop[team] || 0) < 4 ? Math.min(base, 0.9) : base;   // a ghost town can't fully staff
+  const pen = (game.pop[team] || 0) < 4 ? Math.min(base, 0.9) : base;   // a ghost town can't fully staff
+  return pen * (styleMod(team).labor ?? 1);            // Industrialist leadership boosts output
 }
+
+// ── Government: active leader style & its faction-wide modifiers (§4) ─────────
+export const styleMod = (team: number) => STYLES[game.leader[team] || 'industrialist'];
+export function setLeader(team: number, style: LeaderStyle) { game.leader[team] = style; }
+/** Discounted alloy cost for a unit/building def, given the team's leader (Technocrat = cheaper). */
+export const alloyCost = (team: number, alloy: number | undefined) => Math.round((alloy || 0) * (styleMod(team).alloyDisc ?? 1));
 function societyTick(dt: number) {
   for (const team of ALL_TEAMS) {
     if (game.eliminated[team]) continue;
@@ -225,7 +234,7 @@ function societyTick(dt: number) {
 }
 /** Turn civilians into a soldier instantly — the population as a military reserve. */
 export function conscript(team: number) {
-  const COST = 15;
+  const COST = Math.max(6, Math.round(15 * (styleMod(team).recruitDisc ?? 1)));   // Populist mobilises cheaply
   if ((game.pop[team] || 0) < COST) { if (team === PLAYER) hint('Not enough population to conscript'); return; }
   const hq = game.buildings.find(b => b.team === team && b.type === 'hq') || game.buildings.find(b => b.team === team);
   if (!hq) return;
@@ -269,7 +278,7 @@ function settlementTick(dt: number) {
 }
 /** Player pays to instantly win over a settlement near their forces (the "recruit" path). */
 export function tryRecruit(s: Settlement): boolean {
-  const COST = 160;
+  const COST = Math.round(160 * (styleMod(PLAYER).recruitDisc ?? 1));
   if (s.owner === PLAYER) return false;
   const near = game.units.some(u => isAllied(PLAYER, u.team) && dist(u, s) < SETTLE_R + 20);
   if (!near) { hint('Move a unit next to the settlement to recruit it'); return false; }
@@ -323,6 +332,7 @@ function eligibleTarget(shooter: Entity, target: Entity) {
 function rofMult(e: Entity) { return defOf(e).coolant && game.overheat[e.team] ? 2 : 1; }
 
 function fireAt(src: Entity, target: Entity, dmg: number, rail: boolean, splash = 0) {
+  dmg = dmg * (styleMod(src.team).combat ?? 1);          // Militarist hits harder, Mercantile/Populist softer
   game.shots.push({ x: src.x, y: src.y, target, dmg, team: src.team, speed: rail ? 940 : 560, col: FAC[src.team].col, rail, splash });
   src.lastShot = game.t;
   spawnParts('muzzle', src.x, src.y, 2, '255,235,180');
@@ -496,7 +506,7 @@ function updateHarvester(u: Unit, dt: number) {
     const dep = nearestDepot(u);
     if (!dep) { u.hState = 'idlewait'; return; }
     if (dist(u, dep) < Math.max(dep.w, dep.h) / 2 + 26) {
-      if (kind === 'crystal') game.money[u.team] += Math.round(u.cargo);
+      if (kind === 'crystal') game.money[u.team] += Math.round(u.cargo * (styleMod(u.team).econ ?? 1));
       else if (kind === 'coolant') game.water[u.team] = clamp((game.water[u.team] || 0) + u.cargo, 0, WATER_CAP);
       else game.alloy[u.team] = (game.alloy[u.team] || 0) + Math.round(u.cargo);
       u.cargo = 0; u.hState = 'find';
@@ -683,7 +693,7 @@ export function castAbility(key: string, wx: number, wy: number) {
   if (key === 'amove') { issueOrder(wx, wy, true); game.armed = null; hint(''); return; }
   const a = ABILITIES[key];
   if (key === 'emp') {
-    game.money[PLAYER] -= a.cost; game.cooldowns.emp = a.cd;
+    game.money[PLAYER] -= a.cost; game.cooldowns.emp = a.cd * (styleMod(PLAYER).cdMul ?? 1);
     game.parts.push({ type: 'emp', x: wx, y: wy, t: 0, life: 0.85 });
     sfx('emp', wx);
     let n = 0; const hitFac: Record<number, number> = {};
@@ -698,7 +708,7 @@ export function castAbility(key: string, wx: number, wy: number) {
       const dd = dist(u, { x: wx, y: wy }); if (dd < bd && tileVisible(u.x, u.y)) { bd = dd; best = u; }
     }
     if (!best) { hint('Hijack: click directly on an enemy unit'); return; }
-    game.money[PLAYER] -= a.cost; game.cooldowns.hijack = a.cd;
+    game.money[PLAYER] -= a.cost; game.cooldowns.hijack = a.cd * (styleMod(PLAYER).cdMul ?? 1);
     if (!isWar(PLAYER, best.team)) addRel(PLAYER, best.team, -18);
     best.team = PLAYER; best.order = 'idle'; best.target = null; best.hState = 'find'; best.hNode = null; best.path = null;
     game.parts.push({ type: 'emp', x: best.x, y: best.y, t: 0, life: 0.8 });
@@ -831,7 +841,7 @@ function aiUpdate(team: number, dt: number) {
   const tShift = persona === 'warlord' ? -25 : (persona === 'merchant' ? 30 : persona === 'industrial' ? -10 : 0);
   while (ai.builtIdx < AI_SCRIPT.length && game.t >= AI_SCRIPT[ai.builtIdx].t + tShift) {
     const step = AI_SCRIPT[ai.builtIdx]; ai.builtIdx++;
-    const ba = B[step.type].alloy || 0;
+    const ba = alloyCost(team, B[step.type].alloy);
     if (game.money[team] >= B[step.type].cost && ba <= (game.alloy[team] || 0)) {
       if (aiPlace(team, step.type, step.dx, step.dy, false)) { game.money[team] -= B[step.type].cost; game.alloy[team] -= ba; }
     }
@@ -873,9 +883,9 @@ function aiUpdate(team: number, dt: number) {
         pick = pool[Math.random() * pool.length | 0];
       }
       if (pick) {
-        if ((U[pick].alloy || 0) > (game.alloy[team] || 0)) pick = 'strike';   // alloy-starved → basic armor
-        if (game.money[team] >= U[pick].cost && (U[pick].alloy || 0) <= (game.alloy[team] || 0)) {
-          f.queue.push(pick); game.money[team] -= U[pick].cost; game.alloy[team] -= (U[pick].alloy || 0);
+        if (alloyCost(team, U[pick].alloy) > (game.alloy[team] || 0)) pick = 'strike';   // alloy-starved → basic armor
+        if (game.money[team] >= U[pick].cost && alloyCost(team, U[pick].alloy) <= (game.alloy[team] || 0)) {
+          f.queue.push(pick); game.money[team] -= U[pick].cost; game.alloy[team] -= alloyCost(team, U[pick].alloy);
         }
       }
     }
@@ -972,7 +982,7 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
 }
 export function startPlacing(type: string) {
   if (game.money[PLAYER] < B[type].cost) { hint('Insufficient crystals'); return; }
-  if ((B[type].alloy || 0) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy'); return; }
+  if (alloyCost(PLAYER, B[type].alloy) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy'); return; }
   game.placing = type; game.armed = null;
   hint('Place ' + B[type].name + ' — right-click to cancel');
 }
@@ -988,8 +998,8 @@ export function tryPlace(wx: number, wy: number) {
   const tx = Math.round(wx / TILE - d.w / 2), ty = Math.round(wy / TILE - d.h / 2);
   if (!canPlaceHere(type, tx, ty)) { hint('Cannot deploy here — needs clear, scouted ground near your base'); return; }
   if (game.money[PLAYER] < d.cost) { hint('Insufficient crystals'); game.placing = null; return; }
-  if ((d.alloy || 0) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy'); game.placing = null; return; }
-  game.money[PLAYER] -= d.cost; game.alloy[PLAYER] -= (d.alloy || 0);
+  if (alloyCost(PLAYER, d.alloy) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy'); game.placing = null; return; }
+  game.money[PLAYER] -= d.cost; game.alloy[PLAYER] -= alloyCost(PLAYER, d.alloy);
   addBuilding(type, tx, ty, PLAYER, false);
   sfx('place', wx); game.placing = null; hint('');
 }
@@ -997,9 +1007,9 @@ export function trainUnit(t: string) {
   const fs = game.buildings.filter(b => b.team === PLAYER && b.type === 'foundry' && b.progress >= 1);
   if (!fs.length) { hint('Build a War Foundry first'); return; }
   if (game.money[PLAYER] < U[t].cost) { hint('Insufficient crystals'); return; }
-  if ((U[t].alloy || 0) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy — build an Alloy Smelter'); return; }
+  if (alloyCost(PLAYER, U[t].alloy) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy — build an Alloy Smelter'); return; }
   fs.sort((a, b) => a.queue.length - b.queue.length);
-  game.money[PLAYER] -= U[t].cost; game.alloy[PLAYER] -= (U[t].alloy || 0); fs[0].queue.push(t); sfx('click');
+  game.money[PLAYER] -= U[t].cost; game.alloy[PLAYER] -= alloyCost(PLAYER, U[t].alloy); fs[0].queue.push(t); sfx('click');
 }
 
 // ── Win / lose ───────────────────────────────────────────────────────────────
@@ -1024,15 +1034,15 @@ export function stepWorld(dt: number) {
   game.shake = Math.max(0, game.shake - dt * 14);
   for (const k in game.cooldowns) game.cooldowns[k] = Math.max(0, game.cooldowns[k] - dt);
   for (const k in game.covCd) game.covCd[k] = Math.max(0, game.covCd[k] - dt);
-  game.money[PLAYER] += tradeIncome(PLAYER) * dt;
-  for (const f of AIS) if (!game.eliminated[f]) game.money[f] += tradeIncome(f) * dt;
-  // coolant & alloy also flow across trade pacts (all resources are tradeable)
+  // trade pacts flow all three resources; Mercantile leadership widens the pipes
   for (const team of ALL_TEAMS) {
     if (game.eliminated[team]) continue;
+    const tm = styleMod(team).trade ?? 1;
+    game.money[team] += tradeIncome(team) * tm * dt;
     let partners = 0; for (const f of ALL_TEAMS) if (f !== team && dip.trade[rk(team, f)] && !game.eliminated[f]) partners++;
     if (partners) {
-      game.water[team] = clamp((game.water[team] || 0) + partners * 6 * dt, 0, WATER_CAP);
-      game.alloy[team] = (game.alloy[team] || 0) + partners * 5 * dt;
+      game.water[team] = clamp((game.water[team] || 0) + partners * 6 * tm * dt, 0, WATER_CAP);
+      game.alloy[team] = (game.alloy[team] || 0) + partners * 5 * tm * dt;
     }
   }
   rebuildUnitGrid();                          // grid for target acquisition this step

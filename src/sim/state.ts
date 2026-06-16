@@ -1,5 +1,6 @@
-import { MAPW, MAPH } from './constants';
+import { MAPW, MAPH, ALL_TEAMS, FAC, PERSONA_STYLE } from './constants';
 import type { GameState, DipState } from './types';
+import type { LeaderStyle } from './constants';
 
 function createGame(): GameState {
   return {
@@ -11,6 +12,7 @@ function createGame(): GameState {
     pop: { 1: 24, 2: 24, 3: 24, 4: 24, 5: 24, 6: 24 },
     happy: { 1: 62, 2: 62, 3: 62, 4: 62, 5: 62, 6: 62 },
     conscriptPenalty: {},
+    leader: Object.fromEntries(ALL_TEAMS.map(t => [t, PERSONA_STYLE[FAC[t].persona]])) as Record<number, LeaderStyle>,
     cam: { x: 0, y: 0 },
     buildings: [], units: [], shots: [], parts: [], nodes: [], settlements: [], trees: [], waterTiles: [],
     terr: new Uint8Array(MAPW * MAPH),
