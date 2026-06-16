@@ -207,6 +207,66 @@ export const styleMod = (team: number) => STYLES[game.leader[team] || 'industria
 export function setLeader(team: number, style: LeaderStyle) { game.leader[team] = style; }
 /** Discounted alloy cost for a unit/building def, given the team's leader (Technocrat = cheaper). */
 export const alloyCost = (team: number, alloy: number | undefined) => Math.round((alloy || 0) * (styleMod(team).alloyDisc ?? 1));
+
+// ── Elections & coups (§4 — "balanced": real levers, uncertain outcome) ──────
+const STYLE_KEYS = Object.keys(STYLES) as LeaderStyle[];
+const randStyleExcept = (s: LeaderStyle) => { const o = STYLE_KEYS.filter(k => k !== s); return o[Math.random() * o.length | 0]; };
+function resolveElection(team: number) {
+  const approval = clamp((game.happy[team] ?? 60) + (game.campaign[team] || 0) + 6, 0, 100);
+  const plat = game.platform[team] || game.leader[team];
+  if (Math.random() * 100 < approval) {                          // mandate → adopt the platform you ran on
+    game.leader[team] = plat;
+    if (team === PLAYER) { logMsg('ELECTION WON — ' + STYLES[plat].name + ' mandate (' + Math.round(approval) + '% approval)', 'good'); sfx('chime'); }
+  } else {                                                        // voted out → opposition doctrine imposed
+    const opp = randStyleExcept(plat);
+    game.leader[team] = opp; game.platform[team] = opp;
+    game.happy[team] = clamp((game.happy[team] ?? 60) - 6, 0, 100);
+    if (team === PLAYER) { logMsg('ELECTION LOST — opposition installs the ' + STYLES[opp].name + ' doctrine', 'war'); sfx('war'); }
+  }
+  game.campaign[team] = 0;
+  game.electionT[team] = game.t + 240 + Math.random() * 60;
+}
+function triggerCoup(team: number) {
+  game.coupT[team] = 0;
+  const opp = randStyleExcept(game.leader[team]);
+  game.leader[team] = opp; game.platform[team] = opp;
+  game.happy[team] = clamp((game.happy[team] ?? 60) + 16, 0, 100);  // a new regime briefly placates the street
+  game.electionT[team] = game.t + 180;
+  if (team === PLAYER) { logMsg('COUP — your government is overthrown; the ' + STYLES[opp].name + ' bloc seizes power', 'war'); sfx('war'); }
+  else logMsg(FAC[team].name + ' is rocked by a coup — its ' + STYLES[opp].name + ' bloc takes power', 'hot');
+}
+function governmentTick(dt: number) {
+  for (const team of ALL_TEAMS) {
+    if (game.eliminated[team]) continue;
+    game.campaign[team] = Math.max(0, (game.campaign[team] || 0) - 1.5 * dt);   // campaign buzz fades
+    if (game.t >= (game.electionT[team] ?? 1e9)) resolveElection(team);
+    const h = game.happy[team] ?? 60;                            // sustained misery → coup risk
+    game.coupT[team] = h < 22 ? (game.coupT[team] || 0) + dt : Math.max(0, (game.coupT[team] || 0) - dt * 0.5);
+    if ((game.coupT[team] || 0) > 40 && Math.random() < dt * 0.05) triggerCoup(team);
+  }
+}
+export function setPlatform(style: LeaderStyle) { game.platform[PLAYER] = style; }
+export function campaignRally() {
+  const COST = 220;
+  if (game.money[PLAYER] < COST) { hint('A campaign rally costs ' + COST + ' crystals'); return; }
+  game.money[PLAYER] -= COST; game.campaign[PLAYER] = Math.min(45, (game.campaign[PLAYER] || 0) + 15);
+  logMsg('Campaign rally held — election approval boosted', 'good'); sfx('chime');
+}
+/** Incite a coup against the current covert target (needs a Cyber Ops Center). */
+export function launchCoup() {
+  const tgt = game.covTarget;
+  if (!hasCyber()) { hint('Inciting a coup needs a Cyber Ops Center'); return; }
+  if (game.eliminated[tgt] || isAllied(PLAYER, tgt)) { hint('Choose a rival faction first'); return; }
+  const COST = 600;
+  if (game.money[PLAYER] < COST) { hint('Inciting a coup costs ' + COST + ' crystals'); return; }
+  game.money[PLAYER] -= COST; sfx('covert');
+  const chance = clamp(0.72 - (game.happy[tgt] ?? 60) / 200, 0.2, 0.72);   // unhappy regimes fall easier
+  if (Math.random() < chance) { logMsg('Covert coup — ' + FAC[tgt].name + ' government toppled', 'good'); triggerCoup(tgt); }
+  else { addRel(PLAYER, tgt, -22); logMsg('Coup plot against ' + FAC[tgt].name + ' EXPOSED — relations −22', 'war'); sfx('war'); }
+}
+export const nextElectionIn = () => Math.max(0, (game.electionT[PLAYER] ?? 0) - game.t);
+export const approvalEst = () => clamp((game.happy[PLAYER] ?? 60) + (game.campaign[PLAYER] || 0) + 6, 0, 100);
+
 function societyTick(dt: number) {
   for (const team of ALL_TEAMS) {
     if (game.eliminated[team]) continue;
@@ -1058,6 +1118,7 @@ export function stepWorld(dt: number) {
   waterStep(dt);
   societyTick(dt);
   settlementTick(dt);
+  governmentTick(dt);
   computeVision();
   checkEnd();
 }

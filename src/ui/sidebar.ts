@@ -6,6 +6,7 @@ import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, 
 import {
   startPlacing, trainUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
   hasCyber, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
+  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst,
 } from '../sim/sim';
 
 let chosenLeader: LeaderStyle = 'industrialist';
@@ -140,6 +141,15 @@ export function makeUI() {
   }
   renderPick();
 
+  // government: platform selector + campaign / coup
+  const pp = $('platformPick');
+  for (const k of Object.keys(STYLES) as LeaderStyle[]) {
+    const b = document.createElement('button'); b.id = 'plat_' + k; b.textContent = STYLES[k].name;
+    b.onclick = () => setPlatform(k); pp.appendChild(b);
+  }
+  ($('campaignBtn') as HTMLButtonElement).onclick = () => campaignRally();
+  ($('coupBtn') as HTMLButtonElement).onclick = () => launchCoup();
+
   ($('conscriptBtn') as HTMLButtonElement).onclick = () => conscript(PLAYER);
   ($('restartBtn') as HTMLButtonElement).onclick = () => restartHook();
   ($('startBtn') as HTMLButtonElement).onclick = () => { $('introOverlay').style.display = 'none'; startHook(); };
@@ -187,6 +197,16 @@ export function refresh() {
   ($('conscriptBtn') as HTMLButtonElement).disabled = pop < 15;
   const ld = STYLES[game.leader[PLAYER] || 'industrialist'];
   $('uiLeader').innerHTML = 'LEADER <b style="color:' + ld.col + '">' + ld.name + '</b>';
+  // government panel
+  const el = nextElectionIn(), ap = Math.round(approvalEst());
+  $('uiElection').textContent = Math.floor(el / 60) + ':' + String(Math.floor(el % 60)).padStart(2, '0');
+  $('uiApproval').textContent = ap + '%';
+  $('uiApprovalFill').style.width = ap + '%';
+  for (const k of Object.keys(STYLES) as LeaderStyle[]) {
+    ($('plat_' + k) as HTMLElement)?.classList.toggle('on', game.platform[PLAYER] === k);
+  }
+  ($('campaignBtn') as HTMLButtonElement).disabled = game.money[PLAYER] < 220;
+  ($('coupBtn') as HTMLButtonElement).disabled = !hasCyber() || game.money[PLAYER] < 600 || !!game.eliminated[game.covTarget] || isAllied(PLAYER, game.covTarget);
   const m = Math.floor(game.t / 60), s = Math.floor(game.t % 60);
   $('uiTime').textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   if (game.t - lastHint > 5) $('uiHint').textContent = '';

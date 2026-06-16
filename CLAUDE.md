@@ -32,6 +32,26 @@ Build **NEXUS COMMAND**: a real-time strategy game in the spirit of Command & Co
 - **Combat**: turret-aim smoothing, waves that scale with time, fog of war (player + allies' vision), win = every surviving faction is you or your ally; lose = all your buildings destroyed.
 - **Slow build-up pacing**: first AI attack ~2.5–3.5 min, escalating size/frequency.
 
+## v4 Phase 4b — Elections & coups (IMPLEMENTED, branch `feature/v4-phase4b-elections`)
+
+Completes Phase 4 (government). Lane: elections/coups "balanced" — real player levers, uncertain outcomes.
+
+- State: `game.platform` (doctrine you run on) / `electionT` / `campaign` / `coupT` per faction.
+- **`governmentTick`**: each faction holds periodic elections (`resolveElection`) — approval = happiness +
+  campaign + 6; a roll under approval keeps your **platform** doctrine, else the **opposition** doctrine is
+  imposed (−happy). Sustained misery (`happy<22`) accrues `coupT`; a high enough timer triggers `triggerCoup`
+  (forced random doctrine + brief happiness bump + snap election).
+- **Player levers**: `setPlatform` (run on any of the 5 doctrines), `campaignRally` (220cr → +approval),
+  `launchCoup` (needs Cyber Ops Center, 600cr, vs `covTarget`; success scales with target's unhappiness).
+- **UI**: GOVERNMENT panel in OPS tab — next-election countdown, approval bar, platform picker, CAMPAIGN &
+  INCITE-COUP buttons.
+- Verified headlessly: miserable faction lost doctrine 13/14 elections, happy kept mandate 10/10; campaign
+  raises approval; coup-by-misery & player-coup both flip doctrines. `tsc + vite` clean.
+- **VERIFY NOTE**: after editing source, **restart the preview server** (don't just reload) before
+  dynamic-import headless tests — Vite HMR `?t=` queries split the module graph (state vs sim/mapgen see
+  different `game`), which shows up as empty nodes/buildings after `resetState`.
+- **Next: Phase 5** — missions (emergent + scripted) + hour-length pacing (DESIGN_SPEC_v4 §5).
+
 ## v4 Phase 4a — Leader doctrines (IMPLEMENTED, branch `feature/v4-phase4a-leaders`)
 
 Lane's item 9 (government), first slice — DESIGN_SPEC_v4 §4. 5 leader styles, chosen at game start.

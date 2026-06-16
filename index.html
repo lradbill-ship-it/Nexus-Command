@@ -113,6 +113,18 @@
   #society{display:flex;flex-direction:column;gap:5px;}
   #uiLeader{font-size:10px;letter-spacing:.06em;color:#c8d4dc;}
   #uiLeader b{color:var(--gold);}
+  /* government panel */
+  #govPanel{display:flex;flex-direction:column;gap:5px;margin-bottom:4px;}
+  #govPanel .socRow b{color:var(--gold);}
+  .platPick{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;}
+  .platPick button{font:inherit;font-size:8px;letter-spacing:.03em;padding:5px 2px;cursor:pointer;border-radius:2px;
+    background:linear-gradient(180deg,#2d3540,#1b212a);border:1px solid #424a56;color:var(--dim);}
+  .platPick button.on{color:#fff;border-color:var(--gold);box-shadow:0 0 6px rgba(232,182,76,.4);}
+  .govBtns{display:flex;gap:4px;}
+  .govBtns button{flex:1;font:inherit;font-size:9px;font-weight:700;letter-spacing:.04em;padding:7px 2px;cursor:pointer;border-radius:2px;
+    background:linear-gradient(180deg,#39414d,#262c35);border:1px solid #4a5260;color:var(--ink);}
+  .govBtns button:hover:not(:disabled){border-color:var(--gold);}
+  .govBtns button:disabled{opacity:.35;cursor:default;}
   .socRow{display:flex;align-items:center;justify-content:space-between;font-size:10px;letter-spacing:.06em;color:#c8d4dc;}
   .socRow b{color:#9fd9cc;font-weight:600;}
   .socRow .dim{color:var(--dim);}
@@ -227,6 +239,14 @@
         </div>
       </div>
       <div class="tab" id="paneOps">
+        <h3 class="sec">GOVERNMENT</h3>
+        <div id="govPanel">
+          <div class="socRow"><span>NEXT ELECTION <b id="uiElection">—</b></span><span class="dim">approval <b id="uiApproval">—</b></span></div>
+          <div class="happyBar"><div class="hfill" id="uiApprovalFill"></div></div>
+          <div class="dim" style="font-size:9px;margin:3px 0 1px">RUN ON THIS DOCTRINE:</div>
+          <div class="platPick" id="platformPick"></div>
+          <div class="govBtns"><button id="campaignBtn">⛳ CAMPAIGN · 220</button><button id="coupBtn">⚑ INCITE COUP · 600</button></div>
+        </div>
         <h3 class="sec">CYBER WARFARE</h3>
         <div class="btnGrid" id="abilityBtns"></div>
         <h3 class="sec">COVERT TARGET</h3>

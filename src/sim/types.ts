@@ -122,6 +122,10 @@ export interface GameState {
   happy: Record<number, number>;          // population happiness 0..100 per faction
   conscriptPenalty: Record<number, number>; // transient happiness hit from recent conscription
   leader: Record<number, import('./constants').LeaderStyle>; // active leader style per faction
+  platform: Record<number, import('./constants').LeaderStyle>; // doctrine each faction runs on next election
+  electionT: Record<number, number>;      // time of each faction's next election
+  campaign: Record<number, number>;       // campaign approval boost (decays)
+  coupT: Record<number, number>;          // sustained-misery timer feeding coup risk
   cam: { x: number; y: number };
   buildings: Building[];
   units: Unit[];
