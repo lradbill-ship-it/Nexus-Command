@@ -1,7 +1,7 @@
 import {
   TILE, MAPW, MAPH, idx, inMap, clamp,
   T_GRASS, T_DIRT, T_WATER, T_ROCK, T_FOREST, T_BRIDGE, T_ROAD, PASSABLE,
-  BASE_INFO, NODE_SITES, HOME_RES, ALL_TEAMS,
+  BASE_INFO, NODE_SITES, HOME_RES, ALL_TEAMS, RELAY_SITES,
 } from './constants';
 import { game } from './state';
 import type { ResourceKind } from './types';
@@ -187,5 +187,12 @@ export function generateMap() {
       pop: 10 + (Math.random() * 16 | 0), owner: 0, capBy: 0, capT: 0, seed: Math.random(),
     });
     n++;
+  }
+  // Command Relays at fixed strategic sites (cleared ground guaranteed near them)
+  game.relays.length = 0;
+  let rid = 1;
+  for (const r of RELAY_SITES) {
+    clear(r.x, r.y, 3);
+    game.relays.push({ id: rid++, x: r.x * TILE + 16, y: r.y * TILE + 16, owner: 0, capBy: 0, capT: 0, pulse: Math.random() * 6 });
   }
 }

@@ -28,6 +28,8 @@
   #uiWaterWrap b{color:#7fd6ea;text-shadow:0 0 6px rgba(127,214,234,.4);}
   #uiWaterWrap.hot b{color:var(--p2);text-shadow:0 0 6px rgba(232,72,58,.5);}
   #uiAlloyWrap b{color:#e0a155;text-shadow:0 0 6px rgba(224,161,85,.4);}
+  #uiVPWrap b{color:#fff;}
+  #uiVPWrap .dim2{color:var(--dim);font-size:10px;}
   #topbar .spacer{flex:1;}
   #uiHint{color:var(--gold);}
   #restartBtn{pointer-events:auto;background:linear-gradient(180deg,var(--steel),var(--steel-lo));
@@ -168,6 +170,7 @@
       <div class="stat" id="uiWaterWrap">❄ COOLANT <b id="uiWater">0</b></div>
       <div class="stat" id="uiAlloyWrap">⬡ ALLOY <b id="uiAlloy">0</b></div>
       <div class="stat" id="uiTradeWrap" style="display:none">TRADE <b id="uiTrade">+0/s</b></div>
+      <div class="stat" id="uiVPWrap">★ RELAYS <b id="uiVP">0</b><span class="dim2">/2800</span> <span id="uiVPlead" class="dim2"></span></div>
       <div class="stat">UPTIME <b id="uiTime">00:00</b></div>
       <div class="spacer"></div>
       <div class="stat" id="uiHint"></div>
@@ -193,7 +196,8 @@
           <li><b>ECONOMY</b>: harvest <b style="color:#9bd4ff">crystals</b> (currency), <b style="color:#7fd6ea">coolant</b> (cools heavy units) &amp; <b style="color:#e0a155">alloy</b> (builds advanced war machines). Each base is rich in some, poor in others — expand to thrive.</li>
           <li><b>SOCIETY</b>: build Habitats &amp; Markets to grow a happy population — they work faster (labor) and can be <kbd>C</kbd> conscripted into troops. Neglect them and they revolt. Recruit or intimidate <b style="color:#b8bcc4">neutral settlements</b> for more people.</li>
           <li><b>DIPLOMACY</b>: gifts, trade pacts (resources flow both ways), alliances (shared vision, allies join your wars), war</li>
-          <li><b>OPS</b> (needs Cyber Ops Center): <kbd>E</kbd> EMP · <kbd>H</kbd> Hijack · covert theft, sabotage, recon, incitement</li>
+          <li><b>OPS</b> (needs Cyber Ops Center): <kbd>E</kbd> EMP · <kbd>H</kbd> Hijack · covert theft, sabotage, recon, incitement · incite coups</li>
+          <li><b>VICTORY</b>: wipe out every rival — or hold the <b style="color:#cfe6ee">★ Command Relays</b> to win on Victory Points.</li>
         </ul>
         <h3 class="sec" style="margin:6px 0 2px">CHOOSE YOUR LEADER'S DOCTRINE</h3>
         <div class="leaderPick" id="leaderPick"></div>

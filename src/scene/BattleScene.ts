@@ -334,6 +334,24 @@ export class BattleScene extends Phaser.Scene {
         g.lineStyle(1, 0xb8bcc4, a * 0.5); g.strokeCircle(s.x, s.y, 18);   // neutral marker
       }
     }
+    // Command Relays — taller beacons with a pulsing owner-coloured halo
+    for (const r of game.relays) {
+      const tx = r.x / TILE | 0, ty = r.y / TILE | 0;
+      if (!game.explored[idx(tx, ty)]) continue;
+      const a = game.visible[idx(tx, ty)] ? 1 : 0.5;
+      const col = r.owner ? Phaser.Display.Color.HexStringToColor(FAC[r.owner].col).color : 0xcfe6ee;
+      const pulse = 0.5 + 0.5 * Math.sin(game.t * 2.5 + r.pulse);
+      g.fillStyle(col, a * (0.10 + pulse * 0.14)); g.fillCircle(r.x, r.y, 22);             // halo
+      g.fillStyle(0x141a22, a); g.fillRect(r.x - 6, r.y - 4, 12, 10);                      // base
+      g.fillStyle(col, a); g.fillTriangle(r.x, r.y - 22, r.x - 6, r.y - 4, r.x + 6, r.y - 4); // obelisk
+      g.fillStyle(0xffffff, a * (0.4 + pulse * 0.5)); g.fillCircle(r.x, r.y - 16, 2.2);    // beacon light
+      g.lineStyle(2, col, a * 0.8); g.strokeCircle(r.x, r.y, 22);
+      if (r.capT > 0.02 && r.capBy) {
+        const cc = Phaser.Display.Color.HexStringToColor(FAC[r.capBy].col).color;
+        g.lineStyle(3, cc, 0.95); g.beginPath();
+        g.arc(r.x, r.y, 25, -Math.PI / 2, -Math.PI / 2 + r.capT * Math.PI * 2); g.strokePath();
+      }
+    }
   }
 
   private syncCrystals() {
@@ -489,6 +507,14 @@ export class BattleScene extends Phaser.Scene {
       if (!game.explored[idx(st.x / TILE | 0, st.y / TILE | 0)]) continue;
       ctx.fillStyle = st.owner ? FAC[st.owner].col : '#b8bcc4';
       ctx.fillRect(st.x / TILE * s - 1.5, st.y / TILE * s - 1.5, 3.5, 3.5);
+    }
+    // command relays (bright ringed markers)
+    for (const r of game.relays) {
+      if (!game.explored[idx(r.x / TILE | 0, r.y / TILE | 0)]) continue;
+      const mx = r.x / TILE * s, my = r.y / TILE * s;
+      ctx.fillStyle = r.owner ? FAC[r.owner].col : '#cfe6ee';
+      ctx.beginPath(); ctx.arc(mx, my, 2.6, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(mx, my, 3.6, 0, 7); ctx.stroke();
     }
     // camera viewport box
     const cam = this.cameras.main;

@@ -32,6 +32,23 @@ Build **NEXUS COMMAND**: a real-time strategy game in the spirit of Command & Co
 - **Combat**: turret-aim smoothing, waves that scale with time, fog of war (player + allies' vision), win = every surviving faction is you or your ally; lose = all your buildings destroyed.
 - **Slow build-up pacing**: first AI attack ~2.5–3.5 min, escalating size/frequency.
 
+## v4 Phase 5 — Objectives: Command Relays & Victory Points (IMPLEMENTED, branch `feature/v4-phase5-objectives`)
+
+Final v4 phase — Lane's "missions" + decisive hour-length ending (DESIGN_SPEC_v4 §5). Emergent objectives (scripted
+campaign deferred as a separate game mode — random-skirmish engine favours emergent).
+
+- **Command Relays** (`Relay` type, `game.relays`): 4 strategic points (centre + 3 frontiers, `RELAY_SITES`),
+  captured by presence (`relayTick`, ~7s, like settlements). A held relay accrues **Victory Points**
+  (`VP_PER_RELAY`) + a crystal trickle (`RELAY_INCOME`) to its owner; grants vision.
+- **VP victory** (`checkEnd` + `allianceVP`): first faction/alliance to `VP_TARGET` (2800) wins outright,
+  alongside annihilation. Tuned so it rewards *sustained* map dominance (≈late-game), not an early grab.
+- **AI contests relays**: the wave logic now sends ~45% of squads to capture the nearest un-owned relay.
+- **Render/HUD**: pulsing owner-coloured relay beacons + capture rings (`drawSettlements`), minimap markers,
+  topbar `★ RELAYS you/2800 · leader` readout. Intro mentions the VP win path.
+- Verified headlessly: 4 neutral relays; presence-capture works; VP accrues; reaching target fires a VP win;
+  AI fights over relays (in a passive-player sim Eastern Bloc held 2 and raced ahead). `tsc + vite` clean.
+- **v4 SPEC FULLY BUILT** (Phases 1–5). Remaining = balance/playtest tuning + (optional) scripted campaign mode.
+
 ## v4 Phase 4b — Elections & coups (IMPLEMENTED, branch `feature/v4-phase4b-elections`)
 
 Completes Phase 4 (government). Lane: elections/coups "balanced" — real player levers, uncertain outcomes.

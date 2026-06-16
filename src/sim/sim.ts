@@ -1,13 +1,14 @@
 import {
   TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, AIS, ALL_TEAMS, FAC, B, U, ABILITIES, COVERT,
   BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD, STYLES,
+  VP_TARGET, VP_PER_RELAY, RELAY_INCOME,
   idx, inMap, clamp, dist,
 } from './constants';
 import type { LeaderStyle } from './constants';
 import {
   game, dip, rk, getRel, setRel, addRel, isAllied, isWar, stateOf, logMsg, hint,
 } from './state';
-import type { Building, Unit, Entity, Vec, Particle, Settlement } from './types';
+import type { Building, Unit, Entity, Vec, Particle, Settlement, Relay } from './types';
 import { findPath, passable } from './pathfind';
 import { spawnResourceField } from './mapgen';
 import { sfx } from '../audio';
@@ -118,6 +119,7 @@ export function computeVision() {
   for (const b of game.buildings) if (isAllied(PLAYER, b.team)) stamp(b.x, b.y, B[b.type].sight);
   for (const u of game.units) if (isAllied(PLAYER, u.team)) stamp(u.x, u.y, U[u.type].sight);
   for (const s of game.settlements) if (s.owner && isAllied(PLAYER, s.owner)) stamp(s.x, s.y, 5);
+  for (const r of game.relays) if (r.owner && isAllied(PLAYER, r.owner)) stamp(r.x, r.y, 6);
   game.tempVision = game.tempVision.filter(v => v.until > game.t);
   for (const v of game.tempVision) stamp(v.x, v.y, v.r);
 }
@@ -335,6 +337,43 @@ function settlementTick(dt: number) {
       s.capT = Math.max(0, s.capT - dt / 18);                      // contested → stalls
     }
   }
+}
+
+// ── Command Relays & Victory Points (objective layer, §5) ─────────────────────
+const RELAY_R = 4 * TILE;
+function captureRelay(r: Relay, team: number) {
+  const prev = r.owner;
+  r.owner = team; r.capT = 0; r.capBy = 0;
+  game.parts.push({ type: 'ring', x: r.x, y: r.y, t: 0, life: 0.7, big: true });
+  if (team === PLAYER) { logMsg('Command Relay secured — Victory Points incoming', 'good'); sfx('chime'); }
+  else if (prev === PLAYER) { logMsg(FAC[team].name + ' has seized a Command Relay from us', 'war'); sfx('war'); }
+  else if (isAllied(PLAYER, team)) logMsg(FAC[team].name + ' (ally) secured a Command Relay', 'good');
+}
+function relayTick(dt: number) {
+  for (const r of game.relays) {
+    const present: Record<number, number> = {};
+    forNearbyUnits(r.x, r.y, RELAY_R, (u) => { if (dist(u, r) <= RELAY_R) present[u.team] = (present[u.team] || 0) + 1; });
+    const challengers = Object.keys(present).map(Number).filter(t => t !== r.owner);
+    if (challengers.length === 1) {
+      const team = challengers[0];
+      r.capBy = team; r.capT += dt / 7;
+      if (r.capT >= 1) captureRelay(r, team);
+    } else if (Object.keys(present).length === 0) {
+      r.capT = Math.max(0, r.capT - dt / 12); if (r.capT === 0) r.capBy = 0;
+    } else {
+      r.capT = Math.max(0, r.capT - dt / 20);                       // contested → stalls
+    }
+    // a held relay generates Victory Points + a crystal trickle for its owner
+    if (r.owner) {
+      game.vp[r.owner] = (game.vp[r.owner] || 0) + VP_PER_RELAY * dt;
+      game.money[r.owner] += RELAY_INCOME * dt;
+    }
+  }
+}
+/** Total Victory Points across a faction's alliance (shared objective progress). */
+export function allianceVP(team: number) {
+  let v = 0; for (const f of ALL_TEAMS) if (isAllied(team, f)) v += game.vp[f] || 0;
+  return v;
 }
 /** Player pays to instantly win over a settlement near their forces (the "recruit" path). */
 export function tryRecruit(s: Settlement): boolean {
@@ -951,22 +990,31 @@ function aiUpdate(team: number, dt: number) {
     }
   }
   if (game.t >= ai.nextWave) {
-    const enemies = ALL_TEAMS.filter(f => f !== team && !game.eliminated[f] && isWar(team, f) && game.buildings.some(b => b.team === f));
-    if (enemies.length) {
-      enemies.sort((a, b) => getRel(team, a) - getRel(team, b));
-      const tgtTeam = enemies[0];
-      ai.waveN++;
-      const size = Math.min(16, 2 + Math.ceil(ai.waveN * 1.7));
-      const squad = army.filter(u => u.order === 'idle').slice(0, size);
-      const tBuilds = game.buildings.filter(b => b.team === tgtTeam);
-      if (squad.length >= Math.min(3, size) && tBuilds.length) {
-        const tb = tBuilds[Math.random() * tBuilds.length | 0];
-        for (const u of squad) {
-          u.order = 'amove'; u.dest = { x: tb.x + (Math.random() * 120 - 60), y: tb.y + (Math.random() * 120 - 60) };
-          setPath(u, u.dest.x, u.dest.y);
+    ai.waveN++;
+    const size = Math.min(16, 2 + Math.ceil(ai.waveN * 1.7));
+    const squad = army.filter(u => u.order === 'idle').slice(0, size);
+    const relayTargets = game.relays.filter(r => r.owner !== team);
+    const contestRelay = relayTargets.length && Math.random() < 0.45;   // half the time, fight for an objective
+    if (squad.length >= Math.min(3, size)) {
+      if (contestRelay) {
+        const bi = BASE_INFO[team], bx = (bi.tx + 1) * TILE, by = (bi.ty + 1) * TILE;
+        relayTargets.sort((a, b) => dist(a, { x: bx, y: by }) - dist(b, { x: bx, y: by }));
+        const r = relayTargets[0];
+        for (const u of squad) { u.order = 'amove'; u.dest = { x: r.x + (Math.random() * 70 - 35), y: r.y + (Math.random() * 70 - 35) }; setPath(u, u.dest.x, u.dest.y); }
+        if (isAllied(PLAYER, team)) logMsg(FAC[team].name + ' (ally) moves on a Command Relay');
+      } else {
+        const enemies = ALL_TEAMS.filter(f => f !== team && !game.eliminated[f] && isWar(team, f) && game.buildings.some(b => b.team === f));
+        if (enemies.length) {
+          enemies.sort((a, b) => getRel(team, a) - getRel(team, b));
+          const tgtTeam = enemies[0];
+          const tBuilds = game.buildings.filter(b => b.team === tgtTeam);
+          if (tBuilds.length) {
+            const tb = tBuilds[Math.random() * tBuilds.length | 0];
+            for (const u of squad) { u.order = 'amove'; u.dest = { x: tb.x + (Math.random() * 120 - 60), y: tb.y + (Math.random() * 120 - 60) }; setPath(u, u.dest.x, u.dest.y); }
+            if (tgtTeam === PLAYER || isAllied(PLAYER, tgtTeam)) { logMsg(FAC[team].name + ' strike force inbound — wave ' + ai.waveN, 'war'); sfx('war'); }
+            else logMsg(FAC[team].name + ' launches an assault on ' + FAC[tgtTeam].name);
+          }
         }
-        if (tgtTeam === PLAYER || isAllied(PLAYER, tgtTeam)) { logMsg(FAC[team].name + ' strike force inbound — wave ' + ai.waveN, 'war'); sfx('war'); }
-        else logMsg(FAC[team].name + ' launches an assault on ' + FAC[tgtTeam].name);
       }
     }
     ai.nextWave = game.t + Math.max(50, 115 - ai.waveN * 8) + Math.random() * 20;
@@ -1076,6 +1124,12 @@ export function trainUnit(t: string) {
 function checkEnd() {
   if (game.over) return;
   if (!game.buildings.some(b => b.team === PLAYER)) { endGame(false); return; }
+  // alternate victory: Victory Points from holding Command Relays (decisive map control)
+  if (allianceVP(PLAYER) >= VP_TARGET) { logMsg('VICTORY — Command Relays have secured the grid', 'good'); endGame(true); return; }
+  for (const f of AIS) {
+    if (game.eliminated[f] || isAllied(PLAYER, f)) continue;
+    if (allianceVP(f) >= VP_TARGET) { endGame(false); return; }
+  }
   let win = true;
   for (const f of AIS) {
     if (game.eliminated[f]) continue;
@@ -1118,6 +1172,7 @@ export function stepWorld(dt: number) {
   waterStep(dt);
   societyTick(dt);
   settlementTick(dt);
+  relayTick(dt);
   governmentTick(dt);
   computeVision();
   checkEnd();
