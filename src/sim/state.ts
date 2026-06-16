@@ -18,7 +18,7 @@ function createGame(): GameState {
     campaign: {},
     coupT: {},
     cam: { x: 0, y: 0 },
-    buildings: [], units: [], shots: [], parts: [], nodes: [], settlements: [], trees: [], waterTiles: [],
+    buildings: [], units: [], shots: [], parts: [], nodes: [], settlements: [], relays: [], vp: {}, trees: [], waterTiles: [],
     terr: new Uint8Array(MAPW * MAPH),
     occupied: new Uint8Array(MAPW * MAPH),
     explored: new Uint8Array(MAPW * MAPH),

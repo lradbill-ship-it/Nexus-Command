@@ -183,6 +183,18 @@ export const HOME_RES: Record<number, ResourceKind> = {
   1: 'crystal', 2: 'alloy', 3: 'coolant', 4: 'alloy', 5: 'crystal', 6: 'coolant',
 };
 
+// ── Objectives: Command Relays & Victory Points (DESIGN_SPEC_v4 §5) ───────────
+// Strategic points (centre + 3 frontiers) that, when held, generate Victory
+// Points + a crystal trickle. First faction/alliance to VP_TARGET wins outright —
+// a decisive map-control path alongside annihilation.
+export const RELAY_SITES = [
+  { x: 56, y: 56 },                       // the central nexus
+  { x: 56, y: 30 }, { x: 32, y: 74 }, { x: 80, y: 74 },
+];
+export const VP_TARGET = 2800;            // sustained map dominance, not an early grab → a late, decisive ending
+export const VP_PER_RELAY = 2.0;          // VP/s per held relay
+export const RELAY_INCOME = 3;            // crystals/s per held relay
+
 export interface AIScriptStep { t: number; type: string; dx: number; dy: number; }
 export const AI_SCRIPT: AIScriptStep[] = [
   { t: 20, type: 'power', dx: -2, dy: 7 }, { t: 55, type: 'foundry', dx: 5, dy: 5 },

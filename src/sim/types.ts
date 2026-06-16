@@ -10,6 +10,17 @@ export interface ResourceNode {
 
 export interface Tree { x: number; y: number; r: number; pine: boolean; tone: number; }
 
+// Command Relays — strategic objective points captured by presence; held relays
+// generate Victory Points toward the alternate win condition (DESIGN_SPEC_v4 §5).
+export interface Relay {
+  id: number;
+  x: number; y: number;
+  owner: number;      // 0 = neutral, else faction id
+  capBy: number;      // faction currently gaining capture progress
+  capT: number;       // capture progress 0..1
+  pulse: number;      // render animation phase
+}
+
 // Neutral civilian settlements on the map — recruited (paid), persuaded (peaceful
 // presence) or intimidated (military presence) into a faction (DESIGN_SPEC_v4 §3.2).
 export interface Settlement {
@@ -133,6 +144,8 @@ export interface GameState {
   parts: Particle[];
   nodes: ResourceNode[];
   settlements: Settlement[];
+  relays: Relay[];
+  vp: Record<number, number>;             // victory points per faction
   trees: Tree[];
   waterTiles: { x: number; y: number }[];
   terr: Uint8Array;
