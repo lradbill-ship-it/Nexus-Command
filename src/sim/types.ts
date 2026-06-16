@@ -121,6 +121,7 @@ export interface GameState {
   pop: Record<number, number>;            // civilian population per faction (labor + conscription pool)
   happy: Record<number, number>;          // population happiness 0..100 per faction
   conscriptPenalty: Record<number, number>; // transient happiness hit from recent conscription
+  leader: Record<number, import('./constants').LeaderStyle>; // active leader style per faction
   cam: { x: number; y: number };
   buildings: Building[];
   units: Unit[];

@@ -32,6 +32,22 @@ Build **NEXUS COMMAND**: a real-time strategy game in the spirit of Command & Co
 - **Combat**: turret-aim smoothing, waves that scale with time, fog of war (player + allies' vision), win = every surviving faction is you or your ally; lose = all your buildings destroyed.
 - **Slow build-up pacing**: first AI attack ~2.5–3.5 min, escalating size/frequency.
 
+## v4 Phase 4a — Leader doctrines (IMPLEMENTED, branch `feature/v4-phase4a-leaders`)
+
+Lane's item 9 (government), first slice — DESIGN_SPEC_v4 §4. 5 leader styles, chosen at game start.
+
+- `LeaderStyle` + `STYLES` table (constants): **Militarist** (+combat −econ), **Industrialist** (+labor),
+  **Populist** (+happy, cheap mobilise), **Technocrat** (−alloy cost, faster cyber), **Mercantile** (+income/trade).
+  `game.leader` per faction; AI styles via `PERSONA_STYLE[persona]`.
+- `styleMod(team)` applied across sim: combat (`fireAt`), crystal income (harvest deliver), `laborFactor`,
+  `happyTarget`, alloy cost (`alloyCost()` in train/place/AI), conscript & settlement-recruit cost, trade flow
+  (`stepWorld`), ability cooldowns (`castAbility`). `setLeader` / `getChosenLeader`.
+- **Game-start picker**: intro overlay leader-doctrine chooser (5 cards); choice persists across restarts
+  (`main.ts` re-applies on start/restart). LEADER readout in the SOCIETY panel.
+- Verified headlessly: each style measurably shifts outcomes (militarist 13.2 vs mercantile 10.4 dmg;
+  technocrat walker-alloy 204 vs 300; populist conscript 8 vs 15 pop & happy +14; industrialist labor 1.16). clean build.
+- **Next: Phase 4b** — elections & coups (the dynamic politics that swing the style mid-match).
+
 ## v4 Phase 3b — Neutral settlements (IMPLEMENTED, branch `feature/v4-phase3b-settlements`)
 
 Lane's item 7 (recruit / persuade / intimidate map population) — DESIGN_SPEC_v4 §3.2. Completes Phase 3.
