@@ -10,6 +10,18 @@ export interface ResourceNode {
 
 export interface Tree { x: number; y: number; r: number; pine: boolean; tone: number; }
 
+// Neutral civilian settlements on the map — recruited (paid), persuaded (peaceful
+// presence) or intimidated (military presence) into a faction (DESIGN_SPEC_v4 §3.2).
+export interface Settlement {
+  id: number;
+  x: number; y: number;
+  pop: number;                 // citizens this settlement contributes when taken
+  owner: number;               // 0 = neutral, else faction id
+  capBy: number;               // faction currently gaining capture progress (0 = none)
+  capT: number;                // capture progress 0..1
+  seed: number;                // render variation
+}
+
 export interface Building {
   id: number;
   kind: 'b';
@@ -115,6 +127,7 @@ export interface GameState {
   shots: Shot[];
   parts: Particle[];
   nodes: ResourceNode[];
+  settlements: Settlement[];
   trees: Tree[];
   waterTiles: { x: number; y: number }[];
   terr: Uint8Array;

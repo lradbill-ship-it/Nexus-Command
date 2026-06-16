@@ -12,7 +12,7 @@ function createGame(): GameState {
     happy: { 1: 62, 2: 62, 3: 62, 4: 62, 5: 62, 6: 62 },
     conscriptPenalty: {},
     cam: { x: 0, y: 0 },
-    buildings: [], units: [], shots: [], parts: [], nodes: [], trees: [], waterTiles: [],
+    buildings: [], units: [], shots: [], parts: [], nodes: [], settlements: [], trees: [], waterTiles: [],
     terr: new Uint8Array(MAPW * MAPH),
     occupied: new Uint8Array(MAPW * MAPH),
     explored: new Uint8Array(MAPW * MAPH),
