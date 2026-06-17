@@ -148,6 +148,10 @@ The sim is engine‑independent and **never touches the DOM/renderer** — it ta
    - **Also:** the Logger's tree‑felling SFX was removed (Lane) — `clearForest` is silent.
    - ⚠️ Compile‑verified only — playtest the burrow movement, the underground‑hunt, the gate, and confirm felling is now silent.
 
+   **Underground‑targeting fix + water‑harvesting (commit `a77c6fc`, main + live):**
+   - **Bug fixed:** non‑Borers could still hit burrowing/underground units (helicopters, turrets, splash). Now only a `tunneler` keeps an underground target — units & turrets **drop** a target that dives, and surface **splash** is shielded from buried units via `Shot.subsurface` (set when a tunneler fires). Acquisition was already gated.
+   - **Coolant from water (Lane):** **Water Tower** (`B.watertower`, 450cr) unlocks **Coolant Tankers drawing coolant straight from rivers & lakes**. Each water tile holds coolant in `game.waterAmt` (Float32Array, 700/tile, set in `mapgen`); tankers drain it (mirrors the Logger's tile‑work via `nearestWaterTile`), and an **emptied tile DRIES to passable dirt** (`dryWater` → `dryWaterAt` repaint hook) so lakes drain shoreline‑inward and open crossings. The tower is also a coolant drop‑off (+4/s). `hasWaterTower()` gates it; **player‑only** (AI sticks to coolant nodes). Coolant nodes are also more plentiful now (richer caches + bigger central field). Tuning: `waterAmt` 700/tile, draw 62/s.
+
 **Big remaining roadmap item:**
 
 4. **#9 Naval / oceans** — the last item from Lane's original 10. Add ocean terrain on the big maps + sea units for **combat, transport, and harvesting (oil + fish as sea resources)**. Depends on the 3× maps (done). This is a large, multi‑part feature — scope it with Lane.
