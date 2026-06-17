@@ -67,7 +67,7 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number): Ve
   const H = (i: number) => { const x = i % MAPW, y = i / MAPW | 0; return Math.abs(x - tx) + Math.abs(y - ty); };
   push(H(start), start);
   let pops = 0, found = false;
-  while (hf.length && pops++ < 8000) {
+  while (hf.length && pops++ < 30000) {   // higher budget for long cross-map paths on the ×3 map
     const cur = pop();
     if (cur === goal) { found = true; break; }
     const cx = cur % MAPW, cy = cur / MAPW | 0, cg = _g[cur];

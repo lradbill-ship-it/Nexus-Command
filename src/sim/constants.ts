@@ -2,8 +2,9 @@ import type { ResourceKind } from './types';
 
 // ── Core grid ────────────────────────────────────────────────────────────────
 export const TILE = 32;
-export const MAPW = 112;
-export const MAPH = 112;
+export const MAP_SCALE = 3;                 // ×3 larger battlefields (note #2)
+export const MAPW = 112 * MAP_SCALE;        // 336 tiles
+export const MAPH = 112 * MAP_SCALE;        // 336 tiles
 export const WORLD_W = MAPW * TILE;
 export const WORLD_H = MAPH * TILE;
 
@@ -162,19 +163,19 @@ export const COVERT: Record<string, CovertDef> = {
 // ── Base anchors (6 factions around the perimeter of the 112² map) ───────────
 export interface BaseInfo { tx: number; ty: number; sx: number; sy: number; }
 export const BASE_INFO: Record<number, BaseInfo> = {
-  1: { tx: 14, ty: 78, sx: +1, sy: -1 }, // AMERICAN FEDERATION (SW, player)
-  2: { tx: 14, ty: 30, sx: +1, sy: +1 }, // EUROPEAN CONCORD     (NW)
-  3: { tx: 54, ty: 8,  sx: +1, sy: +1 }, // PAN-AFRICAN UNION    (N)
-  4: { tx: 95, ty: 30, sx: -1, sy: +1 }, // GULF COALITION       (NE)
-  5: { tx: 95, ty: 78, sx: -1, sy: -1 }, // EASTERN BLOC         (SE)
-  6: { tx: 54, ty: 99, sx: +1, sy: -1 }, // OCEANIC LEAGUE       (S)
+  1: { tx: 14 * MAP_SCALE, ty: 78 * MAP_SCALE, sx: +1, sy: -1 }, // AMERICAN FEDERATION (SW, player)
+  2: { tx: 14 * MAP_SCALE, ty: 30 * MAP_SCALE, sx: +1, sy: +1 }, // EUROPEAN CONCORD     (NW)
+  3: { tx: 54 * MAP_SCALE, ty: 8 * MAP_SCALE,  sx: +1, sy: +1 }, // PAN-AFRICAN UNION    (N)
+  4: { tx: 95 * MAP_SCALE, ty: 30 * MAP_SCALE, sx: -1, sy: +1 }, // GULF COALITION       (NE)
+  5: { tx: 95 * MAP_SCALE, ty: 78 * MAP_SCALE, sx: -1, sy: -1 }, // EASTERN BLOC         (SE)
+  6: { tx: 54 * MAP_SCALE, ty: 99 * MAP_SCALE, sx: +1, sy: -1 }, // OCEANIC LEAGUE       (S)
 };
 
 // Indices 0-5 sit just inside each base toward centre; 6 = centre; 7-10 = frontier.
 export const NODE_SITES = [
-  { x: 26, y: 70 }, { x: 26, y: 40 }, { x: 56, y: 22 }, { x: 86, y: 40 }, { x: 86, y: 70 }, { x: 56, y: 88 },
-  { x: 56, y: 56 },
-  { x: 38, y: 56 }, { x: 74, y: 56 }, { x: 56, y: 36 }, { x: 56, y: 76 },
+  { x: 26 * MAP_SCALE, y: 70 * MAP_SCALE }, { x: 26 * MAP_SCALE, y: 40 * MAP_SCALE }, { x: 56 * MAP_SCALE, y: 22 * MAP_SCALE }, { x: 86 * MAP_SCALE, y: 40 * MAP_SCALE }, { x: 86 * MAP_SCALE, y: 70 * MAP_SCALE }, { x: 56 * MAP_SCALE, y: 88 * MAP_SCALE },
+  { x: 56 * MAP_SCALE, y: 56 * MAP_SCALE },
+  { x: 38 * MAP_SCALE, y: 56 * MAP_SCALE }, { x: 74 * MAP_SCALE, y: 56 * MAP_SCALE }, { x: 56 * MAP_SCALE, y: 36 * MAP_SCALE }, { x: 56 * MAP_SCALE, y: 76 * MAP_SCALE },
 ];
 
 // Each base is RICH in its home resource and scarce in the other two → forces
@@ -189,8 +190,8 @@ export const HOME_RES: Record<number, ResourceKind> = {
 // grants its owner a crystal trickle (income) and battlefield vision — no longer
 // a Victory-Point win path (annihilation is the sole win condition).
 export const RELAY_SITES = [
-  { x: 56, y: 56 },                       // the central nexus
-  { x: 56, y: 30 }, { x: 32, y: 74 }, { x: 80, y: 74 },
+  { x: 56 * MAP_SCALE, y: 56 * MAP_SCALE },                       // the central nexus
+  { x: 56 * MAP_SCALE, y: 30 * MAP_SCALE }, { x: 32 * MAP_SCALE, y: 74 * MAP_SCALE }, { x: 80 * MAP_SCALE, y: 74 * MAP_SCALE },
 ];
 export const RELAY_INCOME = 3;            // crystals/s per held relay
 

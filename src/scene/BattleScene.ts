@@ -259,6 +259,10 @@ export class BattleScene extends Phaser.Scene {
       this.recs.set(b.id, r);
     }
     const vis = canSee(b);
+    const wv = this.cameras.main.worldView;                          // viewport culling — skip off-screen sprites
+    if (!vis || b.x < wv.x - 64 || b.x > wv.right + 64 || b.y < wv.y - 64 || b.y > wv.bottom + 64) {
+      r.body.setVisible(false); r.glow?.setVisible(false); r.dish?.setVisible(false); r.barrel?.setVisible(false); return;
+    }
     r.body.setVisible(vis).setDepth(b.y);
     // construction look: darken + fade while building
     const built = b.progress >= 1;
@@ -295,6 +299,10 @@ export class BattleScene extends Phaser.Scene {
       if (r.barrel && hasBarrel) { const bk = `t_${u.type}_${u.team}`; r.barrel.setTexture(bk); this.setOrigin(r.barrel, bk); }
     }
     const vis = canSee(u);
+    const wv = this.cameras.main.worldView;                          // viewport culling — skip off-screen sprites
+    if (!vis || u.x < wv.x - 48 || u.x > wv.right + 48 || u.y < wv.y - 48 || u.y > wv.bottom + 48) {
+      r.body.setVisible(false); r.barrel?.setVisible(false); r.rotor?.setVisible(false); r.shadow?.setVisible(false); return;
+    }
     const air = !!U[u.type].air;
     const bob = Math.sin(game.t * 3 + u.bob) * (air ? 2.5 : 1.5);
     const dy = u.y - (air ? ALT : 0) + bob;       // airborne units float above the deck
