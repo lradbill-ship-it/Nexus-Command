@@ -82,6 +82,7 @@ export interface Unit {
   hState: 'find' | 'go' | 'mine' | 'return' | 'idlewait';
   chopTx?: number; chopTy?: number;   // forest tile a Logger is felling
   chopT?: number;                     // chop progress (seconds) on the current tile
+  tunnelT?: number;                   // >0 ⇒ a harvester is burrowing underground (phases through terrain)
   facing: number;
   aim: number;
   bob: number;

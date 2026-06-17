@@ -8,7 +8,7 @@ import type { LeaderStyle } from './constants';
 import {
   game, dip, rk, getRel, setRel, addRel, isAllied, isWar, stateOf, logMsg, hint,
 } from './state';
-import type { Building, Unit, Entity, Vec, Particle, Settlement, Relay } from './types';
+import type { Building, Unit, Entity, Vec, Particle, Settlement, Relay, ResourceNode } from './types';
 import { findPath, passable, nearestPassableTile } from './pathfind';
 import { spawnResourceField } from './mapgen';
 import { sfx } from '../audio';
@@ -536,6 +536,7 @@ function nearestHostile(e: Entity, range: number, team: number, playerVisOnly: b
   let best: Entity | null = null, bd = range;
   forNearbyUnits(e.x, e.y, range, (u) => {
     if (!isWar(team, u.team)) return;
+    if ((u.tunnelT ?? 0) > 0) return;                      // burrowing harvesters are underground — can't be targeted
     if (!eligibleTarget(e, u)) return;
     if (playerVisOnly && !tileVisible(u.x, u.y)) return;
     const d = dist(e, u) - U[u.type].radius; if (d < bd) { bd = d; best = u; }
@@ -550,13 +551,15 @@ function nearestHostile(e: Entity, range: number, team: number, playerVisOnly: b
 
 // ── Movement: path following + local steering ────────────────────────────────
 function unitBlocked(x: number, y: number) { return !passable(x / TILE | 0, y / TILE | 0); }
+// Phasing units ignore terrain entirely: fliers always, and harvesters while burrowing underground.
+const phasing = (u: Unit) => !!U[u.type].air || (u.tunnelT ?? 0) > 0;
 function stepToward(u: Unit, dx: number, dy: number, dt: number) {
   const sp = U[u.type].speed * dt, len = Math.hypot(dx, dy);
   if (len < 1) { u.moving = false; return true; }
   u.moving = true;
   const nx = u.x + dx / len * sp, ny = u.y + dy / len * sp;
   u.facing = Math.atan2(dy, dx);
-  if (U[u.type].air) { u.x = nx; u.y = ny; }              // fliers ignore terrain entirely
+  if (phasing(u)) { u.x = nx; u.y = ny; }                 // fliers + burrowing harvesters ignore terrain entirely
   else if (!unitBlocked(nx, ny)) { u.x = nx; u.y = ny; }
   else if (!unitBlocked(nx, u.y)) { u.x = nx; }
   else if (!unitBlocked(u.x, ny)) { u.y = ny; }
@@ -572,7 +575,7 @@ export function setPath(u: Unit, wx: number, wy: number) {
 }
 function followPath(u: Unit, dt: number) {
   // escape if we ended up sitting on a blocked tile (e.g. a building was placed on us)
-  if (!U[u.type].air && unitBlocked(u.x, u.y)) {
+  if (!phasing(u) && unitBlocked(u.x, u.y)) {
     const np = nearestPassableTile(u.x / TILE | 0, u.y / TILE | 0);
     if (np) { u.x = np[0] * TILE + 16; u.y = np[1] * TILE + 16; }
   }
@@ -593,6 +596,11 @@ function followPath(u: Unit, dt: number) {
   u.lx = u.x; u.ly = u.y;
   if (u.stuckT > 0.8 && u.finalDest) {
     u.stuckT = 0;
+    if (U[u.type].harvests) {                              // harvesters burrow straight through the obstacle to their goal
+      u.tunnelT = (u.tunnelT ?? 0) + 0.001;                // enter tunnel mode (cleared by updateHarvester on arrival)
+      u.path = [{ x: u.finalDest.x, y: u.finalDest.y }];
+      return false;
+    }
     const n = (u.unstick || 0) + 1; u.unstick = n;
     if (n >= 2) {
       // wedged → hop toward the next waypoint onto open ground (get past the obstacle), then re-path
@@ -613,10 +621,10 @@ function followPath(u: Unit, dt: number) {
 function separation() {
   rebuildUnitGrid();                                       // fresh buckets from post-movement positions
   for (const a of game.units) {
-    if (U[a.type].air) continue;                           // air & ground occupy separate layers
+    if (phasing(a)) continue;                              // air & burrowing units occupy separate layers
     const ar = U[a.type].radius;
     forNearbyUnits(a.x, a.y, GCELL, (b) => {
-      if (a.id >= b.id || U[b.type].air) return;           // each ground pair resolved once
+      if (a.id >= b.id || phasing(b)) return;              // each ground pair resolved once
       const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
       const min = ar + U[b.type].radius;
       if (d > 0 && d < min) {
@@ -643,6 +651,16 @@ function nearestNodePathable(u: Unit) {
   }
   return null;
 }
+/** Nearest field of the right kind by straight distance, ignoring whether a surface route exists (for tunnelling). */
+function nearestNodeAny(u: Unit): ResourceNode | null {
+  const kind = resOf(u);
+  let best: ResourceNode | null = null, bd = Infinity;
+  for (const n of game.nodes) {
+    if (n.amount <= 0 || n.kind !== kind) continue;
+    const d = (n.x - u.x) * (n.x - u.x) + (n.y - u.y) * (n.y - u.y); if (d < bd) { bd = d; best = n; }
+  }
+  return best;
+}
 function nearestDepot(u: Unit): Building | null {
   const kind = resOf(u);
   let best: Building | null = null, bd = 1e9;
@@ -657,14 +675,19 @@ function updateHarvester(u: Unit, dt: number) {
   const cap = U[u.type].cargo!;
   const kind = resOf(u);
   if (u.hState === 'find') {
+    u.tunnelT = 0;                                          // surface when planning a fresh leg
     const got = nearestNodePathable(u);
     if (got) { u.hNode = got.node; u.path = got.path; u.finalDest = { x: got.node.x, y: got.node.y }; u.hState = 'go'; }
-    else u.hState = 'idlewait';
+    else {
+      const n = nearestNodeAny(u);                          // no surface route to any field → burrow straight to the nearest
+      if (n) { u.hNode = n; u.finalDest = { x: n.x, y: n.y }; u.path = [{ x: n.x, y: n.y }]; u.tunnelT = 0.001; u.hState = 'go'; }
+      else u.hState = 'idlewait';
+    }
   }
   if (u.hState === 'idlewait') { if (game.t % 2 < dt) u.hState = 'find'; u.moving = false; return; }
   if (u.hState === 'go') {
     if (!u.hNode || u.hNode.amount <= 0) { u.hState = 'find'; return; }
-    if (dist(u, u.hNode) < 28) { u.hState = 'mine'; u.path = null; }
+    if (dist(u, u.hNode) < 28) { u.hState = 'mine'; u.path = null; u.tunnelT = 0; }   // surfaced at the field
     else followPath(u, dt);
   } else if (u.hState === 'mine') {
     u.moving = false;
@@ -684,11 +707,12 @@ function updateHarvester(u: Unit, dt: number) {
       if (kind === 'crystal') game.money[u.team] += Math.round(u.cargo * (styleMod(u.team).econ ?? 1));
       else if (kind === 'coolant') game.water[u.team] = clamp((game.water[u.team] || 0) + u.cargo, 0, WATER_CAP);
       else game.alloy[u.team] = (game.alloy[u.team] || 0) + Math.round(u.cargo);
-      u.cargo = 0; u.hState = 'find';
+      u.cargo = 0; u.hState = 'find'; u.tunnelT = 0;        // surfaced at the depot
       dep.unloadFx = game.t; u.moving = false; u.path = null;
       if (u.team === PLAYER) sfx('cash', dep.x);
     } else followPath(u, dt);
   }
+  if ((u.tunnelT ?? 0) > 0 && Math.random() < dt * 9) spawnParts('debris', u.x, u.y + 5, 1, '120,92,56');   // burrow spoil
 }
 
 // ── Logging: a Logger fells & clears forest tiles for wood (opens new ground) ──
@@ -777,17 +801,17 @@ function updateLogger(u: Unit, dt: number) {
 const REPAIR_RANGE = 42;      // how close the rig must be to mend a target
 const REPAIR_RATE = 34;       // hp/sec restored
 const WOOD_PER_HP = 0.05;     // wood consumed per hp restored
-const REPAIR_SEEK = 360;      // idle auto-seek radius for the wounded
 const sizeOf = (e: Entity) => e.kind === 'b' ? Math.max((e as Building).w, (e as Building).h) / 2 : U[(e as Unit).type].radius;
 let lastWoodNag = -9;
+/** Nearest wounded friendly (unit OR building) within `range` px — pass Infinity for map-wide auto-repair. */
 function nearestDamagedFriendly(u: Unit, range: number): Entity | null {
   let best: Entity | null = null, bd = range * range;
-  forNearbyUnits(u.x, u.y, range, (o) => {
-    if (o === u || o.dead || U[o.type].air || !isAllied(u.team, o.team) || o.hp >= o.hpMax) return;
+  for (const o of game.units) {
+    if (o === u || o.dead || U[o.type].air || !isAllied(u.team, o.team) || o.hp >= o.hpMax) continue;
     const d = (o.x - u.x) * (o.x - u.x) + (o.y - u.y) * (o.y - u.y); if (d < bd) { bd = d; best = o; }
-  });
+  }
   for (const b of game.buildings) {
-    if (b.team !== u.team || b.dead || b.progress < 1 || b.hp >= b.hpMax) continue;
+    if (b.dead || b.progress < 1 || b.hp >= b.hpMax || !isAllied(u.team, b.team)) continue;
     const d = (b.x - u.x) * (b.x - u.x) + (b.y - u.y) * (b.y - u.y); if (d < bd) { bd = d; best = b; }
   }
   return best;
@@ -825,12 +849,12 @@ function updateRepair(u: Unit, dt: number) {
     if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; }
     return;
   }
-  // idle → seek out and mend the nearest wounded friendly
+  // idle → continuously auto-search the whole map for any wounded unit OR building and go mend it
   if (u.order === 'idle') {
     if (!u.target || u.target.dead || u.target.hp >= u.target.hpMax) {
       u.target = null;
       u.acqT = (u.acqT || 0) - dt;
-      if (u.acqT <= 0) { u.acqT = 0.5; u.target = nearestDamagedFriendly(u, REPAIR_SEEK); }
+      if (u.acqT <= 0) { u.acqT = 0.5; u.target = nearestDamagedFriendly(u, Infinity); }
     }
     const tgt = u.target;
     if (tgt) {

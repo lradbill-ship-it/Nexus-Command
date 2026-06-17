@@ -361,7 +361,7 @@ export class BattleScene extends Phaser.Scene {
     const dy = u.y - (air ? ALT : 0) + bob;       // airborne units float above the deck
     const depth = air ? u.y + 4000 : u.y;         // …and draw above ground entities
     r.body.setVisible(vis).setDepth(depth).setPosition(u.x, dy).setRotation(u.facing + Math.PI / 2)
-      .setAlpha(u.disabledUntil > game.t ? 0.6 : 1);
+      .setAlpha((u.tunnelT ?? 0) > 0 ? 0.3 : u.disabledUntil > game.t ? 0.6 : 1);   // faded while burrowing underground
     if (r.shadow) r.shadow.setVisible(vis).setDepth(u.y - 1).setPosition(u.x, u.y).setScale(0.8).setAlpha(0.45);
     if (r.barrel) r.barrel.setVisible(vis).setDepth(depth + 0.5).setPosition(u.x, dy).setRotation(u.aim + Math.PI / 2);
     if (r.rotor) r.rotor.setVisible(vis).setDepth(depth + 0.6).setPosition(u.x, dy).setRotation(game.t * 22)
