@@ -10,8 +10,8 @@ export interface ResourceNode {
 
 export interface Tree { x: number; y: number; r: number; pine: boolean; tone: number; }
 
-// Command Relays — strategic objective points captured by presence; held relays
-// generate Victory Points toward the alternate win condition (DESIGN_SPEC_v4 §5).
+// Command Relays — strategic points captured by presence; a held relay grants
+// its owner income (crystal trickle) and battlefield vision (DESIGN_SPEC_v4 §5).
 export interface Relay {
   id: number;
   x: number; y: number;
@@ -145,7 +145,6 @@ export interface GameState {
   nodes: ResourceNode[];
   settlements: Settlement[];
   relays: Relay[];
-  vp: Record<number, number>;             // victory points per faction
   trees: Tree[];
   waterTiles: { x: number; y: number }[];
   terr: Uint8Array;

@@ -6,7 +6,7 @@ import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, 
 import {
   startPlacing, trainUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
   hasCyber, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
-  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, allianceVP,
+  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst,
 } from '../sim/sim';
 
 let chosenLeader: LeaderStyle = 'industrialist';
@@ -189,10 +189,6 @@ export function refresh() {
   $('uiWater').textContent = Math.floor(w.stored) + (w.net >= 0 ? ' +' + w.net : ' ' + w.net) + '/s';
   $('uiWaterWrap').className = 'stat' + (game.overheat[PLAYER] ? ' hot' : '');
   $('uiAlloy').textContent = String(Math.floor(game.alloy[PLAYER] || 0));
-  $('uiVP').textContent = String(Math.floor(allianceVP(PLAYER)));
-  let leadName = '', leadVP = 0;
-  for (const f of AIS) if (!isAllied(PLAYER, f) && !game.eliminated[f]) { const v = allianceVP(f); if (v > leadVP) { leadVP = v; leadName = FAC[f].name.split(' ')[0]; } }
-  $('uiVPlead').textContent = leadVP > 20 ? '· ' + leadName + ' ' + Math.floor(leadVP) : '';
   const pop = Math.floor(game.pop[PLAYER] || 0), cap = housingCap(PLAYER), hap = Math.round(game.happy[PLAYER] ?? 60);
   $('uiPop').textContent = String(pop);
   $('uiPopCap').textContent = String(cap);
