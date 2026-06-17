@@ -13,7 +13,7 @@ let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
 
 const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'smelter', 'habitat', 'market', 'aaturret', 'cyber'];
-const unitOrder = ['harvester', 'tanker', 'hauler', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'aircraft'];
+const unitOrder = ['harvester', 'tanker', 'hauler', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -43,6 +43,7 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'artillery') { g.fillStyle = '#1a232e'; g.fillRect(10, 6, 3, 14); g.fillRect(27, 6, 3, 14); g.fillStyle = '#1a2735'; g.fillRect(13, 7, 14, 12); g.strokeRect(13, 7, 14, 12); g.strokeStyle = '#aebcc8'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 12, cy - 7); g.stroke(); }
     else if (type === 'walker') { g.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * 7 + 0.5; const px = cx + Math.cos(a) * 8, py = cy + Math.sin(a) * 8; if (i) g.lineTo(px, py); else g.moveTo(px, py); } g.closePath(); g.fill(); g.stroke(); }
     else if (type === 'aircraft') { g.fillStyle = '#1a2735'; g.beginPath(); g.moveTo(cx, cy - 8); g.lineTo(cx + 4, cy + 6); g.lineTo(cx - 4, cy + 6); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = '#cfe6ee'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(cx - 9, cy); g.lineTo(cx + 9, cy); g.stroke(); }
+    else if (type === 'harrier') { g.fillStyle = '#1a2735'; g.beginPath(); g.moveTo(cx, cy - 9); g.lineTo(cx + 3, cy + 7); g.lineTo(cx - 3, cy + 7); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = '#cfe6ee'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx - 8, cy + 2); g.lineTo(cx, cy - 3); g.lineTo(cx + 8, cy + 2); g.stroke(); }
   }
   return c;
 }

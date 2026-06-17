@@ -286,6 +286,13 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.strokeStyle = 'rgba(120,140,165,.6)'; g.lineWidth = 1; for (let i = -8; i <= 8; i += 4) { g.beginPath(); g.moveTo(cx - 12, cy + i); g.lineTo(cx - 8, cy + i); g.moveTo(cx + 8, cy + i); g.lineTo(cx + 12, cy + i); g.stroke(); }
     g.fillStyle = body; g.strokeStyle = col; g.lineWidth = 1.6; rr(g, cx - 8, cy - 8, 16, 16, 3); g.fill(); g.stroke();
     g.fillStyle = '#1a2530'; g.beginPath(); g.arc(cx, cy, 5, 0, 7); g.fill();
+  } else if (type === 'harrier') {
+    // strike jet: slim swept-wing dart pointing "up"
+    g.fillStyle = body; g.strokeStyle = col; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(cx, cy - 13); g.lineTo(cx + 3, cy + 8); g.lineTo(cx - 3, cy + 8); g.closePath(); g.fill(); g.stroke();   // fuselage
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - 10, cy + 4); g.lineTo(cx, cy - 2); g.lineTo(cx + 10, cy + 4); g.stroke();   // swept wings
+    g.fillStyle = '#cdd9e3'; g.beginPath(); g.arc(cx, cy - 8, 1.6, 0, 7); g.fill();   // canopy
+    g.fillStyle = '#ffb15a'; g.fillRect(cx - 1.2, cy + 8, 2.4, 3);   // exhaust glow
   } else if (type === 'aircraft') {
     // VTOL gunship: swept fuselage + twin rotor nacelles (rotor discs spin in-scene)
     g.fillStyle = body; g.strokeStyle = col; g.lineWidth = 1.6;

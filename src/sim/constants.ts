@@ -142,7 +142,8 @@ export const U: Record<string, UnitDef> = {
   strike: { name: 'Hover Tank', cost: 300, hp: 155, speed: 96, radius: 10, sight: 7, buildTime: 9, dmg: 11, range: 124, rof: 0.8, desc: 'Backbone main battle tank.' },
   artillery: { name: 'Siege Artillery', cost: 850, hp: 200, speed: 50, radius: 12, sight: 6, buildTime: 18, dmg: 58, range: 256, rof: 3.0, splash: 58, coolant: 3, alloy: 350, desc: 'Long-range splash siege. Fragile; needs coolant + alloy.' },
   walker: { name: 'Railgun Walker', cost: 700, hp: 440, speed: 56, radius: 13, sight: 7, buildTime: 16, dmg: 48, range: 182, rof: 2.2, coolant: 4, alloy: 300, desc: 'Quad-legged siege platform. Runs hot; needs alloy.' },
-  aircraft: { name: 'Wraith Gunship', cost: 760, hp: 240, speed: 158, radius: 10, sight: 10, buildTime: 16, dmg: 24, range: 150, rof: 0.6, splash: 26, air: true, antiAir: true, coolant: 6, alloy: 300, desc: 'VTOL gunship. Devastating splash strafes; flies over terrain; heavy coolant + alloy upkeep.' },
+  harrier: { name: 'Harrier Jet', cost: 420, hp: 130, speed: 176, radius: 8, sight: 9, buildTime: 9, dmg: 14, range: 122, rof: 0.5, air: true, antiAir: true, coolant: 3, alloy: 120, desc: 'Cheap, fast strike jet. Flies over terrain; light air-to-ground & dogfighting. Modest coolant + alloy.' },
+  aircraft: { name: 'Wraith Gunship', cost: 600, hp: 240, speed: 158, radius: 10, sight: 10, buildTime: 16, dmg: 24, range: 150, rof: 0.6, splash: 26, air: true, antiAir: true, coolant: 6, alloy: 300, desc: 'VTOL gunship. Devastating splash strafes; flies over terrain; heavy coolant + alloy upkeep.' },
 };
 
 export interface AbilityDef { name: string; cost: number; cd: number; key: string; desc: string; }
