@@ -311,6 +311,7 @@ export function conscript(team: number) {
 
 // ── Neutral settlements: recruit / persuade / intimidate (DESIGN_SPEC_v4 §3.2) ─
 const SETTLE_R = 4 * TILE;   // capture influence radius
+const SETTLE_INCOME = 0.05;  // crystals/sec per population point an owned settlement yields (civilian economy)
 function captureSettlement(s: Settlement, team: number, militaryOnly: boolean) {
   const prev = s.owner;
   s.owner = team; s.capT = 0; s.capBy = 0;
@@ -338,6 +339,8 @@ function settlementTick(dt: number) {
     } else {
       s.capT = Math.max(0, s.capT - dt / 18);                      // contested → stalls
     }
+    // an owned settlement is a working town — its citizens yield a crystal trickle to the owner
+    if (s.owner) game.money[s.owner] += s.pop * SETTLE_INCOME * dt;
   }
 }
 

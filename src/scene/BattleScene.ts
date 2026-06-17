@@ -314,25 +314,29 @@ export class BattleScene extends Phaser.Scene {
       if (!game.explored[idx(tx, ty)]) continue;                  // hidden in unexplored fog
       const dim = !game.visible[idx(tx, ty)];                     // explored-but-not-visible → faded
       const a = dim ? 0.5 : 1;
-      // little cluster of huts (seeded layout)
-      const huts: [number, number][] = [[-9, 2], [3, -4], [8, 5], [-3, -8], [0, 7]];
-      for (let i = 0; i < 4 + (s.seed * 2 | 0); i++) {
-        const [hx, hy] = huts[i % huts.length];
-        const ox = hx + (s.seed * 13 + i * 7 % 5) - 2;
-        g.fillStyle(0x6b5436, a); g.fillRect(s.x + ox - 4, s.y + hy - 3, 8, 7);
-        g.fillStyle(0x9a8050, a * 0.9); g.fillRect(s.x + ox - 5, s.y + hy - 5, 10, 3);   // roof
+      const nHuts = Math.min(12, 5 + (s.pop / 5 | 0));            // bigger population → bigger town
+      const ringR = 16 + nHuts;
+      // faint ground footprint so a town reads clearly on the map
+      g.fillStyle(0x4a4636, a * 0.5); g.fillCircle(s.x, s.y, ringR - 2);
+      // cluster of huts (golden-angle scatter, seeded), sized by population
+      for (let i = 0; i < nHuts; i++) {
+        const ang = i * 2.39996 + s.seed * 6.283;
+        const rad = 4 + (i % 4) * 5;
+        const ox = Math.cos(ang) * rad, oy = Math.sin(ang) * rad * 0.8;
+        g.fillStyle(0x6b5436, a); g.fillRect(s.x + ox - 5, s.y + oy - 3, 10, 8);
+        g.fillStyle(0x9a8050, a * 0.9); g.fillRect(s.x + ox - 6, s.y + oy - 5, 12, 3);   // roof
       }
       // flag — neutral grey, else owner colour
       const col = s.owner ? Phaser.Display.Color.HexStringToColor(FAC[s.owner].col).color : 0xb8bcc4;
-      g.lineStyle(1.5, 0x2a2018, a); g.lineBetween(s.x + 10, s.y - 14, s.x + 10, s.y + 2);
-      g.fillStyle(col, a); g.fillTriangle(s.x + 10, s.y - 14, s.x + 10, s.y - 7, s.x + 19, s.y - 10.5);
-      // capture progress ring
+      g.lineStyle(1.5, 0x2a2018, a); g.lineBetween(s.x + ringR - 4, s.y - 18, s.x + ringR - 4, s.y - 2);
+      g.fillStyle(col, a); g.fillTriangle(s.x + ringR - 4, s.y - 18, s.x + ringR - 4, s.y - 10, s.x + ringR + 6, s.y - 14);
+      // ownership ring / capture progress — clearer "where & whose"
       if (s.capT > 0.02 && s.capBy) {
         const cc = Phaser.Display.Color.HexStringToColor(FAC[s.capBy].col).color;
-        g.lineStyle(2, cc, 0.9); g.beginPath();
-        g.arc(s.x, s.y, 18, -Math.PI / 2, -Math.PI / 2 + s.capT * Math.PI * 2); g.strokePath();
-      } else if (!s.owner) {
-        g.lineStyle(1, 0xb8bcc4, a * 0.5); g.strokeCircle(s.x, s.y, 18);   // neutral marker
+        g.lineStyle(2.5, cc, 0.95); g.beginPath();
+        g.arc(s.x, s.y, ringR, -Math.PI / 2, -Math.PI / 2 + s.capT * Math.PI * 2); g.strokePath();
+      } else {
+        g.lineStyle(1.5, col, a * (s.owner ? 0.85 : 0.55)); g.strokeCircle(s.x, s.y, ringR);
       }
     }
     // Command Relays — taller beacons with a pulsing owner-coloured halo
@@ -507,7 +511,7 @@ export class BattleScene extends Phaser.Scene {
     for (const st of game.settlements) {
       if (!game.explored[idx(st.x / TILE | 0, st.y / TILE | 0)]) continue;
       ctx.fillStyle = st.owner ? FAC[st.owner].col : '#b8bcc4';
-      ctx.fillRect(st.x / TILE * s - 1.5, st.y / TILE * s - 1.5, 3.5, 3.5);
+      ctx.fillRect(st.x / TILE * s - 2.5, st.y / TILE * s - 2.5, 5, 5);
     }
     // command relays (bright ringed markers)
     for (const r of game.relays) {
