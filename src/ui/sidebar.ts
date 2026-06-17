@@ -5,15 +5,15 @@ import type { LeaderStyle } from '../sim/constants';
 import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, setHintHook } from '../sim/state';
 import {
   startPlacing, trainUnit, cancelUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
-  hasCyber, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
+  hasCyber, hasBuilding, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
   setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, sellSelected, setAutoScout, getAutoScout,
 } from '../sim/sim';
 
 let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
 
-const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'cyber'];
-const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft'];
+const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'cyber', 'drillbay'];
+const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'borer'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -33,6 +33,7 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'market') { g.fillStyle = '#caa05a'; for (let i = 0; i < 4; i++) { g.fillRect(12 + i * 4, 8, 3, 4); } g.strokeStyle = '#e0c089'; g.strokeRect(12, 12, 16, 8); g.fillStyle = '#9fd9cc'; g.fillRect(14, 14, 3, 4); g.fillRect(23, 14, 3, 4); }
     else if (type === 'aaturret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - 2, cy); g.lineTo(cx + 5, cy - 8); g.moveTo(cx + 2, cy); g.lineTo(cx + 9, cy - 6); g.stroke(); }
     else if (type === 'cyber') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(155,111,232,.5)'; g.fill(); g.strokeStyle = '#b07dff'; g.stroke(); }
+    else if (type === 'drillbay') { g.fillStyle = '#1a2735'; g.fillRect(12, 11, 16, 9); g.strokeRect(12, 11, 16, 9); g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(15, 20); g.lineTo(20, 7); g.lineTo(25, 20); g.stroke(); g.fillStyle = '#9fb3c2'; g.beginPath(); g.moveTo(20, 10); g.lineTo(23, 17); g.lineTo(17, 17); g.closePath(); g.fill(); }
   } else {
     if (type === 'harvester') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#9bd4ff'; g.fillRect(16, 9, 8, 6); }
     else if (type === 'tanker') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#7fd6ea'; g.beginPath(); g.arc(20, 13, 5, 0, 7); g.fill(); g.strokeStyle = '#cfeef5'; g.beginPath(); g.moveTo(15, 13); g.lineTo(25, 13); g.stroke(); }
@@ -47,6 +48,7 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'walker') { g.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * 7 + 0.5; const px = cx + Math.cos(a) * 8, py = cy + Math.sin(a) * 8; if (i) g.lineTo(px, py); else g.moveTo(px, py); } g.closePath(); g.fill(); g.stroke(); }
     else if (type === 'aircraft') { g.fillStyle = '#1a2735'; g.beginPath(); g.moveTo(cx, cy - 8); g.lineTo(cx + 4, cy + 6); g.lineTo(cx - 4, cy + 6); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = '#cfe6ee'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(cx - 9, cy); g.lineTo(cx + 9, cy); g.stroke(); }
     else if (type === 'harrier') { g.fillStyle = '#1a2735'; g.beginPath(); g.moveTo(cx, cy - 9); g.lineTo(cx + 3, cy + 7); g.lineTo(cx - 3, cy + 7); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = '#cfe6ee'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx - 8, cy + 2); g.lineTo(cx, cy - 3); g.lineTo(cx + 8, cy + 2); g.stroke(); }
+    else if (type === 'borer') { g.fillRect(13, 8, 14, 12); g.strokeRect(13, 8, 14, 12); g.fillStyle = '#dde7ef'; g.beginPath(); g.moveTo(20, 2); g.lineTo(25, 8); g.lineTo(15, 8); g.closePath(); g.fill(); g.strokeStyle = '#1a232e'; g.lineWidth = 1; g.beginPath(); g.moveTo(18, 4); g.lineTo(20, 8); g.moveTo(22, 4); g.lineTo(20, 8); g.stroke(); }
   }
   return c;
 }
@@ -231,7 +233,10 @@ export function refresh() {
     btn.disabled = game.money[PLAYER] < B[t].cost || (B[t].alloy || 0) > alloyHave;
     btn.classList.toggle('armed', game.placing === t);
   }
-  for (const t of unitOrder) ($('u_' + t) as HTMLButtonElement).disabled = !hasF || game.money[PLAYER] < U[t].cost || (U[t].alloy || 0) > alloyHave;
+  for (const t of unitOrder) {
+    const req = U[t].requires;
+    ($('u_' + t) as HTMLButtonElement).disabled = !hasF || game.money[PLAYER] < U[t].cost || (U[t].alloy || 0) > alloyHave || (!!req && !hasBuilding(req));
+  }
   for (const k of Object.keys(ABILITIES)) {
     const btn = $('a_' + k) as HTMLButtonElement;
     btn.disabled = !hc || game.money[PLAYER] < ABILITIES[k].cost || game.cooldowns[k] > 0;

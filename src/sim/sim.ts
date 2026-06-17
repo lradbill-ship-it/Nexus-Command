@@ -534,9 +534,10 @@ function forNearbyUnits(x: number, y: number, r: number, fn: (u: Unit) => void) 
 
 function nearestHostile(e: Entity, range: number, team: number, playerVisOnly: boolean): Entity | null {
   let best: Entity | null = null, bd = range;
+  const canHitUnderground = e.kind === 'u' && !!U[(e as Unit).type].tunneler;   // only a Borer reaches below ground
   forNearbyUnits(e.x, e.y, range, (u) => {
     if (!isWar(team, u.team)) return;
-    if ((u.tunnelT ?? 0) > 0) return;                      // burrowing harvesters are underground — can't be targeted
+    if ((u.tunnelT ?? 0) > 0 && !canHitUnderground) return;   // burrowing units are underground — only a tunneler can target them
     if (!eligibleTarget(e, u)) return;
     if (playerVisOnly && !tileVisible(u.x, u.y)) return;
     const d = dist(e, u) - U[u.type].radius; if (d < bd) { bd = d; best = u; }
@@ -551,8 +552,9 @@ function nearestHostile(e: Entity, range: number, team: number, playerVisOnly: b
 
 // ── Movement: path following + local steering ────────────────────────────────
 function unitBlocked(x: number, y: number) { return !passable(x / TILE | 0, y / TILE | 0); }
-// Phasing units ignore terrain entirely: fliers always, and harvesters while burrowing underground.
-const phasing = (u: Unit) => !!U[u.type].air || (u.tunnelT ?? 0) > 0;
+// Phasing units ignore terrain entirely: fliers always, dedicated tunnelers (Borer) always,
+// and harvesters while burrowing underground.
+const phasing = (u: Unit) => !!U[u.type].air || !!U[u.type].tunneler || (u.tunnelT ?? 0) > 0;
 function stepToward(u: Unit, dx: number, dy: number, dt: number) {
   const sp = U[u.type].speed * dt, len = Math.hypot(dx, dy);
   if (len < 1) { u.moving = false; return true; }
@@ -726,8 +728,7 @@ function clearForest(tx: number, ty: number) {
   const wx = tx * TILE + 16, wy = ty * TILE + 16;
   spawnParts('debris', wx, wy, 6, '120,92,52');
   game.parts.push({ type: 'ring', x: wx, y: wy, t: 0, life: 0.4, big: false });
-  clearForestHook(tx, ty);                                           // repaint the cleared patch
-  sfx('place', wx);
+  clearForestHook(tx, ty);                                           // repaint the cleared patch (silent — no chop SFX)
 }
 /** Nearest fellable forest tile (with a passable approach) the logger can path to. */
 function nearestForest(u: Unit): { tx: number; ty: number; approach: Vec; path: Vec[] } | null {
@@ -871,6 +872,7 @@ function updateUnit(u: Unit, dt: number) {
   if (u.disabledUntil > game.t) { u.moving = false; return; }
   const d = U[u.type];
   u.cooldown = Math.max(0, u.cooldown - dt);
+  if (U[u.type].tunneler && u.moving && Math.random() < dt * 7) spawnParts('debris', u.x, u.y + 6, 1, '120,100,72');   // burrow spoil trail
   // turret aim smoothing
   let want = u.facing;
   if (u.target && !u.target.dead) want = Math.atan2(u.target.y - u.y, u.target.x - u.x);
@@ -906,7 +908,7 @@ function updateUnit(u: Unit, dt: number) {
         const r = (d.range || 0) + (tgt.kind === 'b' ? Math.max((tgt as Building).w, (tgt as Building).h) / 2 : U[(tgt as Unit).type].radius);
         if (dist(u, tgt) <= r) {
           u.moving = false; u.path = null; u.facing = Math.atan2(tgt.y - u.y, tgt.x - u.x);
-          if (u.cooldown <= 0 && Math.abs(da) < 0.5) { fireAt(u, tgt, d.dmg!, u.type === 'walker', d.splash || 0); u.cooldown = d.rof! * rofMult(u); }
+          if (u.cooldown <= 0 && Math.abs(da) < 0.5) { fireAt(u, tgt, d.dmg!, u.type === 'walker' || u.type === 'borer', d.splash || 0); u.cooldown = d.rof! * rofMult(u); }
         } else { u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.7; setPath(u, tgt.x, tgt.y); } followPath(u, dt); }
       } else if (dist(u, g) > GUARD_FOLLOW) {                 // no threat → stay close to the guarded unit
         u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.5; setPath(u, g.x, g.y); } followPath(u, dt);
@@ -920,7 +922,7 @@ function updateUnit(u: Unit, dt: number) {
     if (dist(u, tgt) <= r) {
       u.moving = false; u.path = null;
       u.facing = Math.atan2(tgt.y - u.y, tgt.x - u.x);
-      if (u.cooldown <= 0 && Math.abs(da) < 0.5) { fireAt(u, tgt, d.dmg!, u.type === 'walker', d.splash || 0); u.cooldown = d.rof! * rofMult(u); }
+      if (u.cooldown <= 0 && Math.abs(da) < 0.5) { fireAt(u, tgt, d.dmg!, u.type === 'walker' || u.type === 'borer', d.splash || 0); u.cooldown = d.rof! * rofMult(u); }
     } else {
       u.repathT -= dt;
       if (!u.path || u.repathT <= 0) { u.repathT = 1.0; setPath(u, tgt.x, tgt.y); }
@@ -1060,6 +1062,7 @@ function updateShots(dt: number) {
 
 // ── Abilities & covert ───────────────────────────────────────────────────────
 export function hasCyber() { return game.buildings.some(b => b.team === PLAYER && b.type === 'cyber' && b.progress >= 1); }
+export function hasBuilding(type: string) { return game.buildings.some(b => b.team === PLAYER && b.type === type && b.progress >= 1); }
 export function tryAbility(key: string) {
   if (game.over) return;
   if (!hasCyber()) { hint('Requires a Cyber Ops Center'); sfx('click'); return; }
@@ -1471,6 +1474,8 @@ export function cancelUnit(t: string) {
 export function trainUnit(t: string) {
   const fs = game.buildings.filter(b => b.team === PLAYER && b.type === 'foundry' && b.progress >= 1);
   if (!fs.length) { hint('Build a War Foundry first'); return; }
+  const req = U[t].requires;
+  if (req && !hasBuilding(req)) { hint('Requires a ' + B[req].name); return; }
   if (game.money[PLAYER] < U[t].cost) { hint('Insufficient crystals'); return; }
   if (alloyCost(PLAYER, U[t].alloy) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy — build an Alloy Smelter'); return; }
   fs.sort((a, b) => a.queue.length - b.queue.length);

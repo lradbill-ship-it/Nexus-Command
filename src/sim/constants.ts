@@ -108,6 +108,7 @@ export const B: Record<string, BuildingDef> = {
   habitat: { name: 'Habitat Block', w: 2, h: 2, hp: 360, cost: 250, power: -5, buildTime: 8, sight: 3, hgt: 22, house: 45, civic: 2, desc: 'Housing for +45 citizens. Population = labor & conscripts.' },
   market: { name: 'Civic Market', w: 2, h: 2, hp: 340, cost: 350, power: -8, buildTime: 9, sight: 3, hgt: 18, civic: 16, desc: 'Meets civic needs (+happiness). Happy citizens work faster.' },
   cyber: { name: 'Cyber Ops Center', w: 2, h: 2, hp: 740, cost: 800, power: -20, buildTime: 14, sight: 6, hgt: 20, alloy: 300, desc: 'Unlocks cyber abilities & covert missions. Needs alloy.' },
+  drillbay: { name: 'Deep Bore Facility', w: 3, h: 2, hp: 980, cost: 1200, power: -25, buildTime: 18, sight: 5, hgt: 22, alloy: 300, desc: 'Hallmark works. Unlocks the Subterranean Borer — a burrowing assault drill. Needs alloy.' },
 };
 
 // ── Units ────────────────────────────────────────────────────────────────────
@@ -131,6 +132,8 @@ export interface UnitDef {
   harvests?: ResourceKind; // resource this unit gathers (harvester=crystal, tanker=coolant, hauler=alloy)
   logs?: boolean;          // fells & clears forest tiles for wood (Logger Rig)
   repair?: boolean;        // mends friendly units & buildings, burning wood (Repair Rig)
+  tunneler?: boolean;      // burrows through any terrain AND can strike underground units (Subterranean Borer)
+  requires?: string;       // building type that must be built before this unit can be trained
   alloy?: number;          // alloy build-cost surcharge (advanced units)
   desc: string;
 }
@@ -149,6 +152,7 @@ export const U: Record<string, UnitDef> = {
   walker: { name: 'Railgun Walker', cost: 700, hp: 440, speed: 56, radius: 13, sight: 7, buildTime: 16, dmg: 48, range: 182, rof: 2.2, coolant: 4, alloy: 300, desc: 'Quad-legged siege platform. Runs hot; needs alloy.' },
   harrier: { name: 'Harrier Jet', cost: 420, hp: 130, speed: 176, radius: 8, sight: 9, buildTime: 9, dmg: 14, range: 122, rof: 0.5, air: true, antiAir: true, coolant: 3, alloy: 120, desc: 'Cheap, fast strike jet. Flies over terrain; light air-to-ground & dogfighting. Modest coolant + alloy.' },
   aircraft: { name: 'Wraith Gunship', cost: 600, hp: 240, speed: 158, radius: 10, sight: 10, buildTime: 16, dmg: 24, range: 150, rof: 0.6, splash: 26, air: true, antiAir: true, coolant: 6, alloy: 300, desc: 'VTOL gunship. Devastating splash strafes; flies over terrain; heavy coolant + alloy upkeep.' },
+  borer: { name: 'Subterranean Borer', cost: 1500, hp: 520, speed: 72, radius: 13, sight: 7, buildTime: 24, dmg: 60, range: 150, rof: 1.6, splash: 30, coolant: 4, alloy: 450, tunneler: true, requires: 'drillbay', desc: 'Burrows through ANY terrain and is the only unit that can strike units underground. Very costly; needs a Deep Bore Facility.' },
 };
 
 export interface AbilityDef { name: string; cost: number; cd: number; key: string; desc: string; }

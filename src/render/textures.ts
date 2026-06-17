@@ -220,6 +220,16 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     g.strokeStyle = '#c9d6e0'; g.lineWidth = 1.6; g.beginPath(); g.arc(rcx + 4, rcy - 6, 6, 0, 7); g.stroke();   // saw blade
     g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(rcx + 4, rcy - 6, 2, 0, 7); g.fill();
     g.fillStyle = '#9ec24f'; g.fillRect(rcx - fw * 0.18, rcy + fh * 0.26, 5, 4);   // green log-pile marker
+  } else if (type === 'drillbay') {
+    // deep-bore facility: a drill derrick over a dark shaft mouth
+    g.fillStyle = '#0a0e14'; g.beginPath(); g.arc(rcx, rcy + 2, fw * 0.2, 0, 7); g.fill();               // shaft
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(rcx, rcy + 2, fw * 0.2, 0, 7); g.stroke();
+    g.strokeStyle = '#9fb3c2'; g.lineWidth = 2;                                                          // derrick truss
+    g.beginPath(); g.moveTo(rcx - fw * 0.22, rcy + fh * 0.22); g.lineTo(rcx, rcy - fh * 0.18); g.lineTo(rcx + fw * 0.22, rcy + fh * 0.22); g.stroke();
+    g.beginPath(); g.moveTo(rcx - fw * 0.1, rcy + fh * 0.04); g.lineTo(rcx + fw * 0.1, rcy + fh * 0.04); g.stroke();
+    const dg = g.createLinearGradient(rcx, rcy - 4, rcx, rcy + 8);                                       // suspended drill bit
+    dg.addColorStop(0, '#cdd9e3'); dg.addColorStop(1, '#5a6573');
+    g.fillStyle = dg; g.beginPath(); g.moveTo(rcx, rcy + 8); g.lineTo(rcx + 4, rcy - 3); g.lineTo(rcx - 4, rcy - 3); g.closePath(); g.fill();
   }
   return [c, cx, cy];
 }
@@ -270,6 +280,17 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillStyle = 'rgba(127,224,127,.95)'; g.fillRect(cx - 2.4, cy - 7, 4.8, 14); g.fillRect(cx - 7, cy - 2.4, 14, 4.8);
     g.fillStyle = `rgba(${rgb},.8)`; g.fillRect(cx - 12, cy + 4, 2.5, 5); g.fillRect(cx + 9.5, cy + 4, 2.5, 5);
     g.fillStyle = '#9fb6c8'; g.fillRect(cx - 6, cy - 15, 12, 4);
+  } else if (type === 'borer') {
+    // subterranean borer: heavy hull + big conical drill bit up front
+    g.fillStyle = '#1a232e'; g.fillRect(cx - 13, cy - 6, 3.6, 18); g.fillRect(cx + 9.4, cy - 6, 3.6, 18);   // tracks
+    rr(g, cx - 11, cy - 8, 22, 22, 5); g.fill(); g.stroke();
+    const dg = g.createLinearGradient(cx, cy - 19, cx, cy - 4);
+    dg.addColorStop(0, '#dde7ef'); dg.addColorStop(1, '#5a6573');
+    g.fillStyle = dg; g.beginPath(); g.moveTo(cx, cy - 20); g.lineTo(cx + 7, cy - 4); g.lineTo(cx - 7, cy - 4); g.closePath(); g.fill();   // drill cone
+    g.strokeStyle = col; g.lineWidth = 1.4; g.beginPath(); g.moveTo(cx, cy - 20); g.lineTo(cx + 7, cy - 4); g.lineTo(cx - 7, cy - 4); g.closePath(); g.stroke();
+    g.strokeStyle = 'rgba(20,28,38,.7)'; g.lineWidth = 1;                                                  // flutes
+    g.beginPath(); g.moveTo(cx - 3.5, cy - 6); g.lineTo(cx, cy - 16); g.moveTo(cx + 3.5, cy - 6); g.lineTo(cx, cy - 16); g.stroke();
+    g.fillStyle = `rgba(${rgb},.75)`; g.fillRect(cx - 9, cy + 9, 18, 3);
   } else if (type === 'recon') {
     // quadcopter: 4 rotor rings + slim core
     g.strokeStyle = 'rgba(200,225,235,.5)'; g.lineWidth = 1.4;
