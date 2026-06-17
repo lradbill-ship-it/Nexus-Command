@@ -37,6 +37,9 @@ export class BattleScene extends Phaser.Scene {
   private dragStart: { x: number; y: number } | null = null;
   private dragging = false;
   private midPan: { x: number; y: number } | null = null;
+  private dragScreen: { x: number; y: number } | null = null;   // screen-space anchor for one-finger touch pan
+  private pinchDist = 0;
+  private twoFingerMid: { x: number; y: number } | null = null;
   private onEnd: (win: boolean) => void = () => {};
   private mm!: HTMLCanvasElement;
   private mmCtx!: CanvasRenderingContext2D;
@@ -70,6 +73,8 @@ export class BattleScene extends Phaser.Scene {
     this.mmCtx = this.mm.getContext('2d')!;
     this.mm.addEventListener('mousedown', (e) => this.minimapJump(e));
     this.mm.addEventListener('mousemove', (e) => { if (e.buttons & 1) this.minimapJump(e); });
+    this.mm.addEventListener('touchstart', (e) => { e.preventDefault(); this.minimapJumpTouch(e); }, { passive: false });
+    this.mm.addEventListener('touchmove', (e) => { e.preventDefault(); this.minimapJumpTouch(e); }, { passive: false });
 
     // input
     this.input.mouse?.disableContextMenu();
@@ -117,18 +122,41 @@ export class BattleScene extends Phaser.Scene {
 
   // ── input ────────────────────────────────────────────────────────────────
   private setupPointer() {
+    this.input.addPointer(2);                          // enable multi-touch (pinch needs 2 active pointers)
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       initAudio();
+      const p1 = this.input.pointer1, p2 = this.input.pointer2;
+      if (p1?.isDown && p2?.isDown) {                  // second finger down → start a pinch gesture
+        this.pinchDist = Phaser.Math.Distance.Between(p1.x, p1.y, p2.x, p2.y);
+        this.twoFingerMid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+        this.dragStart = null; this.dragging = false; this.dragScreen = null;
+        return;
+      }
       if (p.middleButtonDown()) { this.midPan = { x: p.x, y: p.y }; return; }
       if (!game.started || game.over) return;
-      if (p.leftButtonDown()) { this.dragStart = { x: p.worldX, y: p.worldY }; this.dragging = false; }
-      else if (p.rightButtonDown()) {
+      if (p.rightButtonDown()) {
         if (game.placing || game.armed) { game.placing = null; game.armed = null; return; }
         issueOrder(p.worldX, p.worldY, false);
+      } else if (p.leftButtonDown()) {
+        this.dragStart = { x: p.worldX, y: p.worldY };
+        this.dragScreen = { x: p.x, y: p.y };
+        this.dragging = false;
       }
     });
 
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      const p1 = this.input.pointer1, p2 = this.input.pointer2;
+      if (p1?.isDown && p2?.isDown) {                  // two-finger pinch-zoom + pan
+        const d = Phaser.Math.Distance.Between(p1.x, p1.y, p2.x, p2.y);
+        const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2, cam = this.cameras.main;
+        if (this.pinchDist > 0) {
+          cam.setZoom(clamp(cam.zoom * (d / this.pinchDist), 0.4, 2.5));
+          if (this.twoFingerMid) { cam.scrollX -= (mx - this.twoFingerMid.x) / cam.zoom; cam.scrollY -= (my - this.twoFingerMid.y) / cam.zoom; }
+        }
+        this.pinchDist = d; this.twoFingerMid = { x: mx, y: my };
+        this.dragStart = null; this.dragging = false;
+        return;
+      }
       if (this.midPan) {
         const z = this.cameras.main.zoom;
         this.cameras.main.scrollX -= (p.x - this.midPan.x) / z;
@@ -136,16 +164,34 @@ export class BattleScene extends Phaser.Scene {
         this.midPan = { x: p.x, y: p.y };
         return;
       }
+      if (this.dragStart && this.dragScreen && p.wasTouch && p.isDown) {   // one-finger drag → pan the map
+        const cam = this.cameras.main;
+        cam.scrollX -= (p.x - this.dragScreen.x) / cam.zoom;
+        cam.scrollY -= (p.y - this.dragScreen.y) / cam.zoom;
+        this.dragScreen = { x: p.x, y: p.y };
+        this.dragging = true;
+        return;
+      }
       if (this.dragStart && p.leftButtonDown() && Phaser.Math.Distance.Between(this.dragStart.x, this.dragStart.y, p.worldX, p.worldY) > 8 / this.cameras.main.zoom) this.dragging = true;
     });
 
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (this.pinchDist > 0 || this.twoFingerMid) { this.pinchDist = 0; this.twoFingerMid = null; this.dragStart = null; this.dragging = false; this.dragScreen = null; return; }
       if (p.middleButtonReleased()) { this.midPan = null; return; }
       if (!game.started || game.over) { this.dragStart = null; return; }
       if (!p.leftButtonReleased()) return;
-      if (game.placing) { tryPlace(p.worldX, p.worldY); this.dragStart = null; this.dragging = false; return; }
-      if (game.armed) { castAbility(game.armed, p.worldX, p.worldY); this.dragStart = null; this.dragging = false; return; }
-      if (this.dragging && this.dragStart) {
+      if (game.placing) { tryPlace(p.worldX, p.worldY); this.dragStart = null; this.dragging = false; this.dragScreen = null; return; }
+      if (game.armed) { castAbility(game.armed, p.worldX, p.worldY); this.dragStart = null; this.dragging = false; this.dragScreen = null; return; }
+      if (p.wasTouch) {
+        if (!this.dragging && this.dragStart) {        // a tap (we didn't pan) — select, or command if units are selected
+          const wx = p.worldX, wy = p.worldY;
+          let hit: Entity | null = null;
+          for (const u of game.units) { if (u.team !== PLAYER) continue; if (dist(u, { x: wx, y: wy }) < U[u.type].radius + 10) { hit = u; break; } }
+          if (!hit) for (const b of game.buildings) { if (b.team !== PLAYER) continue; if (Math.abs(wx - b.x) < b.w / 2 && Math.abs(wy - b.y) < b.h / 2) { hit = b; break; } }
+          if (!hit && game.selection.some(s => s.kind === 'u')) issueOrder(wx, wy, false);
+          else { game.selection = hit ? [hit] : []; if (hit) sfx('click'); }
+        }
+      } else if (this.dragging && this.dragStart) {
         const x1 = Math.min(this.dragStart.x, p.worldX), x2 = Math.max(this.dragStart.x, p.worldX);
         const y1 = Math.min(this.dragStart.y, p.worldY), y2 = Math.max(this.dragStart.y, p.worldY);
         game.selection = game.units.filter(u => u.team === PLAYER && u.x > x1 && u.x < x2 && u.y > y1 && u.y < y2);
@@ -158,11 +204,11 @@ export class BattleScene extends Phaser.Scene {
         game.selection = hit ? [hit] : [];
         if (hit) sfx('click');
       }
-      this.dragStart = null; this.dragging = false;
+      this.dragStart = null; this.dragging = false; this.dragScreen = null;
     });
 
     this.input.on('wheel', (_p: any, _o: any, _dx: number, dy: number) => {
-      const z = clamp(this.cameras.main.zoom * (dy > 0 ? 0.9 : 1.1), 0.55, 1.7);
+      const z = clamp(this.cameras.main.zoom * (dy > 0 ? 0.9 : 1.1), 0.4, 2.5);
       this.cameras.main.setZoom(z);
     });
   }
@@ -198,6 +244,12 @@ export class BattleScene extends Phaser.Scene {
   private minimapJump(e: MouseEvent) {
     const r = this.mm.getBoundingClientRect();
     const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    this.cameras.main.centerOn(fx * WORLD_W, fy * WORLD_H);
+  }
+  private minimapJumpTouch(e: TouchEvent) {
+    const t = e.touches[0]; if (!t) return;
+    const r = this.mm.getBoundingClientRect();
+    const fx = (t.clientX - r.left) / r.width, fy = (t.clientY - r.top) / r.height;
     this.cameras.main.centerOn(fx * WORLD_W, fy * WORLD_H);
   }
 

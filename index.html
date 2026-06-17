@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NEXUS COMMAND</title>
 <style>
   :root{
@@ -15,8 +15,8 @@
   html,body{height:100%;overflow:hidden;background:#000;
     font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;color:var(--ink);}
   #wrap{display:flex;height:100vh;}
-  #gameArea{position:relative;flex:1;min-width:0;}
-  #gameArea canvas{display:block;}
+  #gameArea{position:relative;flex:1;min-width:0;touch-action:none;}
+  #gameArea canvas{display:block;touch-action:none;}
   /* top bar */
   #topbar{position:absolute;top:0;left:0;right:0;height:40px;display:flex;align-items:center;
     gap:18px;padding:0 14px;
@@ -157,6 +157,17 @@
   .panelBox .go:hover{filter:brightness(1.1);}
   #endOverlay{display:none;}
   #endOverlay h1.win{color:var(--green);} #endOverlay h1.lose{color:var(--p2);}
+  /* ── mobile / touch: shrink the UI so the battlefield stays usable on a phone ── */
+  @media (max-width: 760px) {
+    #sidebar { width: 168px; }
+    #topbar { gap: 8px; font-size: 10px; padding: 0 8px; }
+    .frame { margin: 5px 5px 0; padding: 3px; }
+    .tabRow button { font-size: 8px; padding: 6px 0; letter-spacing: .06em; }
+    button.cmd .lbl { font-size: 7px; }
+    button.cmd .cost { font-size: 7px; }
+    .btnGrid { gap: 3px; }
+    #restartBtn { font-size: 8px; padding: 5px 8px; }
+  }
 </style>
 </head>
 <body>
