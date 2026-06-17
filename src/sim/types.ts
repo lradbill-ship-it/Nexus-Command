@@ -35,6 +35,20 @@ export interface Settlement {
   seed: number;                // render variation
 }
 
+// Hero Vaults — buried in mountain rock, found by surveying (Hero Hunter), excavated
+// by a Subterranean Borer (pay-as-you-drill) to unearth a unique hero super-unit.
+export interface Vault {
+  id: number;
+  x: number; y: number;
+  tx: number; ty: number;
+  archetype: string;      // unit type the vault yields (titan / siegelord / warden)
+  discovered: boolean;    // revealed to the player by surveying
+  digBy: number;          // team currently / last excavating
+  digT: number;           // excavation progress 0..1
+  done: boolean;          // hero already extracted
+  pulse: number;          // render animation phase
+}
+
 export interface Building {
   id: number;
   kind: 'b';
@@ -65,8 +79,9 @@ export interface Unit {
   team: number;
   x: number; y: number;
   hpMax: number; hp: number;
-  order: 'idle' | 'move' | 'amove' | 'attack' | 'guard';
+  order: 'idle' | 'move' | 'amove' | 'attack' | 'guard' | 'dig';
   dest: Vec | null;
+  digVault?: number;     // vault id a Borer is excavating (order === 'dig')
   target: Entity | null;
   path: Vec[] | null;
   finalDest?: Vec;
@@ -154,6 +169,7 @@ export interface GameState {
   nodes: ResourceNode[];
   settlements: Settlement[];
   relays: Relay[];
+  vaults: Vault[];
   trees: Tree[];
   waterTiles: { x: number; y: number }[];
   waterAmt: Float32Array;                  // per-tile coolant remaining in water features (drained by tankers → dries up)

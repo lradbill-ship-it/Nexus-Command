@@ -8,7 +8,7 @@ import type { LeaderStyle } from './constants';
 import {
   game, dip, rk, getRel, setRel, addRel, isAllied, isWar, stateOf, logMsg, hint,
 } from './state';
-import type { Building, Unit, Entity, Vec, Particle, Settlement, Relay, ResourceNode } from './types';
+import type { Building, Unit, Entity, Vec, Particle, Settlement, Relay, ResourceNode, Vault } from './types';
 import { findPath, passable, nearestPassableTile } from './pathfind';
 import { spawnResourceField } from './mapgen';
 import { sfx } from '../audio';
@@ -293,7 +293,7 @@ function societyTick(dt: number) {
     // revolt: sustained misery makes troops desert (recoverable, never an instant loss).
     // Probability scales with how miserable they are, so neglect compounds.
     if (h < 18 && Math.random() < dt * 0.14 * ((18 - h) / 18)) {
-      const army = game.units.filter(u => u.team === team && !isSupport(u.type));
+      const army = game.units.filter(u => u.team === team && !isSupport(u.type) && !U[u.type].hero);   // heroes never desert
       if (army.length > 3) {
         const u = army[Math.random() * army.length | 0]; destroy(u, 0);
         if (team === PLAYER) { logMsg('UNREST — a unit has deserted. Calm your population!', 'war'); sfx('war'); }
@@ -410,6 +410,63 @@ export function tryRecruit(s: Settlement): boolean {
   if (game.money[PLAYER] < COST) { hint('Recruiting costs ' + COST + ' crystals'); return false; }
   game.money[PLAYER] -= COST; captureSettlement(s, PLAYER, false);
   return true;
+}
+
+// ── Hero Vaults: survey to find, Borer to excavate, unearth a hero (roadmap #6) ──
+const SURVEY_R = 14 * TILE;   // a Survey Hunter senses buried vaults from this far
+const STUMBLE_R = 2.5 * TILE; // any unit this close trips over one
+const DIG_TIME = 18;          // seconds of drilling to unearth a hero
+const DIG_CR_RATE = 50;       // crystals/sec spent while excavating ("resources")
+const DIG_AL_RATE = 12;       // alloy/sec spent while excavating ("special equipment")
+let lastDigNag = -9;
+function vaultTick(dt: number) {
+  for (const v of game.vaults) {
+    if (v.discovered) continue;
+    let found = false;
+    forNearbyUnits(v.x, v.y, SURVEY_R, (u) => {
+      if (!isAllied(PLAYER, u.team)) return;
+      const dd = dist(u, v);
+      if ((U[u.type].survey && dd < SURVEY_R) || dd < STUMBLE_R) found = true;
+    });
+    if (found) {
+      v.discovered = true;
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const tx = v.tx + dx, ty = v.ty + dy; if (inMap(tx, ty)) game.explored[idx(tx, ty)] = 1; }   // clear fog so the vault shows
+      logMsg('Survey complete — a HERO VAULT detected in the highlands. Send a Borer to excavate.', 'good'); sfx('chime');
+      game.parts.push({ type: 'ring', x: v.x, y: v.y, t: 0, life: 0.9, big: true });
+    }
+  }
+}
+/** A Borer drills a discovered vault, paying crystals + alloy as it goes; at 100% a hero rises. */
+function excavate(v: Vault, team: number, dt: number) {
+  if (v.done) return;
+  v.digBy = team;
+  const crNeed = DIG_CR_RATE * dt, alNeed = DIG_AL_RATE * dt;
+  if (game.money[team] < crNeed || (game.alloy[team] || 0) < alNeed) {        // can't pay → drilling stalls
+    if (team === PLAYER && game.t - lastDigNag > 6) { lastDigNag = game.t; hint('Excavation needs crystals + alloy to continue'); }
+    return;
+  }
+  game.money[team] -= crNeed; game.alloy[team] -= alNeed;
+  v.digT = Math.min(1, v.digT + dt / DIG_TIME);
+  if (Math.random() < dt * 9) spawnParts('debris', v.x + (Math.random() * 22 - 11), v.y + (Math.random() * 22 - 11), 1, '150,132,92');
+  if (v.digT >= 1 && !v.done) {
+    v.done = true;
+    const sp = freeSpotNear(v.x, v.y);
+    addUnit(v.archetype, sp.x, sp.y, team);
+    game.parts.push({ type: 'ring', x: v.x, y: v.y, t: 0, life: 1.1, big: true });
+    game.parts.push({ type: 'flash', x: v.x, y: v.y, t: 0, life: 0.32, big: true });
+    game.shake = Math.min(14, game.shake + 8);
+    if (team === PLAYER) { logMsg('★ HERO UNEARTHED — the ' + U[v.archetype].name + ' joins your forces!', 'good'); sfx('bigboom', v.x); }
+  }
+}
+/** Warden hero: a constant healing aura over nearby allied units (free — a hero's gift). */
+const AURA_R = 130;
+function auraTick(u: Unit, dt: number) {
+  const rate = U[u.type].auraHeal! * dt;
+  forNearbyUnits(u.x, u.y, AURA_R, (o) => {
+    if (o === u || o.dead || !isAllied(u.team, o.team) || o.hp >= o.hpMax || dist(o, u) > AURA_R) return;
+    o.hp = Math.min(o.hpMax, o.hp + rate);
+    if (Math.random() < dt * 1.5) spawnParts('spark', o.x + (Math.random() * 14 - 7), o.y - 6, 1, '150,235,160');
+  });
 }
 
 // ── Crystal regeneration ──────────────────────────────────────────────────────
@@ -927,6 +984,7 @@ function updateUnit(u: Unit, dt: number) {
   const d = U[u.type];
   u.cooldown = Math.max(0, u.cooldown - dt);
   if (U[u.type].tunneler && u.moving && Math.random() < dt * 7) spawnParts('debris', u.x, u.y + 6, 1, '120,100,72');   // burrow spoil trail
+  if (U[u.type].auraHeal) auraTick(u, dt);                              // Warden hero — constant heal aura
   // turret aim smoothing
   let want = u.facing;
   if (u.target && !u.target.dead) want = Math.atan2(u.target.y - u.y, u.target.x - u.x);
@@ -949,6 +1007,13 @@ function updateUnit(u: Unit, dt: number) {
   if (U[u.type].repair) { updateRepair(u, dt); return; }
   // drop a target that's dead — or that dived underground (only a tunneler can keep hitting it)
   if (u.target && (u.target.dead || (u.target.kind === 'u' && ((u.target as Unit).tunnelT ?? 0) > 0 && !U[u.type].tunneler))) u.target = null;
+  if (u.order === 'dig') {                                              // Borer excavating a Hero Vault
+    const v = game.vaults.find(x => x.id === u.digVault);
+    if (!v || v.done) { u.order = 'idle'; u.digVault = undefined; u.path = null; }
+    else if (dist(u, v) > 34) { u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.6; setPath(u, v.x, v.y); } followPath(u, dt); }
+    else { u.moving = false; u.path = null; u.facing += dt * 2.5; excavate(v, u.team, dt); if (v.done) { u.order = 'idle'; u.digVault = undefined; } }
+    return;
+  }
   if (u.order === 'guard') {
     const g = u.guard;
     if (!g || g.dead) { u.order = 'idle'; u.guard = null; u.path = null; }
@@ -1444,6 +1509,13 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
     if (f) { f.rally = { x: wx, y: wy }; hint('Rally point set'); }
     return;
   }
+  // right-click a discovered Hero Vault with a Borer selected → send it to excavate
+  const clickedVault = game.vaults.find(v => v.discovered && !v.done && dist(v, { x: wx, y: wy }) < 34);
+  if (clickedVault && sel.some(s => U[s.type].tunneler)) {
+    for (const u of sel) if (U[u.type].tunneler) { u.order = 'dig'; u.digVault = clickedVault.id; u.target = null; u.guard = null; setPath(u, clickedVault.x, clickedVault.y); }
+    hint('Borer dispatched to excavate the Hero Vault'); sfx('click');
+    return;
+  }
   // right-clicking a settlement you don't own tries to recruit it (paid); on failure,
   // fall through so the units simply move there and take it by presence.
   const clickedSettle = game.settlements.find(s => s.owner !== PLAYER && dist(s, { x: wx, y: wy }) < 30);
@@ -1611,6 +1683,7 @@ export function stepWorld(dt: number) {
   societyTick(dt);
   settlementTick(dt);
   relayTick(dt);
+  vaultTick(dt);
   governmentTick(dt);
   autoScoutTick(dt);
   processStrikes();

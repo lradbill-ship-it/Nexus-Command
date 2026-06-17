@@ -13,7 +13,7 @@ let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
 
 const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'cyber', 'drillbay'];
-const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'borer'];
+const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'hunter', 'borer'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -50,6 +50,7 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'aircraft') { g.fillStyle = '#1a2735'; g.beginPath(); g.moveTo(cx, cy - 8); g.lineTo(cx + 4, cy + 6); g.lineTo(cx - 4, cy + 6); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = '#cfe6ee'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(cx - 9, cy); g.lineTo(cx + 9, cy); g.stroke(); }
     else if (type === 'harrier') { g.fillStyle = '#1a2735'; g.beginPath(); g.moveTo(cx, cy - 9); g.lineTo(cx + 3, cy + 7); g.lineTo(cx - 3, cy + 7); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = '#cfe6ee'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx - 8, cy + 2); g.lineTo(cx, cy - 3); g.lineTo(cx + 8, cy + 2); g.stroke(); }
     else if (type === 'borer') { g.fillRect(13, 8, 14, 12); g.strokeRect(13, 8, 14, 12); g.fillStyle = '#dde7ef'; g.beginPath(); g.moveTo(20, 2); g.lineTo(25, 8); g.lineTo(15, 8); g.closePath(); g.fill(); g.strokeStyle = '#1a232e'; g.lineWidth = 1; g.beginPath(); g.moveTo(18, 4); g.lineTo(20, 8); g.moveTo(22, 4); g.lineTo(20, 8); g.stroke(); }
+    else if (type === 'hunter') { g.fillStyle = '#1a2735'; g.beginPath(); g.moveTo(cx, cy - 8); g.lineTo(cx + 5, cy + 6); g.lineTo(cx - 5, cy + 6); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = '#9ce6a4'; g.lineWidth = 1.4; g.beginPath(); g.arc(cx, cy, 4, 0, 7); g.stroke(); }
   }
   return c;
 }

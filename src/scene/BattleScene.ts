@@ -20,7 +20,7 @@ interface SpriteRec {
   shadow?: Phaser.GameObjects.Image;   // ground shadow for airborne units
 }
 const ALT = 17;                        // render altitude (px) for flying units
-const hasRotor = (t: string) => t === 'aircraft' || t === 'recon';
+const hasRotor = (t: string) => t === 'aircraft' || t === 'recon' || t === 'hunter';
 
 export class BattleScene extends Phaser.Scene {
   private terrainImg!: Phaser.GameObjects.Image;
@@ -424,6 +424,21 @@ export class BattleScene extends Phaser.Scene {
         g.arc(r.x, r.y, 25, -Math.PI / 2, -Math.PI / 2 + r.capT * Math.PI * 2); g.strokePath();
       }
     }
+    // Hero Vaults — shown only once surveyed: a glowing shaft buried in the rock, with dig progress
+    for (const v of game.vaults) {
+      if (!v.discovered) continue;
+      const tint = v.archetype === 'titan' ? 0xe8a33d : v.archetype === 'siegelord' ? 0xb07dff : 0x6fe08a;
+      const pulse = 0.5 + 0.5 * Math.sin(game.t * 2.2 + v.pulse);
+      g.fillStyle(tint, 0.12 + pulse * 0.16); g.fillCircle(v.x, v.y, 20);             // glow
+      g.fillStyle(0x0a0e14, 0.9); g.fillCircle(v.x, v.y, 13);                         // shaft mouth
+      g.lineStyle(2, tint, 0.85); g.strokeCircle(v.x, v.y, 13);
+      if (v.done) { g.lineStyle(2, tint, 0.45); g.strokeCircle(v.x, v.y, 7); }        // emptied vault
+      else if (v.digT > 0.001) {                                                      // excavation progress
+        g.lineStyle(3, tint, 0.95); g.beginPath();
+        g.arc(v.x, v.y, 17, -Math.PI / 2, -Math.PI / 2 + v.digT * Math.PI * 2); g.strokePath();
+      }
+      g.fillStyle(tint, 0.9); g.fillCircle(v.x, v.y, 3 + pulse * 1.6);                // core gem
+    }
   }
 
   private syncCrystals() {
@@ -587,6 +602,13 @@ export class BattleScene extends Phaser.Scene {
       ctx.fillStyle = r.owner ? FAC[r.owner].col : '#cfe6ee';
       ctx.beginPath(); ctx.arc(mx, my, 2.6, 0, 7); ctx.fill();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(mx, my, 3.6, 0, 7); ctx.stroke();
+    }
+    // hero vaults (discovered) — archetype-tinted diamond markers
+    for (const v of game.vaults) {
+      if (!v.discovered) continue;
+      const mx = v.x / TILE * s, my = v.y / TILE * s;
+      ctx.fillStyle = v.archetype === 'titan' ? '#e8a33d' : v.archetype === 'siegelord' ? '#b07dff' : '#6fe08a';
+      ctx.beginPath(); ctx.moveTo(mx, my - 3.4); ctx.lineTo(mx + 3.4, my); ctx.lineTo(mx, my + 3.4); ctx.lineTo(mx - 3.4, my); ctx.closePath(); ctx.fill();
     }
     // camera viewport box
     const cam = this.cameras.main;

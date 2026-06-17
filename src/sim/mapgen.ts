@@ -196,4 +196,21 @@ export function generateMap() {
     clear(r.x, r.y, 3);
     game.relays.push({ id: rid++, x: r.x * TILE + 16, y: r.y * TILE + 16, owner: 0, capBy: 0, capT: 0, hp: RELAY_HP, hpMax: RELAY_HP, pulse: Math.random() * 6 });
   }
+  // Hero Vaults — buried in mountain rock, away from bases. One per archetype (found by surveying, dug by a Borer).
+  game.vaults.length = 0;
+  const archetypes = ['titan', 'siegelord', 'warden'];
+  const farFromBases2 = (tx: number, ty: number) => {
+    for (const f of ALL_TEAMS) { const bi = BASE_INFO[f]; if (Math.hypot(tx - bi.tx, ty - bi.ty) < 22) return false; }
+    return true;
+  };
+  let vid = 1;
+  for (const arch of archetypes) {
+    for (let tries = 0; tries < 600; tries++) {
+      const tx = 6 + (Math.random() * (MAPW - 12) | 0), ty = 6 + (Math.random() * (MAPH - 12) | 0);
+      if (T[idx(tx, ty)] !== T_ROCK || !farFromBases2(tx, ty)) continue;
+      if (game.vaults.some(v => Math.hypot(v.tx - tx, v.ty - ty) < 18)) continue;
+      game.vaults.push({ id: vid++, x: tx * TILE + 16, y: ty * TILE + 16, tx, ty, archetype: arch, discovered: false, digBy: 0, digT: 0, done: false, pulse: Math.random() * 6 });
+      break;
+    }
+  }
 }

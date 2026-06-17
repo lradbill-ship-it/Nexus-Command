@@ -301,6 +301,31 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.strokeStyle = 'rgba(20,28,38,.7)'; g.lineWidth = 1;                                                  // flutes
     g.beginPath(); g.moveTo(cx - 3.5, cy - 6); g.lineTo(cx, cy - 16); g.moveTo(cx + 3.5, cy - 6); g.lineTo(cx, cy - 16); g.stroke();
     g.fillStyle = `rgba(${rgb},.75)`; g.fillRect(cx - 9, cy + 9, 18, 3);
+  } else if (type === 'hunter') {
+    // survey drone: slim delta + a green sensor ring (vault-finder)
+    g.fillStyle = body; g.strokeStyle = col; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(cx, cy - 11); g.lineTo(cx + 6, cy + 7); g.lineTo(cx - 6, cy + 7); g.closePath(); g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(150,235,160,.85)'; g.lineWidth = 1.4; g.beginPath(); g.arc(cx, cy, 6, 0, 7); g.stroke();
+    g.fillStyle = '#cdd9e3'; g.beginPath(); g.arc(cx, cy - 5, 1.6, 0, 7); g.fill();
+  } else if (type === 'titan') {
+    // HERO brawler: hulking hex body + heavy frontal cannon
+    g.fillStyle = body; g.strokeStyle = col; g.lineWidth = 2;
+    g.beginPath();
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; const px = cx + Math.cos(a) * 13, py = cy + Math.sin(a) * 13; if (i) g.lineTo(px, py); else g.moveTo(px, py); }
+    g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#39424f'; rr(g, cx - 4, cy - 15, 8, 12, 2); g.fill();
+    g.strokeStyle = '#cdd9e3'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, cy - 9); g.lineTo(cx, cy - 18); g.stroke();
+  } else if (type === 'siegelord') {
+    // HERO artillery: tracked hull + a very long barrel
+    g.fillStyle = '#1a232e'; g.fillRect(cx - 13, cy - 8, 4, 18); g.fillRect(cx + 9, cy - 8, 4, 18);
+    g.fillStyle = body; g.strokeStyle = col; g.lineWidth = 1.8; rr(g, cx - 9, cy - 8, 18, 18, 3); g.fill(); g.stroke();
+    g.strokeStyle = '#aebcc8'; g.lineWidth = 4; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx, cy - 22); g.stroke();
+    g.fillStyle = '#1a2129'; g.fillRect(cx - 3, cy - 24, 6, 3);
+  } else if (type === 'warden') {
+    // HERO guardian: rounded hull + green mend-cross + aura ring
+    g.fillStyle = body; g.strokeStyle = col; g.lineWidth = 1.8; rr(g, cx - 10, cy - 11, 20, 22, 6); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(127,224,127,.95)'; g.fillRect(cx - 2.6, cy - 7, 5.2, 14); g.fillRect(cx - 7, cy - 2.6, 14, 5.2);
+    g.strokeStyle = 'rgba(150,235,160,.5)'; g.lineWidth = 1.2; g.beginPath(); g.arc(cx, cy, 9, 0, 7); g.stroke();
   } else if (type === 'recon') {
     // quadcopter: 4 rotor rings + slim core
     g.strokeStyle = 'rgba(200,225,235,.5)'; g.lineWidth = 1.4;
@@ -354,6 +379,11 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillStyle = '#2c3a48';
     for (const sx of [-1, 1]) { g.save(); g.translate(cx + sx * 9, cy - 1); rr(g, -2.5, -5, 5, 10, 2); g.fill(); g.strokeStyle = col; g.stroke(); g.restore(); } // nacelles
     g.fillStyle = '#cdd9e3'; g.beginPath(); g.moveTo(cx, cy - 13); g.lineTo(cx - 2, cy - 7); g.lineTo(cx + 2, cy - 7); g.closePath(); g.fill(); // canopy
+  }
+  // heroes wear a golden crown + base ring so they read as unique
+  if (d.hero) {
+    g.fillStyle = '#ffd95a'; for (const ox of [-3.5, 0, 3.5]) { g.beginPath(); g.arc(cx + ox, cy - d.radius - 2, 1.5, 0, 7); g.fill(); }
+    g.strokeStyle = 'rgba(255,213,90,.9)'; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy + d.radius * 0.5, d.radius * 0.55, Math.PI * 0.08, Math.PI * 0.92); g.stroke();
   }
   // core light + faction halo (polish)
   g.fillStyle = `rgba(${rgb},.45)`; g.beginPath(); g.arc(cx, cy, 4.5, 0, 7); g.fill();
