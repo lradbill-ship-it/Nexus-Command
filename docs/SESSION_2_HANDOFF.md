@@ -141,6 +141,13 @@ The sim is engine‑independent and **never touches the DOM/renderer** — it ta
    - **Repair Rig auto‑search is map‑wide & continuous** — an idle rig scans the WHOLE map for any wounded friendly **unit OR building** (`nearestDamagedFriendly(u, Infinity)`, nearest‑wins) and goes to mend it. Build one and it keeps the whole army + base patched without micro.
    - **Harvester tunnelling** (harvesters ONLY) — a new `phasing()` movement mode (shared with fliers). When a harvester's pathing stalls (`followPath` stuck trigger) **or** a crystal field has no surface route at all (`nearestNodeAny` fallback), it **burrows straight through terrain** to its target and surfaces on arrival. While underground it's **untargetable** (skipped in `nearestHostile`), doesn't separate, and renders faded (alpha 0.3) with spoil dust. Fixes stuck harvesters & lets them mine walled‑off fields. `Unit.tunnelT`.
 
+   **Subterranean Borer super‑unit (commit `f34caa7`, main + live):**
+   - **Deep Bore Facility** (`B.drillbay`, 1200cr + 300 alloy) — the **hallmark** that gates it. **Subterranean Borer** (`U.borer`, **1500cr + 450 alloy**, hp 520, dmg 60 rail+splash) — `tunneler:true` makes it **phase through ANY terrain** always, and it's the **only** unit that can strike **underground** units (burrowing harvesters / other tunnelers) via the `canHitUnderground` exception in `nearestHostile`. It IS targetable itself (balance: the AI can shoot it).
+   - Generic prereq system: `UnitDef.requires` + `hasBuilding()` — `trainUnit` refuses and the sidebar button disables until the prereq building is up. Reusable for future gated units.
+   - **Player‑only** (AI doesn't build the facility or the Borer), like wood/repair.
+   - **Also:** the Logger's tree‑felling SFX was removed (Lane) — `clearForest` is silent.
+   - ⚠️ Compile‑verified only — playtest the burrow movement, the underground‑hunt, the gate, and confirm felling is now silent.
+
 **Big remaining roadmap item:**
 
 4. **#9 Naval / oceans** — the last item from Lane's original 10. Add ocean terrain on the big maps + sea units for **combat, transport, and harvesting (oil + fish as sea resources)**. Depends on the 3× maps (done). This is a large, multi‑part feature — scope it with Lane.
