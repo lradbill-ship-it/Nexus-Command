@@ -465,6 +465,27 @@ function checkElimination(team: number) {
     logMsg(FAC[team].name + ' has been wiped from the battlefield', 'war'); sfx('war');
   }
 }
+/** Sell the player's selected structure(s): refund half the invested cost, free the footprint. */
+export function sellSelected() {
+  if (game.over) return;
+  const blds = game.selection.filter((s): s is Building => s.kind === 'b' && s.team === PLAYER && !s.dead);
+  if (!blds.length) { hint('Select one of your structures to sell'); return; }
+  let cr = 0, al = 0;
+  for (const b of blds) {
+    const d = B[b.type], frac = 0.5 * Math.min(1, b.progress);
+    cr += Math.round(d.cost * frac);
+    al += Math.round((d.alloy || 0) * frac);
+    removeBuildingTiles(b);
+    spawnParts('smoke', b.x, b.y, 8, '120,120,128');
+    b.dead = true;
+  }
+  game.buildings = game.buildings.filter(b => !blds.includes(b));
+  game.selection = game.selection.filter(s => !blds.includes(s as Building));
+  game.money[PLAYER] += cr;
+  game.alloy[PLAYER] = (game.alloy[PLAYER] || 0) + al;
+  logMsg('Structure sold — refunded ' + cr + ' crystals' + (al ? ' + ' + al + ' alloy' : ''), 'good');
+  sfx('place');
+}
 // ── Spatial grid — keeps separation & target-acquisition near O(n) at scale ───
 // (the 112² / 6-faction map can field hundreds of units; the old O(n²) scans
 //  spiked frame time in big battles).
