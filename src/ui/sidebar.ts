@@ -6,7 +6,7 @@ import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, 
 import {
   startPlacing, trainUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
   hasCyber, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
-  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, allianceVP, sellSelected,
+  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, allianceVP, sellSelected, setAutoScout, getAutoScout,
 } from '../sim/sim';
 
 let chosenLeader: LeaderStyle = 'industrialist';
@@ -152,6 +152,7 @@ export function makeUI() {
 
   ($('conscriptBtn') as HTMLButtonElement).onclick = () => conscript(PLAYER);
   ($('sellBtn') as HTMLButtonElement).onclick = () => sellSelected();
+  ($('autoScoutBtn') as HTMLButtonElement).onclick = () => setAutoScout(!getAutoScout());
   ($('restartBtn') as HTMLButtonElement).onclick = () => restartHook();
   ($('startBtn') as HTMLButtonElement).onclick = () => { $('introOverlay').style.display = 'none'; startHook(); };
   ($('endBtn') as HTMLButtonElement).onclick = () => { $('endOverlay').style.display = 'none'; restartHook(); };
@@ -200,6 +201,11 @@ export function refresh() {
   $('uiHappyFill').style.width = hap + '%';
   $('uiHappyTxt').textContent = hap > 70 ? 'thriving' : hap > 45 ? 'content' : hap > 25 ? 'restless' : 'in revolt';
   ($('conscriptBtn') as HTMLButtonElement).disabled = pop < 15;
+  const asOn = getAutoScout();
+  const asBtn = $('autoScoutBtn') as HTMLButtonElement;
+  asBtn.textContent = '🔭 AUTO-SCOUT: ' + (asOn ? 'ON' : 'OFF');
+  asBtn.style.color = asOn ? '#69d84f' : '#c8d4dc';
+  asBtn.style.borderColor = asOn ? '#69d84f' : '#424a56';
   const ld = STYLES[game.leader[PLAYER] || 'industrialist'];
   $('uiLeader').innerHTML = 'LEADER <b style="color:' + ld.col + '">' + ld.name + '</b>';
   // government panel

@@ -25,7 +25,9 @@ let dipTickT = 0;
 let lastStates: Record<string, string> = {};
 let lastHintT = 0;
 let crystalT = 55;   // first new formation seeds ~55s in
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; }
+let autoScout = false;   // when on, idle Recon Drones auto-reveal the map (scouts-only auto-explore)
+let autoScoutT = 0;      // throttle accumulator for auto-scout order assignment
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -1163,6 +1165,32 @@ function endGame(win: boolean) {
   endHook(win);
 }
 
+// ── Auto-scout: idle Recon Drones auto-reveal the map when enabled (scouts-only) ──
+export function setAutoScout(on: boolean) { autoScout = on; }
+export function getAutoScout() { return autoScout; }
+function nearestUnexplored(u: Unit): Vec | null {
+  let best: Vec | null = null, bestD = Infinity;
+  for (let i = 0; i < 90; i++) {
+    const tx = Math.random() * MAPW | 0, ty = Math.random() * MAPH | 0;
+    if (game.explored[idx(tx, ty)] || !passable(tx, ty)) continue;
+    const wx = tx * TILE + 16, wy = ty * TILE + 16;
+    const d = (wx - u.x) * (wx - u.x) + (wy - u.y) * (wy - u.y);
+    if (d < bestD) { bestD = d; best = { x: wx, y: wy }; }
+  }
+  return best;
+}
+function autoScoutTick(dt: number) {
+  autoScoutT += dt;
+  if (autoScoutT < 1.2) return;
+  autoScoutT = 0;
+  if (!autoScout) return;
+  for (const u of game.units) {
+    if (u.team !== PLAYER || u.type !== 'recon' || u.order !== 'idle' || u.path) continue;
+    const t = nearestUnexplored(u);
+    if (t) { u.order = 'move'; u.dest = t; setPath(u, t.x, t.y); }
+  }
+}
+
 // ── Per-frame world step (everything except camera/input/render) ─────────────
 export function stepWorld(dt: number) {
   game.t += dt;
@@ -1195,6 +1223,7 @@ export function stepWorld(dt: number) {
   settlementTick(dt);
   relayTick(dt);
   governmentTick(dt);
+  autoScoutTick(dt);
   computeVision();
   checkEnd();
 }
