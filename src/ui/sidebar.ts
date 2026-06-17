@@ -6,7 +6,7 @@ import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, 
 import {
   startPlacing, trainUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
   hasCyber, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
-  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst,
+  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, sellSelected, setAutoScout, getAutoScout,
 } from '../sim/sim';
 
 let chosenLeader: LeaderStyle = 'industrialist';
@@ -151,6 +151,8 @@ export function makeUI() {
   ($('coupBtn') as HTMLButtonElement).onclick = () => launchCoup();
 
   ($('conscriptBtn') as HTMLButtonElement).onclick = () => conscript(PLAYER);
+  ($('sellBtn') as HTMLButtonElement).onclick = () => sellSelected();
+  ($('autoScoutBtn') as HTMLButtonElement).onclick = () => setAutoScout(!getAutoScout());
   ($('restartBtn') as HTMLButtonElement).onclick = () => restartHook();
   ($('startBtn') as HTMLButtonElement).onclick = () => { $('introOverlay').style.display = 'none'; startHook(); };
   ($('endBtn') as HTMLButtonElement).onclick = () => { $('endOverlay').style.display = 'none'; restartHook(); };
@@ -195,6 +197,11 @@ export function refresh() {
   $('uiHappyFill').style.width = hap + '%';
   $('uiHappyTxt').textContent = hap > 70 ? 'thriving' : hap > 45 ? 'content' : hap > 25 ? 'restless' : 'in revolt';
   ($('conscriptBtn') as HTMLButtonElement).disabled = pop < 15;
+  const asOn = getAutoScout();
+  const asBtn = $('autoScoutBtn') as HTMLButtonElement;
+  asBtn.textContent = '🔭 AUTO-SCOUT: ' + (asOn ? 'ON' : 'OFF');
+  asBtn.style.color = asOn ? '#69d84f' : '#c8d4dc';
+  asBtn.style.borderColor = asOn ? '#69d84f' : '#424a56';
   const ld = STYLES[game.leader[PLAYER] || 'industrialist'];
   $('uiLeader').innerHTML = 'LEADER <b style="color:' + ld.col + '">' + ld.name + '</b>';
   // government panel
@@ -255,6 +262,12 @@ export function refresh() {
 
 function refreshSel() {
   const el = $('selInfo');
+  const sellable = game.selection.filter(s => s.kind === 'b' && (s as any).team === PLAYER) as any[];
+  const sellBtn = $('sellBtn') as HTMLButtonElement;
+  if (sellable.length) {
+    let cr = 0; for (const b of sellable) cr += Math.round(B[b.type].cost * 0.5 * Math.min(1, b.progress));
+    sellBtn.style.display = ''; sellBtn.textContent = '✖ SELL STRUCTURE' + (cr ? ' · +' + cr : '');
+  } else sellBtn.style.display = 'none';
   if (!game.selection.length) { el.innerHTML = 'Nothing selected.'; return; }
   if (game.selection.length === 1) {
     const sObj = game.selection[0];

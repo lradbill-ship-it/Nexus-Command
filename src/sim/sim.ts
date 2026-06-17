@@ -25,7 +25,9 @@ let dipTickT = 0;
 let lastStates: Record<string, string> = {};
 let lastHintT = 0;
 let crystalT = 55;   // first new formation seeds ~55s in
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; }
+let autoScout = false;   // when on, idle Recon Drones auto-reveal the map (scouts-only auto-explore)
+let autoScoutT = 0;      // throttle accumulator for auto-scout order assignment
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -456,6 +458,27 @@ function checkElimination(team: number) {
     game.eliminated[team] = true;
     logMsg(FAC[team].name + ' has been wiped from the battlefield', 'war'); sfx('war');
   }
+}
+/** Sell the player's selected structure(s): refund half the invested cost, free the footprint. */
+export function sellSelected() {
+  if (game.over) return;
+  const blds = game.selection.filter((s): s is Building => s.kind === 'b' && s.team === PLAYER && !s.dead);
+  if (!blds.length) { hint('Select one of your structures to sell'); return; }
+  let cr = 0, al = 0;
+  for (const b of blds) {
+    const d = B[b.type], frac = 0.5 * Math.min(1, b.progress);
+    cr += Math.round(d.cost * frac);
+    al += Math.round((d.alloy || 0) * frac);
+    removeBuildingTiles(b);
+    spawnParts('smoke', b.x, b.y, 8, '120,120,128');
+    b.dead = true;
+  }
+  game.buildings = game.buildings.filter(b => !blds.includes(b));
+  game.selection = game.selection.filter(s => !blds.includes(s as Building));
+  game.money[PLAYER] += cr;
+  game.alloy[PLAYER] = (game.alloy[PLAYER] || 0) + al;
+  logMsg('Structure sold — refunded ' + cr + ' crystals' + (al ? ' + ' + al + ' alloy' : ''), 'good');
+  sfx('place');
 }
 // ── Spatial grid — keeps separation & target-acquisition near O(n) at scale ───
 // (the 112² / 6-faction map can field hundreds of units; the old O(n²) scans
@@ -1128,6 +1151,32 @@ function endGame(win: boolean) {
   endHook(win);
 }
 
+// ── Auto-scout: idle Recon Drones auto-reveal the map when enabled (scouts-only) ──
+export function setAutoScout(on: boolean) { autoScout = on; }
+export function getAutoScout() { return autoScout; }
+function nearestUnexplored(u: Unit): Vec | null {
+  let best: Vec | null = null, bestD = Infinity;
+  for (let i = 0; i < 90; i++) {
+    const tx = Math.random() * MAPW | 0, ty = Math.random() * MAPH | 0;
+    if (game.explored[idx(tx, ty)] || !passable(tx, ty)) continue;
+    const wx = tx * TILE + 16, wy = ty * TILE + 16;
+    const d = (wx - u.x) * (wx - u.x) + (wy - u.y) * (wy - u.y);
+    if (d < bestD) { bestD = d; best = { x: wx, y: wy }; }
+  }
+  return best;
+}
+function autoScoutTick(dt: number) {
+  autoScoutT += dt;
+  if (autoScoutT < 1.2) return;
+  autoScoutT = 0;
+  if (!autoScout) return;
+  for (const u of game.units) {
+    if (u.team !== PLAYER || u.type !== 'recon' || u.order !== 'idle' || u.path) continue;
+    const t = nearestUnexplored(u);
+    if (t) { u.order = 'move'; u.dest = t; setPath(u, t.x, t.y); }
+  }
+}
+
 // ── Per-frame world step (everything except camera/input/render) ─────────────
 export function stepWorld(dt: number) {
   game.t += dt;
@@ -1160,6 +1209,7 @@ export function stepWorld(dt: number) {
   settlementTick(dt);
   relayTick(dt);
   governmentTick(dt);
+  autoScoutTick(dt);
   computeVision();
   checkEnd();
 }
