@@ -4,9 +4,9 @@ import {
 import type { LeaderStyle } from '../sim/constants';
 import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, setHintHook } from '../sim/state';
 import {
-  startPlacing, trainUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
+  startPlacing, trainUnit, cancelUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
   hasCyber, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
-  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, allianceVP,
+  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, sellSelected, setAutoScout, getAutoScout,
 } from '../sim/sim';
 
 let chosenLeader: LeaderStyle = 'industrialist';
@@ -75,7 +75,7 @@ export function makeUI() {
   for (const t of unitOrder) {
     const d = U[t];
     const btn = cmdButton('u_' + t, iconCanvas('u', t), d.name, '▣' + d.cost + (d.alloy ? ' ⬡' + d.alloy : ''));
-    btn.title = d.desc; btn.onclick = () => trainUnit(t); ug.appendChild(btn);
+    btn.title = d.desc + ' · right-click cancels one'; btn.onclick = () => trainUnit(t); btn.oncontextmenu = (e) => { e.preventDefault(); cancelUnit(t); }; ug.appendChild(btn);
   }
   const ag = $('abilityBtns');
   for (const k of Object.keys(ABILITIES)) {
@@ -151,6 +151,8 @@ export function makeUI() {
   ($('coupBtn') as HTMLButtonElement).onclick = () => launchCoup();
 
   ($('conscriptBtn') as HTMLButtonElement).onclick = () => conscript(PLAYER);
+  ($('sellBtn') as HTMLButtonElement).onclick = () => sellSelected();
+  ($('autoScoutBtn') as HTMLButtonElement).onclick = () => setAutoScout(!getAutoScout());
   ($('restartBtn') as HTMLButtonElement).onclick = () => restartHook();
   ($('startBtn') as HTMLButtonElement).onclick = () => { $('introOverlay').style.display = 'none'; startHook(); };
   ($('endBtn') as HTMLButtonElement).onclick = () => { $('endOverlay').style.display = 'none'; restartHook(); };
@@ -189,16 +191,17 @@ export function refresh() {
   $('uiWater').textContent = Math.floor(w.stored) + (w.net >= 0 ? ' +' + w.net : ' ' + w.net) + '/s';
   $('uiWaterWrap').className = 'stat' + (game.overheat[PLAYER] ? ' hot' : '');
   $('uiAlloy').textContent = String(Math.floor(game.alloy[PLAYER] || 0));
-  $('uiVP').textContent = String(Math.floor(allianceVP(PLAYER)));
-  let leadName = '', leadVP = 0;
-  for (const f of AIS) if (!isAllied(PLAYER, f) && !game.eliminated[f]) { const v = allianceVP(f); if (v > leadVP) { leadVP = v; leadName = FAC[f].name.split(' ')[0]; } }
-  $('uiVPlead').textContent = leadVP > 20 ? '· ' + leadName + ' ' + Math.floor(leadVP) : '';
   const pop = Math.floor(game.pop[PLAYER] || 0), cap = housingCap(PLAYER), hap = Math.round(game.happy[PLAYER] ?? 60);
   $('uiPop').textContent = String(pop);
   $('uiPopCap').textContent = String(cap);
   $('uiHappyFill').style.width = hap + '%';
   $('uiHappyTxt').textContent = hap > 70 ? 'thriving' : hap > 45 ? 'content' : hap > 25 ? 'restless' : 'in revolt';
   ($('conscriptBtn') as HTMLButtonElement).disabled = pop < 15;
+  const asOn = getAutoScout();
+  const asBtn = $('autoScoutBtn') as HTMLButtonElement;
+  asBtn.textContent = '🔭 AUTO-SCOUT: ' + (asOn ? 'ON' : 'OFF');
+  asBtn.style.color = asOn ? '#69d84f' : '#c8d4dc';
+  asBtn.style.borderColor = asOn ? '#69d84f' : '#424a56';
   const ld = STYLES[game.leader[PLAYER] || 'industrialist'];
   $('uiLeader').innerHTML = 'LEADER <b style="color:' + ld.col + '">' + ld.name + '</b>';
   // government panel
@@ -259,6 +262,12 @@ export function refresh() {
 
 function refreshSel() {
   const el = $('selInfo');
+  const sellable = game.selection.filter(s => s.kind === 'b' && (s as any).team === PLAYER) as any[];
+  const sellBtn = $('sellBtn') as HTMLButtonElement;
+  if (sellable.length) {
+    let cr = 0; for (const b of sellable) cr += Math.round(B[b.type].cost * 0.5 * Math.min(1, b.progress));
+    sellBtn.style.display = ''; sellBtn.textContent = '✖ SELL STRUCTURE' + (cr ? ' · +' + cr : '');
+  } else sellBtn.style.display = 'none';
   if (!game.selection.length) { el.innerHTML = 'Nothing selected.'; return; }
   if (game.selection.length === 1) {
     const sObj = game.selection[0];

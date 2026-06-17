@@ -28,8 +28,6 @@
   #uiWaterWrap b{color:#7fd6ea;text-shadow:0 0 6px rgba(127,214,234,.4);}
   #uiWaterWrap.hot b{color:var(--p2);text-shadow:0 0 6px rgba(232,72,58,.5);}
   #uiAlloyWrap b{color:#e0a155;text-shadow:0 0 6px rgba(224,161,85,.4);}
-  #uiVPWrap b{color:#fff;}
-  #uiVPWrap .dim2{color:var(--dim);font-size:10px;}
   #topbar .spacer{flex:1;}
   #uiHint{color:var(--gold);}
   #restartBtn{pointer-events:auto;background:linear-gradient(180deg,var(--steel),var(--steel-lo));
@@ -170,7 +168,6 @@
       <div class="stat" id="uiWaterWrap">❄ COOLANT <b id="uiWater">0</b></div>
       <div class="stat" id="uiAlloyWrap">⬡ ALLOY <b id="uiAlloy">0</b></div>
       <div class="stat" id="uiTradeWrap" style="display:none">TRADE <b id="uiTrade">+0/s</b></div>
-      <div class="stat" id="uiVPWrap">★ RELAYS <b id="uiVP">0</b><span class="dim2">/2800</span> <span id="uiVPlead" class="dim2"></span></div>
       <div class="stat">UPTIME <b id="uiTime">00:00</b></div>
       <div class="spacer"></div>
       <div class="stat" id="uiHint"></div>
@@ -197,7 +194,7 @@
           <li><b>SOCIETY</b>: build Habitats &amp; Markets to grow a happy population — they work faster (labor) and can be <kbd>C</kbd> conscripted into troops. Neglect them and they revolt. Recruit or intimidate <b style="color:#b8bcc4">neutral settlements</b> for more people.</li>
           <li><b>DIPLOMACY</b>: gifts, trade pacts (resources flow both ways), alliances (shared vision, allies join your wars), war</li>
           <li><b>OPS</b> (needs Cyber Ops Center): <kbd>E</kbd> EMP · <kbd>H</kbd> Hijack · covert theft, sabotage, recon, incitement · incite coups</li>
-          <li><b>VICTORY</b>: wipe out every rival — or hold the <b style="color:#cfe6ee">★ Command Relays</b> to win on Victory Points.</li>
+          <li><b>VICTORY</b>: wipe out every rival faction. Capture the <b style="color:#cfe6ee">★ Command Relays</b> for bonus income and battlefield vision.</li>
         </ul>
         <h3 class="sec" style="margin:6px 0 2px">CHOOSE YOUR LEADER'S DOCTRINE</h3>
         <div class="leaderPick" id="leaderPick"></div>
@@ -222,6 +219,8 @@
     </div></div>
     <div class="frame"><div class="screenIn"><canvas id="minimap" width="252" height="252"></canvas></div></div>
     <div class="frame"><div class="screenIn" id="selInfo">Nothing selected.</div></div>
+    <button id="sellBtn" title="Sell the selected structure for a partial crystal refund (Del / Backspace)" style="display:none;margin:2px 8px 0;font:inherit;font-size:10px;letter-spacing:.12em;font-weight:700;padding:7px;cursor:pointer;color:#fff;background:linear-gradient(180deg,#b3463a,#7d2c24);border:1px solid #2a2e36;border-top-color:#c66;border-radius:2px;">✖ SELL STRUCTURE</button>
+    <button id="autoScoutBtn" title="Idle Recon Drones automatically scout the unexplored map (toggle)" style="margin:2px 8px 0;font:inherit;font-size:9.5px;letter-spacing:.1em;font-weight:700;padding:6px;cursor:pointer;color:#c8d4dc;background:linear-gradient(180deg,#2d3540,#1b212a);border:1px solid #424a56;border-radius:2px;">🔭 AUTO-SCOUT: OFF</button>
     <div class="tabRow">
       <button id="tabBase" class="on">BASE</button>
       <button id="tabOps">OPS</button>
@@ -261,9 +260,9 @@
       <div class="tab" id="paneDip">
         <div id="dipRows" style="display:flex;flex-direction:column;gap:7px;"></div>
       </div>
-      <h3 class="sec" style="margin-top:8px">BATTLEFIELD FEED</h3>
-      <div class="screenIn" id="log"></div>
     </div>
+    <h3 class="sec" style="margin:6px 8px 0">BATTLEFIELD FEED</h3>
+    <div class="frame" style="margin:4px 8px 8px"><div class="screenIn" id="log"></div></div>
   </div>
 </div>
 <script type="module" src="/src/main.ts"></script>

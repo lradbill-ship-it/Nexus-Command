@@ -1,7 +1,7 @@
 import {
   TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, AIS, ALL_TEAMS, FAC, B, U, ABILITIES, COVERT,
   BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD, STYLES,
-  VP_TARGET, VP_PER_RELAY, RELAY_INCOME,
+  RELAY_INCOME,
   idx, inMap, clamp, dist,
 } from './constants';
 import type { LeaderStyle } from './constants';
@@ -25,7 +25,9 @@ let dipTickT = 0;
 let lastStates: Record<string, string> = {};
 let lastHintT = 0;
 let crystalT = 55;   // first new formation seeds ~55s in
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; }
+let autoScout = false;   // when on, idle Recon Drones auto-reveal the map (scouts-only auto-explore)
+let autoScoutT = 0;      // throttle accumulator for auto-scout order assignment
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -339,13 +341,13 @@ function settlementTick(dt: number) {
   }
 }
 
-// ── Command Relays & Victory Points (objective layer, §5) ─────────────────────
+// ── Command Relays — income + vision objective points (§5) ───────────────────
 const RELAY_R = 4 * TILE;
 function captureRelay(r: Relay, team: number) {
   const prev = r.owner;
   r.owner = team; r.capT = 0; r.capBy = 0;
   game.parts.push({ type: 'ring', x: r.x, y: r.y, t: 0, life: 0.7, big: true });
-  if (team === PLAYER) { logMsg('Command Relay secured — Victory Points incoming', 'good'); sfx('chime'); }
+  if (team === PLAYER) { logMsg('Command Relay secured — bonus income & vision', 'good'); sfx('chime'); }
   else if (prev === PLAYER) { logMsg(FAC[team].name + ' has seized a Command Relay from us', 'war'); sfx('war'); }
   else if (isAllied(PLAYER, team)) logMsg(FAC[team].name + ' (ally) secured a Command Relay', 'good');
 }
@@ -363,17 +365,9 @@ function relayTick(dt: number) {
     } else {
       r.capT = Math.max(0, r.capT - dt / 20);                       // contested → stalls
     }
-    // a held relay generates Victory Points + a crystal trickle for its owner
-    if (r.owner) {
-      game.vp[r.owner] = (game.vp[r.owner] || 0) + VP_PER_RELAY * dt;
-      game.money[r.owner] += RELAY_INCOME * dt;
-    }
+    // a held relay grants its owner a crystal trickle (income); vision via computeVision
+    if (r.owner) game.money[r.owner] += RELAY_INCOME * dt;
   }
-}
-/** Total Victory Points across a faction's alliance (shared objective progress). */
-export function allianceVP(team: number) {
-  let v = 0; for (const f of ALL_TEAMS) if (isAllied(team, f)) v += game.vp[f] || 0;
-  return v;
 }
 /** Player pays to instantly win over a settlement near their forces (the "recruit" path). */
 export function tryRecruit(s: Settlement): boolean {
@@ -464,6 +458,27 @@ function checkElimination(team: number) {
     game.eliminated[team] = true;
     logMsg(FAC[team].name + ' has been wiped from the battlefield', 'war'); sfx('war');
   }
+}
+/** Sell the player's selected structure(s): refund half the invested cost, free the footprint. */
+export function sellSelected() {
+  if (game.over) return;
+  const blds = game.selection.filter((s): s is Building => s.kind === 'b' && s.team === PLAYER && !s.dead);
+  if (!blds.length) { hint('Select one of your structures to sell'); return; }
+  let cr = 0, al = 0;
+  for (const b of blds) {
+    const d = B[b.type], frac = 0.5 * Math.min(1, b.progress);
+    cr += Math.round(d.cost * frac);
+    al += Math.round((d.alloy || 0) * frac);
+    removeBuildingTiles(b);
+    spawnParts('smoke', b.x, b.y, 8, '120,120,128');
+    b.dead = true;
+  }
+  game.buildings = game.buildings.filter(b => !blds.includes(b));
+  game.selection = game.selection.filter(s => !blds.includes(s as Building));
+  game.money[PLAYER] += cr;
+  game.alloy[PLAYER] = (game.alloy[PLAYER] || 0) + al;
+  logMsg('Structure sold — refunded ' + cr + ' crystals' + (al ? ' + ' + al + ' alloy' : ''), 'good');
+  sfx('place');
 }
 // ── Spatial grid — keeps separation & target-acquisition near O(n) at scale ───
 // (the 112² / 6-faction map can field hundreds of units; the old O(n²) scans
@@ -1132,6 +1147,19 @@ export function tryPlace(wx: number, wy: number) {
   addBuilding(type, tx, ty, PLAYER, false);
   sfx('place', wx); game.placing = null; hint('');
 }
+export function cancelUnit(t: string) {
+  const fs = game.buildings.filter(b => b.team === PLAYER && b.type === 'foundry' && b.queue.includes(t));
+  if (!fs.length) { hint('Nothing of that type queued to cancel'); return; }
+  const f = fs[fs.length - 1];
+  const i = f.queue.lastIndexOf(t);
+  if (i < 0) return;
+  f.queue.splice(i, 1);
+  if (i === 0) f.queueT = 0;
+  game.money[PLAYER] += U[t].cost;
+  game.alloy[PLAYER] = (game.alloy[PLAYER] || 0) + alloyCost(PLAYER, U[t].alloy);
+  logMsg(U[t].name + ' production cancelled — refunded', 'good');
+  sfx('click');
+}
 export function trainUnit(t: string) {
   const fs = game.buildings.filter(b => b.team === PLAYER && b.type === 'foundry' && b.progress >= 1);
   if (!fs.length) { hint('Build a War Foundry first'); return; }
@@ -1141,16 +1169,10 @@ export function trainUnit(t: string) {
   game.money[PLAYER] -= U[t].cost; game.alloy[PLAYER] -= alloyCost(PLAYER, U[t].alloy); fs[0].queue.push(t); sfx('click');
 }
 
-// ── Win / lose ───────────────────────────────────────────────────────────────
+// ── Win / lose (annihilation only) ───────────────────────────────────────────
 function checkEnd() {
   if (game.over) return;
   if (!game.buildings.some(b => b.team === PLAYER)) { endGame(false); return; }
-  // alternate victory: Victory Points from holding Command Relays (decisive map control)
-  if (allianceVP(PLAYER) >= VP_TARGET) { logMsg('VICTORY — Command Relays have secured the grid', 'good'); endGame(true); return; }
-  for (const f of AIS) {
-    if (game.eliminated[f] || isAllied(PLAYER, f)) continue;
-    if (allianceVP(f) >= VP_TARGET) { endGame(false); return; }
-  }
   let win = true;
   for (const f of AIS) {
     if (game.eliminated[f]) continue;
@@ -1161,6 +1183,32 @@ function checkEnd() {
 function endGame(win: boolean) {
   game.over = true; game.won = win;
   endHook(win);
+}
+
+// ── Auto-scout: idle Recon Drones auto-reveal the map when enabled (scouts-only) ──
+export function setAutoScout(on: boolean) { autoScout = on; }
+export function getAutoScout() { return autoScout; }
+function nearestUnexplored(u: Unit): Vec | null {
+  let best: Vec | null = null, bestD = Infinity;
+  for (let i = 0; i < 90; i++) {
+    const tx = Math.random() * MAPW | 0, ty = Math.random() * MAPH | 0;
+    if (game.explored[idx(tx, ty)] || !passable(tx, ty)) continue;
+    const wx = tx * TILE + 16, wy = ty * TILE + 16;
+    const d = (wx - u.x) * (wx - u.x) + (wy - u.y) * (wy - u.y);
+    if (d < bestD) { bestD = d; best = { x: wx, y: wy }; }
+  }
+  return best;
+}
+function autoScoutTick(dt: number) {
+  autoScoutT += dt;
+  if (autoScoutT < 1.2) return;
+  autoScoutT = 0;
+  if (!autoScout) return;
+  for (const u of game.units) {
+    if (u.team !== PLAYER || u.type !== 'recon' || u.order !== 'idle' || u.path) continue;
+    const t = nearestUnexplored(u);
+    if (t) { u.order = 'move'; u.dest = t; setPath(u, t.x, t.y); }
+  }
 }
 
 // ── Per-frame world step (everything except camera/input/render) ─────────────
@@ -1195,6 +1243,7 @@ export function stepWorld(dt: number) {
   settlementTick(dt);
   relayTick(dt);
   governmentTick(dt);
+  autoScoutTick(dt);
   computeVision();
   checkEnd();
 }
