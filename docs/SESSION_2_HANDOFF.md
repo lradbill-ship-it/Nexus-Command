@@ -137,6 +137,10 @@ The sim is engine‑independent and **never touches the DOM/renderer** — it ta
    - **⚠️ Compile‑verified only — needs Lane's playtest** (per §7 the headless preview can't run the sim/render). Confirm: loggers find & fell forest and the cleared tile turns to passable grass on screen; wood accrues; Repair Rigs follow (guard) + heal and burn wood; idle rigs seek the wounded; the WOOD/cargo HUD reads right.
    - **AI is unchanged** — wood/repair is **player‑only** for now. A follow‑up could give the AI loggers/repair for parity (would need mill in `AI_SCRIPT` + logger/repair picks in `aiUpdate`).
 
+   **Refinements (commit `944ea8a`, main + live):**
+   - **Repair Rig auto‑search is map‑wide & continuous** — an idle rig scans the WHOLE map for any wounded friendly **unit OR building** (`nearestDamagedFriendly(u, Infinity)`, nearest‑wins) and goes to mend it. Build one and it keeps the whole army + base patched without micro.
+   - **Harvester tunnelling** (harvesters ONLY) — a new `phasing()` movement mode (shared with fliers). When a harvester's pathing stalls (`followPath` stuck trigger) **or** a crystal field has no surface route at all (`nearestNodeAny` fallback), it **burrows straight through terrain** to its target and surfaces on arrival. While underground it's **untargetable** (skipped in `nearestHostile`), doesn't separate, and renders faded (alpha 0.3) with spoil dust. Fixes stuck harvesters & lets them mine walled‑off fields. `Unit.tunnelT`.
+
 **Big remaining roadmap item:**
 
 4. **#9 Naval / oceans** — the last item from Lane's original 10. Add ocean terrain on the big maps + sea units for **combat, transport, and harvesting (oil + fish as sea resources)**. Depends on the 3× maps (done). This is a large, multi‑part feature — scope it with Lane.
