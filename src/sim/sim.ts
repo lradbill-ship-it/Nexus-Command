@@ -1082,6 +1082,33 @@ function aiUpdate(team: number, dt: number) {
 }
 
 // ── Orders, placement, training (player intent) ──────────────────────────────
+/** Arrange `units` into a grid formation centred on (wx,wy), facing the movement direction.
+ *  Returns one slot per unit (index-aligned), nearest-assigned to cut down on path crossing. */
+function formationSlots(units: Unit[], wx: number, wy: number): Vec[] {
+  const n = units.length;
+  if (n <= 1) return n ? [{ x: wx, y: wy }] : [];
+  let cx = 0, cy = 0; for (const u of units) { cx += u.x; cy += u.y; } cx /= n; cy /= n;
+  const dir = Math.atan2(wy - cy, wx - cx);
+  const fx = Math.cos(dir), fy = Math.sin(dir);        // forward (depth) axis — points the way they're going
+  const rx = -Math.sin(dir), ry = Math.cos(dir);       // right (width) axis
+  const S = Math.max(22, 2.4 * Math.max(...units.map(u => U[u.type].radius)));
+  const cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols);
+  const slots: Vec[] = [];
+  for (let row = 0; row < rows && slots.length < n; row++) {
+    for (let col = 0; col < cols && slots.length < n; col++) {
+      const depth = ((rows - 1) / 2 - row) * S;        // front rows pushed ahead
+      const width = (col - (cols - 1) / 2) * S;
+      slots.push({ x: wx + fx * depth + rx * width, y: wy + fy * depth + ry * width });
+    }
+  }
+  const used = new Array(n).fill(false), out: Vec[] = new Array(n);
+  for (const slot of slots) {                          // each slot grabs its nearest still-free unit
+    let best = -1, bd = Infinity;
+    for (let u = 0; u < n; u++) { if (used[u]) continue; const d = (units[u].x - slot.x) ** 2 + (units[u].y - slot.y) ** 2; if (d < bd) { bd = d; best = u; } }
+    if (best >= 0) { used[best] = true; out[best] = slot; }
+  }
+  return out;
+}
 export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
   const sel = game.selection.filter(s => s.kind === 'u') as Unit[];
   if (!sel.length) {
@@ -1111,19 +1138,19 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
       logMsg('Attacking ' + FAC[tgt.team].name + ' — relations −10', 'war');
     }
   }
-  let i = 0;
+  // attackers head to the target, harvesters to the node; everyone else deploys in a formation
+  const movers: Unit[] = [];
   for (const u of sel) {
     const harvester = !!U[u.type].harvests;
     if (tgt && !harvester && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; setPath(u, tgt.x, tgt.y); }
     else if (node && harvester && node.kind === U[u.type].harvests) { u.hNode = node; u.hState = 'go'; u.order = 'idle'; setPath(u, node.x, node.y); }
-    else {
-      const a = (i / sel.length) * Math.PI * 2, r = i === 0 ? 0 : 14 + 8 * Math.sqrt(i);
-      const dx = wx + Math.cos(a) * r, dy = wy + Math.sin(a) * r;
-      u.dest = { x: dx, y: dy };
-      u.order = fromAmove && !harvester ? 'amove' : 'move'; u.target = null;
-      setPath(u, dx, dy);
-    }
-    i++;
+    else movers.push(u);
+  }
+  const slots = formationSlots(movers, wx, wy);
+  for (let k = 0; k < movers.length; k++) {
+    const u = movers[k], harvester = !!U[u.type].harvests;
+    u.dest = slots[k]; u.order = fromAmove && !harvester ? 'amove' : 'move'; u.target = null;
+    setPath(u, slots[k].x, slots[k].y);
   }
   sfx('click');
 }
