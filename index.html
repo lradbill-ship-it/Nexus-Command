@@ -150,7 +150,7 @@
   .facList{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 14px;}
   .facCard{border:1px solid #3a414d;border-left-width:3px;padding:8px 10px;font-size:10.8px;line-height:1.55;background:rgba(0,0,0,.25);}
   .facCard b{display:block;letter-spacing:.1em;}
-  .panelBox .go{display:block;width:100%;margin-top:8px;border:1px solid #1a1d14;cursor:pointer;
+  .panelBox .go{display:block;width:100%;margin-top:8px;border:1px solid #1a1d14;cursor:pointer;position:sticky;bottom:0;z-index:1;
     background:linear-gradient(180deg,#f0c25e,#b9893a);color:#1c1606;
     font:inherit;font-weight:700;letter-spacing:.18em;font-size:13px;padding:13px;border-radius:3px;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 2px 6px rgba(0,0,0,.5);}
@@ -162,11 +162,22 @@
     #sidebar { width: 168px; }
     #topbar { gap: 8px; font-size: 10px; padding: 0 8px; }
     .frame { margin: 5px 5px 0; padding: 3px; }
+    #minimap { width: 108px; height: 108px; }            /* free vertical space so the feed isn't clipped */
+    #selInfo { min-height: 26px; padding: 4px 6px; font-size: 10px; }
     .tabRow button { font-size: 8px; padding: 6px 0; letter-spacing: .06em; }
     button.cmd .lbl { font-size: 7px; }
     button.cmd .cost { font-size: 7px; }
     .btnGrid { gap: 3px; }
     #restartBtn { font-size: 8px; padding: 5px 8px; }
+    #log { min-height: 48px; max-height: 76px; font-size: 9px; }
+    /* compact the intro so DEPLOY is reachable */
+    .overlay { position: fixed; }                        /* full-screen intro on a phone, not just the game-area column */
+    .panelBox { padding: 16px 14px; }
+    .panelBox h1 { font-size: 19px; letter-spacing: .16em; }
+    .panelBox h2 { font-size: 9.5px; margin: 3px 0 10px; }
+    .panelBox p, .panelBox li, .facCard { font-size: 10px; line-height: 1.5; }
+    .facList, .leaderPick { grid-template-columns: 1fr; gap: 6px; margin: 8px 0; }
+    .panelBox .go { font-size: 12px; padding: 12px; }
   }
 </style>
 </head>
