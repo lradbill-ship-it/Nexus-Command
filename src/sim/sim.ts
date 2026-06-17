@@ -1,7 +1,7 @@
 import {
   TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, AIS, ALL_TEAMS, FAC, B, U, ABILITIES, COVERT,
   BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD, STYLES,
-  VP_TARGET, VP_PER_RELAY, RELAY_INCOME,
+  RELAY_INCOME,
   idx, inMap, clamp, dist,
 } from './constants';
 import type { LeaderStyle } from './constants';
@@ -339,13 +339,13 @@ function settlementTick(dt: number) {
   }
 }
 
-// ── Command Relays & Victory Points (objective layer, §5) ─────────────────────
+// ── Command Relays — income + vision objective points (§5) ───────────────────
 const RELAY_R = 4 * TILE;
 function captureRelay(r: Relay, team: number) {
   const prev = r.owner;
   r.owner = team; r.capT = 0; r.capBy = 0;
   game.parts.push({ type: 'ring', x: r.x, y: r.y, t: 0, life: 0.7, big: true });
-  if (team === PLAYER) { logMsg('Command Relay secured — Victory Points incoming', 'good'); sfx('chime'); }
+  if (team === PLAYER) { logMsg('Command Relay secured — bonus income & vision', 'good'); sfx('chime'); }
   else if (prev === PLAYER) { logMsg(FAC[team].name + ' has seized a Command Relay from us', 'war'); sfx('war'); }
   else if (isAllied(PLAYER, team)) logMsg(FAC[team].name + ' (ally) secured a Command Relay', 'good');
 }
@@ -363,17 +363,9 @@ function relayTick(dt: number) {
     } else {
       r.capT = Math.max(0, r.capT - dt / 20);                       // contested → stalls
     }
-    // a held relay generates Victory Points + a crystal trickle for its owner
-    if (r.owner) {
-      game.vp[r.owner] = (game.vp[r.owner] || 0) + VP_PER_RELAY * dt;
-      game.money[r.owner] += RELAY_INCOME * dt;
-    }
+    // a held relay grants its owner a crystal trickle (income); vision via computeVision
+    if (r.owner) game.money[r.owner] += RELAY_INCOME * dt;
   }
-}
-/** Total Victory Points across a faction's alliance (shared objective progress). */
-export function allianceVP(team: number) {
-  let v = 0; for (const f of ALL_TEAMS) if (isAllied(team, f)) v += game.vp[f] || 0;
-  return v;
 }
 /** Player pays to instantly win over a settlement near their forces (the "recruit" path). */
 export function tryRecruit(s: Settlement): boolean {
@@ -1120,16 +1112,10 @@ export function trainUnit(t: string) {
   game.money[PLAYER] -= U[t].cost; game.alloy[PLAYER] -= alloyCost(PLAYER, U[t].alloy); fs[0].queue.push(t); sfx('click');
 }
 
-// ── Win / lose ───────────────────────────────────────────────────────────────
+// ── Win / lose (annihilation only) ───────────────────────────────────────────
 function checkEnd() {
   if (game.over) return;
   if (!game.buildings.some(b => b.team === PLAYER)) { endGame(false); return; }
-  // alternate victory: Victory Points from holding Command Relays (decisive map control)
-  if (allianceVP(PLAYER) >= VP_TARGET) { logMsg('VICTORY — Command Relays have secured the grid', 'good'); endGame(true); return; }
-  for (const f of AIS) {
-    if (game.eliminated[f] || isAllied(PLAYER, f)) continue;
-    if (allianceVP(f) >= VP_TARGET) { endGame(false); return; }
-  }
   let win = true;
   for (const f of AIS) {
     if (game.eliminated[f]) continue;
