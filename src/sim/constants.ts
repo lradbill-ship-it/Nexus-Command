@@ -195,6 +195,7 @@ export const RELAY_SITES = [
   { x: 56 * MAP_SCALE, y: 30 * MAP_SCALE }, { x: 32 * MAP_SCALE, y: 74 * MAP_SCALE }, { x: 80 * MAP_SCALE, y: 74 * MAP_SCALE },
 ];
 export const RELAY_INCOME = 3;            // crystals/s per held relay
+export const RELAY_HP = 600;              // an owned relay's "hold" — shoot it to 0 to knock it neutral, then re-take by presence
 
 export interface AIScriptStep { t: number; type: string; dx: number; dy: number; }
 export const AI_SCRIPT: AIScriptStep[] = [

@@ -18,6 +18,8 @@ export interface Relay {
   owner: number;      // 0 = neutral, else faction id
   capBy: number;      // faction currently gaining capture progress
   capT: number;       // capture progress 0..1
+  hp: number;         // "hold" strength — an owned relay must be shot to 0 to knock it neutral
+  hpMax: number;
   pulse: number;      // render animation phase
 }
 

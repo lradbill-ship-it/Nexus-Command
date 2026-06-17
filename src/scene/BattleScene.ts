@@ -411,6 +411,11 @@ export class BattleScene extends Phaser.Scene {
       g.fillStyle(col, a); g.fillTriangle(r.x, r.y - 22, r.x - 6, r.y - 4, r.x + 6, r.y - 4); // obelisk
       g.fillStyle(0xffffff, a * (0.4 + pulse * 0.5)); g.fillCircle(r.x, r.y - 16, 2.2);    // beacon light
       g.lineStyle(2, col, a * 0.8); g.strokeCircle(r.x, r.y, 22);
+      if (r.owner && r.hp < r.hpMax) {                                                      // "hold" damage ring — shrinks as you shoot it offline
+        const f = Math.max(0, r.hp / r.hpMax);
+        g.lineStyle(3, 0xe8483a, a * 0.9); g.beginPath();
+        g.arc(r.x, r.y, 25, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); g.strokePath();
+      }
       if (r.capT > 0.02 && r.capBy) {
         const cc = Phaser.Display.Color.HexStringToColor(FAC[r.capBy].col).color;
         g.lineStyle(3, cc, 0.95); g.beginPath();

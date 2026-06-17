@@ -1,7 +1,7 @@
 import {
   TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, AIS, ALL_TEAMS, FAC, B, U, ABILITIES, COVERT,
   BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD, STYLES,
-  RELAY_INCOME,
+  RELAY_INCOME, RELAY_HP,
   idx, inMap, clamp, dist,
 } from './constants';
 import type { LeaderStyle } from './constants';
@@ -358,26 +358,43 @@ function captureRelay(r: Relay, team: number) {
 function relayTick(dt: number) {
   for (const r of game.relays) {
     const present: Record<number, number> = {};
-    forNearbyUnits(r.x, r.y, RELAY_R, (u) => { if (dist(u, r) <= RELAY_R) present[u.team] = (present[u.team] || 0) + 1; });
-    const challengers = Object.keys(present).map(Number).filter(t => t !== r.owner);
-    if (challengers.length === 1) {
-      const team = challengers[0];
-      // a NEUTRAL relay is taken by presence; once OWNED it must be taken by force — the
-      // challenger has to be at war with the owner (so seizing a friend's relay means turning on them first)
-      if (r.owner && !isWar(team, r.owner)) {
-        r.capT = Math.max(0, r.capT - dt / 10);
-        if (team === PLAYER && game.t % 3 < dt) hint("That relay is " + FAC[r.owner].name + "'s — you must be at war to seize it");
-      } else {
+    let assault = 0; const attackers = new Set<number>();           // non-owner military firepower on an owned relay
+    forNearbyUnits(r.x, r.y, RELAY_R, (u) => {
+      if (dist(u, r) > RELAY_R) return;
+      present[u.team] = (present[u.team] || 0) + 1;
+      if (r.owner && u.team !== r.owner && (U[u.type].dmg || 0) > 0) { assault += U[u.type].dmg!; attackers.add(u.team); }
+    });
+    if (r.owner) {
+      // an OWNED relay can't be flipped by presence — it must be shot offline first
+      const defended = !!present[r.owner];
+      if (assault > 0 && !defended) {                               // undefended + under fire → the hold breaks down
+        r.hp -= assault * 1.5 * dt;
+        for (const t of attackers) if (!isWar(t, r.owner)) addRel(t, r.owner, -3 * dt);   // shelling a non-enemy's relay sours relations → eventually war
+        if (Math.random() < dt * 9) game.parts.push({ type: 'flash', x: r.x + (Math.random() * 22 - 11), y: r.y + (Math.random() * 22 - 11), t: 0, life: 0.16 });
+        if (attackers.has(PLAYER) && game.t % 3 < dt) hint('Assaulting ' + FAC[r.owner].name + "'s relay — knock it offline to take it");
+        if (r.hp <= 0) {                                            // knocked offline → reverts to neutral, then re-takeable by presence
+          const prev = r.owner; r.owner = 0; r.hp = r.hpMax; r.capT = 0; r.capBy = 0;
+          game.parts.push({ type: 'ring', x: r.x, y: r.y, t: 0, life: 0.7, big: true });
+          if (prev === PLAYER) { logMsg('A Command Relay was knocked offline!', 'war'); sfx('war'); }
+          else if (attackers.has(PLAYER)) { logMsg('Enemy relay knocked offline — move in to seize it', 'good'); sfx('chime'); }
+        }
+      } else if (r.hp < r.hpMax) {
+        r.hp = Math.min(r.hpMax, r.hp + r.hpMax * 0.02 * dt);        // unthreatened (or defended) → the hold recovers
+      }
+      game.money[r.owner] += RELAY_INCOME * dt;                     // income + vision while held
+    } else {
+      // NEUTRAL relay → taken by presence (uncontested)
+      const challengers = Object.keys(present).map(Number).filter(t => t !== 0);
+      if (challengers.length === 1) {
+        const team = challengers[0];
         r.capBy = team; r.capT += dt / 7;
         if (r.capT >= 1) captureRelay(r, team);
+      } else if (Object.keys(present).length === 0) {
+        r.capT = Math.max(0, r.capT - dt / 12); if (r.capT === 0) r.capBy = 0;
+      } else {
+        r.capT = Math.max(0, r.capT - dt / 20);                     // contested → stalls
       }
-    } else if (Object.keys(present).length === 0) {
-      r.capT = Math.max(0, r.capT - dt / 12); if (r.capT === 0) r.capBy = 0;
-    } else {
-      r.capT = Math.max(0, r.capT - dt / 20);                       // contested → stalls
     }
-    // a held relay grants its owner a crystal trickle (income); vision via computeVision
-    if (r.owner) game.money[r.owner] += RELAY_INCOME * dt;
   }
 }
 /** Player pays to instantly win over a settlement near their forces (the "recruit" path). */
