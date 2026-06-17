@@ -1,5 +1,7 @@
 # CLAUDE.md — Project Stratadug
 
+> ⚡ **Session 2+ START HERE:** read **`docs/SESSION_2_HANDOFF.md`** first — current state, where the repo/hosting now live (moved to `lradbill-ship-it/Nexus-Command`), everything shipped in Session 1, pending work (repair units, wood/trees, naval), conventions, and gotchas. The notes below are the original v1 mission/spec (still useful background).
+
 You are picking up an in-progress game project. Read this file, then `docs/DESIGN_SPEC.md`, then skim `playable/nexus-command-v2.html` (the current best playable build) before writing any code.
 
 ## Mission
