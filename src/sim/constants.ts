@@ -148,6 +148,7 @@ export interface AbilityDef { name: string; cost: number; cd: number; key: strin
 export const ABILITIES: Record<string, AbilityDef> = {
   emp: { name: 'EMP Pulse', cost: 300, cd: 60, key: 'E', desc: 'Disable non-allied units & turrets in a zone for 8s. Hitting neutrals angers them.' },
   hijack: { name: 'System Hijack', cost: 600, cd: 90, key: 'H', desc: 'Seize one enemy unit permanently. A hostile act against neutrals.' },
+  nuke: { name: 'Ballistic Missile', cost: 2000, cd: 150, key: 'N', desc: 'Long-range nuclear strike — a devastating area blast at the target after a short flight. Needs a Cyber Ops Center.' },
 };
 
 export interface CovertDef { name: string; cost: number; cd: number; chance: number; desc: string; }

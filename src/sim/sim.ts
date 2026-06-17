@@ -27,7 +27,8 @@ let lastHintT = 0;
 let crystalT = 55;   // first new formation seeds ~55s in
 let autoScout = false;   // when on, idle Recon Drones auto-reveal the map (scouts-only auto-explore)
 let autoScoutT = 0;      // throttle accumulator for auto-scout order assignment
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; }
+let pendingStrikes: { x: number; y: number; at: number }[] = [];   // in-flight ballistic missiles → detonate when game.t >= at
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; pendingStrikes = []; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -852,8 +853,35 @@ export function castAbility(key: string, wx: number, wy: number) {
     game.parts.push({ type: 'emp', x: best.x, y: best.y, t: 0, life: 0.8 });
     sfx('emp', best.x);
     logMsg(U[best.type].name + ' hijacked — it\'s ours now', 'hot');
+  } else if (key === 'nuke') {
+    game.money[PLAYER] -= a.cost; game.cooldowns.nuke = a.cd * (styleMod(PLAYER).cdMul ?? 1);
+    pendingStrikes.push({ x: wx, y: wy, at: game.t + NUKE_TRAVEL });
+    sfx('rail', wx);
+    logMsg('☢ Ballistic missile launched — impact in ' + NUKE_TRAVEL + 's', 'war');
   }
   game.armed = null;
+}
+const NUKE_TRAVEL = 4;     // seconds from launch to impact
+const NUKE_R = 150;        // blast radius (px)
+function detonateNuke(x: number, y: number) {
+  const hitFac: Record<number, number> = {};
+  for (const u of [...game.units]) { const d = dist(u, { x, y }); if (d < NUKE_R) { if (!isAllied(PLAYER, u.team)) hitFac[u.team] = 1; damage(u, 1100 * (1 - d / NUKE_R) + 120, 0); } }
+  for (const b of [...game.buildings]) { const d = dist(b, { x, y }); if (d < NUKE_R) { if (!isAllied(PLAYER, b.team)) hitFac[b.team] = 1; damage(b, 1600 * (1 - d / NUKE_R) + 260, 0); } }
+  for (const f in hitFac) if (!isWar(PLAYER, +f)) addRel(PLAYER, +f, -20);
+  spawnParts('fire', x, y, 64, '255,170,70'); spawnParts('smoke', x, y, 44, '80,80,86'); spawnParts('debris', x, y, 30, '120,120,128');
+  game.parts.push({ type: 'ring', x, y, t: 0, life: 1.3, big: true });
+  game.parts.push({ type: 'flash', x, y, t: 0, life: 0.35, big: true });
+  scorchHook(x, y, NUKE_R * 0.7);
+  game.shake = Math.min(22, game.shake + 18);
+  sfx('bigboom', x);
+  logMsg('☢ Missile detonation', 'war');
+}
+function processStrikes() {
+  if (!pendingStrikes.length) return;
+  const due = pendingStrikes.filter(s => s.at <= game.t);
+  if (!due.length) return;
+  pendingStrikes = pendingStrikes.filter(s => s.at > game.t);
+  for (const s of due) detonateNuke(s.x, s.y);
 }
 export function runCovert(key: string) {
   if (game.over) return;
@@ -1274,6 +1302,7 @@ export function stepWorld(dt: number) {
   relayTick(dt);
   governmentTick(dt);
   autoScoutTick(dt);
+  processStrikes();
   computeVision();
   checkEnd();
 }
