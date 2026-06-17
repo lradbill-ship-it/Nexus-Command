@@ -178,13 +178,13 @@ export function generateMap() {
     for (const f of ALL_TEAMS) { const bi = BASE_INFO[f]; if (Math.hypot(tx - bi.tx, ty - bi.ty) < 16) return false; }
     return true;
   };
-  for (let n = 0, tries = 0; n < 7 && tries < 400; tries++) {
+  for (let n = 0, tries = 0; n < 14 && tries < 700; tries++) {
     const tx = 8 + (Math.random() * (MAPW - 16) | 0), ty = 8 + (Math.random() * (MAPH - 16) | 0);
     if (!tPassable(tx, ty) || !farFromBases(tx, ty)) continue;
-    if (game.settlements.some(s => Math.hypot(s.x / TILE - tx, s.y / TILE - ty) < 12)) continue;
+    if (game.settlements.some(s => Math.hypot(s.x / TILE - tx, s.y / TILE - ty) < 9)) continue;
     game.settlements.push({
       id: sid++, x: tx * TILE + 16, y: ty * TILE + 16,
-      pop: 10 + (Math.random() * 16 | 0), owner: 0, capBy: 0, capT: 0, seed: Math.random(),
+      pop: 14 + (Math.random() * 20 | 0), owner: 0, capBy: 0, capT: 0, seed: Math.random(),
     });
     n++;
   }
