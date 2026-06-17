@@ -4,7 +4,7 @@ import {
   idx, clamp, dist,
 } from '../sim/constants';
 import { game, resetState, isAllied } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, scorch, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import { buildAllTextures, originOf } from '../render/textures';
@@ -178,6 +178,7 @@ export class BattleScene extends Phaser.Scene {
       else if (k === 'm') toggleMute();
       else if (k === 't') { if (game.selection.some(s => s.kind === 'u')) game.armed = 'amove'; }
       else if (k === 'c') conscript(PLAYER);
+      else if (k === 'delete' || k === 'backspace') { e.preventDefault(); sellSelected(); }
       else if (k >= '1' && k <= '9') this.controlGroup(+k, e.ctrlKey || e.metaKey, e.shiftKey);
     });
   }
