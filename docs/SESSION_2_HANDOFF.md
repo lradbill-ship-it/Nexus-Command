@@ -129,14 +129,17 @@ The sim is engine‑independent and **never touches the DOM/renderer** — it ta
 
 ## 6. Pending work (start here in Session 2)
 
-**Immediately pending — promised to Lane, not yet built (from his last batch):**
+**✅ DONE in Session 2 (commit `97b311a`, on `main` + live) — the wood logistics loop:**
 
-1. **Repair units** — mobile rigs that heal friendly **units and buildings**. Plan: a new unit (e.g. `repair`) with no weapon; reuse the **guard order** (a repair rig "guarding" a unit follows + heals it) + auto‑seek the nearest damaged friendly when idle; heal HP/sec, cost a resource. Add `repair?:boolean` to `UnitDef`, a behavior branch in `updateUnit`, a `nearestDamagedFriendly` helper, sprite + icon.
-2. **Wood / tree‑clearing + a novel wood use** — a **Logger** unit that harvests & **clears forest tiles** (`T_FOREST` → passable, which also opens new routes) for a new **wood** resource. **Planned novel use: wood is the field‑repair material** that fuels the repair rigs above (clear forests → wood → repairs) — ties the two asks into one logistics loop. (Alt ideas Lane floated: palisade walls, faster construction. Confirm with Lane before building.)
+1. ✅ **Repair Rigs** — `U.repair` (`repair:true`, no weapon). Heals friendly **units AND buildings**, burning wood. Reuses the **guard order** (right‑click a friendly with a rig selected → escort + heal it) and **auto‑seeks the nearest wounded friendly when idle** (`nearestDamagedFriendly`, seek radius `REPAIR_SEEK` 360px). `updateRepair`/`healEntity` in sim. Tuning: `REPAIR_RATE` 34 hp/s, `WOOD_PER_HP` 0.05, `REPAIR_RANGE` 42px.
+2. ✅ **Wood / tree‑clearing** — `U.logger` (`logs:true`, cargo 150) fells & **clears forest tiles** (`T_FOREST` → passable grass, which **opens new routes**) for the new **WOOD** resource. Delivers to a new **Lumber Mill** (`B.mill`, `accepts:'wood'`, free Logger on build) or the HQ. `updateLogger`/`nearestForest`/`clearForest` in sim; renderer surgically repaints cleared tiles (`clearForestAt` in `terrain.ts`, wired via `setClearForestHook`) + re‑bakes surviving neighbour trees. Tuning: `CHOP_TIME` 2.6s/tile, `WOOD_PER_TILE` 50. **The loop:** clear forests → wood → field repairs (the novel use Lane wanted).
+3. ✅ **`isSupport(type)`** unifies the non‑combat checks (harvester/logger/repair): no desertion in a revolt, count as civilians at settlements, never take attack orders. WOOD topbar readout (`🪵`, `#9ec24f`) + green logger cargo bar.
+   - **⚠️ Compile‑verified only — needs Lane's playtest** (per §7 the headless preview can't run the sim/render). Confirm: loggers find & fell forest and the cleared tile turns to passable grass on screen; wood accrues; Repair Rigs follow (guard) + heal and burn wood; idle rigs seek the wounded; the WOOD/cargo HUD reads right.
+   - **AI is unchanged** — wood/repair is **player‑only** for now. A follow‑up could give the AI loggers/repair for parity (would need mill in `AI_SCRIPT` + logger/repair picks in `aiUpdate`).
 
 **Big remaining roadmap item:**
 
-3. **#9 Naval / oceans** — the last item from Lane's original 10. Add ocean terrain on the big maps + sea units for **combat, transport, and harvesting (oil + fish as sea resources)**. Depends on the 3× maps (done). This is a large, multi‑part feature — scope it with Lane.
+4. **#9 Naval / oceans** — the last item from Lane's original 10. Add ocean terrain on the big maps + sea units for **combat, transport, and harvesting (oil + fish as sea resources)**. Depends on the 3× maps (done). This is a large, multi‑part feature — scope it with Lane.
 
 **Continuous:**
 
