@@ -150,7 +150,7 @@
   .facList{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 14px;}
   .facCard{border:1px solid #3a414d;border-left-width:3px;padding:8px 10px;font-size:10.8px;line-height:1.55;background:rgba(0,0,0,.25);}
   .facCard b{display:block;letter-spacing:.1em;}
-  .panelBox .go{display:block;width:100%;margin-top:8px;border:1px solid #1a1d14;cursor:pointer;
+  .panelBox .go{display:block;width:100%;margin-top:8px;border:1px solid #1a1d14;cursor:pointer;position:sticky;bottom:0;z-index:1;
     background:linear-gradient(180deg,#f0c25e,#b9893a);color:#1c1606;
     font:inherit;font-weight:700;letter-spacing:.18em;font-size:13px;padding:13px;border-radius:3px;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 2px 6px rgba(0,0,0,.5);}
@@ -162,11 +162,22 @@
     #sidebar { width: 168px; }
     #topbar { gap: 8px; font-size: 10px; padding: 0 8px; }
     .frame { margin: 5px 5px 0; padding: 3px; }
+    #minimap { width: 108px; height: 108px; }            /* free vertical space so the feed isn't clipped */
+    #selInfo { min-height: 26px; padding: 4px 6px; font-size: 10px; }
     .tabRow button { font-size: 8px; padding: 6px 0; letter-spacing: .06em; }
     button.cmd .lbl { font-size: 7px; }
     button.cmd .cost { font-size: 7px; }
     .btnGrid { gap: 3px; }
     #restartBtn { font-size: 8px; padding: 5px 8px; }
+    #log { min-height: 48px; max-height: 76px; font-size: 9px; }
+    /* compact the intro so DEPLOY is reachable */
+    .overlay { position: fixed; }                        /* full-screen intro on a phone, not just the game-area column */
+    .panelBox { padding: 16px 14px; }
+    .panelBox h1 { font-size: 19px; letter-spacing: .16em; }
+    .panelBox h2 { font-size: 9.5px; margin: 3px 0 10px; }
+    .panelBox p, .panelBox li, .facCard { font-size: 10px; line-height: 1.5; }
+    .facList, .leaderPick { grid-template-columns: 1fr; gap: 6px; margin: 8px 0; }
+    .panelBox .go { font-size: 12px; padding: 12px; }
   }
 </style>
   <script type="module" crossorigin>var ys=Object.defineProperty;var Ts=(F,V,D)=>V in F?ys(F,V,{enumerable:!0,configurable:!0,writable:!0,value:D}):F[V]=D;var Nt=(F,V,D)=>Ts(F,typeof V!="symbol"?V+"":V,D);(function(){const V=document.createElement("link").relList;if(V&&V.supports&&V.supports("modulepreload"))return;for(const U of document.querySelectorAll('link[rel="modulepreload"]'))I(U);new MutationObserver(U=>{for(const H of U)if(H.type==="childList")for(const p of H.addedNodes)p.tagName==="LINK"&&p.rel==="modulepreload"&&I(p)}).observe(document,{childList:!0,subtree:!0});function D(U){const H={};return U.integrity&&(H.integrity=U.integrity),U.referrerPolicy&&(H.referrerPolicy=U.referrerPolicy),U.crossOrigin==="use-credentials"?H.credentials="include":U.crossOrigin==="anonymous"?H.credentials="omit":H.credentials="same-origin",H}function I(U){if(U.ep)return;U.ep=!0;const H=D(U);fetch(U.href,H)}})();var Ss=typeof globalThis<"u"?globalThis:typeof window<"u"?window:typeof global<"u"?global:typeof self<"u"?self:{};function Cs(F){return F&&F.__esModule&&Object.prototype.hasOwnProperty.call(F,"default")?F.default:F}var Ni={exports:{}};(function(F,V){(function(I,U){F.exports=U()})(Ss,()=>(()=>{var D={50792:p=>{var y=Object.prototype.hasOwnProperty,t="~";function u(){}Object.create&&(u.prototype=Object.create(null),new u().__proto__||(t=!1));function c(e,s,o){this.fn=e,this.context=s,this.once=o||!1}function a(e,s,o,i,h){if(typeof o!="function")throw new TypeError("The listener must be a function");var l=new c(o,i||e,h),d=t?t+s:s;return e._events[d]?e._events[d].fn?e._events[d]=[e._events[d],l]:e._events[d].push(l):(e._events[d]=l,e._eventsCount++),e}function r(e,s){--e._eventsCount===0?e._events=new u:delete e._events[s]}function n(){this._events=new u,this._eventsCount=0}n.prototype.eventNames=function(){var s=[],o,i;if(this._eventsCount===0)return s;for(i in o=this._events)y.call(o,i)&&s.push(t?i.slice(1):i);return Object.getOwnPropertySymbols?s.concat(Object.getOwnPropertySymbols(o)):s},n.prototype.listeners=function(s){var o=t?t+s:s,i=this._events[o];if(!i)return[];if(i.fn)return[i.fn];for(var h=0,l=i.length,d=new Array(l);h<l;h++)d[h]=i[h].fn;return d},n.prototype.listenerCount=function(s){var o=t?t+s:s,i=this._events[o];return i?i.fn?1:i.length:0},n.prototype.emit=function(s,o,i,h,l,d){var f=t?t+s:s;if(!this._events[f])return!1;var v=this._events[f],m=arguments.length,x,g;if(v.fn){switch(v.once&&this.removeListener(s,v.fn,void 0,!0),m){case 1:return v.fn.call(v.context),!0;case 2:return v.fn.call(v.context,o),!0;case 3:return v.fn.call(v.context,o,i),!0;case 4:return v.fn.call(v.context,o,i,h),!0;case 5:return v.fn.call(v.context,o,i,h,l),!0;case 6:return v.fn.call(v.context,o,i,h,l,d),!0}for(g=1,x=new Array(m-1);g<m;g++)x[g-1]=arguments[g];v.fn.apply(v.context,x)}else{var T=v.length,S;for(g=0;g<T;g++)switch(v[g].once&&this.removeListener(s,v[g].fn,void 0,!0),m){case 1:v[g].fn.call(v[g].context);break;case 2:v[g].fn.call(v[g].context,o);break;case 3:v[g].fn.call(v[g].context,o,i);break;case 4:v[g].fn.call(v[g].context,o,i,h);break;default:if(!x)for(S=1,x=new Array(m-1);S<m;S++)x[S-1]=arguments[S];v[g].fn.apply(v[g].context,x)}}return!0},n.prototype.on=function(s,o,i){return a(this,s,o,i,!1)},n.prototype.once=function(s,o,i){return a(this,s,o,i,!0)},n.prototype.removeListener=function(s,o,i,h){var l=t?t+s:s;if(!this._events[l])return this;if(!o)return r(this,l),this;var d=this._events[l];if(d.fn)d.fn===o&&(!h||d.once)&&(!i||d.context===i)&&r(this,l);else{for(var f=0,v=[],m=d.length;f<m;f++)(d[f].fn!==o||h&&!d[f].once||i&&d[f].context!==i)&&v.push(d[f]);v.length?this._events[l]=v.length===1?v[0]:v:r(this,l)}return this},n.prototype.removeAllListeners=function(s){var o;return s?(o=t?t+s:s,this._events[o]&&r(this,o)):(this._events=new u,this._eventsCount=0),this},n.prototype.off=n.prototype.removeListener,n.prototype.addListener=n.prototype.on,n.prefixed=t,n.EventEmitter=n,p.exports=n},11517:(p,y,t)=>{/**
