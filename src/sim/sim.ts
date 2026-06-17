@@ -565,13 +565,19 @@ function followPath(u: Unit, dt: number) {
   const moved = Math.hypot(u.x - u.lx, u.y - u.ly);
   if (moved < U[u.type].speed * dt * 0.25) u.stuckT += dt; else u.stuckT = 0;
   u.lx = u.x; u.ly = u.y;
-  if (u.stuckT > 1.0 && u.finalDest) {
+  if (u.stuckT > 0.8 && u.finalDest) {
     u.stuckT = 0;
     const n = (u.unstick || 0) + 1; u.unstick = n;
-    if (n > 2) {
-      // wedged repeatedly → physically dislodge to a nearby open tile, then re-path
-      const np = nearestPassableTile((u.x / TILE | 0) + ((Math.random() * 3 | 0) - 1), (u.y / TILE | 0) + ((Math.random() * 3 | 0) - 1));
-      if (np) { u.x = np[0] * TILE + 16; u.y = np[1] * TILE + 16; }
+    if (n >= 2) {
+      // wedged → hop toward the next waypoint onto open ground (get past the obstacle), then re-path
+      const aim = (u.path && u.path[0]) ? u.path[0] : u.finalDest;
+      const ang = Math.atan2(aim.y - u.y, aim.x - u.x);
+      let placed = false;
+      for (const hop of [2.2, 1.4, 3.2, 0.8]) {
+        const np = nearestPassableTile((u.x + Math.cos(ang) * hop * TILE) / TILE | 0, (u.y + Math.sin(ang) * hop * TILE) / TILE | 0);
+        if (np) { u.x = np[0] * TILE + 16; u.y = np[1] * TILE + 16; placed = true; break; }
+      }
+      if (!placed) { const np = nearestPassableTile(u.x / TILE | 0, u.y / TILE | 0); if (np) { u.x = np[0] * TILE + 16; u.y = np[1] * TILE + 16; } }
       u.unstick = 0;
     }
     setPath(u, u.finalDest.x, u.finalDest.y);

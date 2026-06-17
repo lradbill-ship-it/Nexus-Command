@@ -136,7 +136,7 @@ export const U: Record<string, UnitDef> = {
   harvester: { name: 'Crystal Harvester', cost: 400, hp: 310, speed: 74, radius: 11, sight: 5, buildTime: 10, cargo: 200, harvests: 'crystal', desc: 'Gathers data crystals. Your economy.' },
   tanker: { name: 'Coolant Tanker', cost: 450, hp: 300, speed: 70, radius: 11, sight: 5, buildTime: 11, cargo: 180, harvests: 'coolant', desc: 'Draws coolant from wells to a Coolant Refinery.' },
   hauler: { name: 'Alloy Hauler', cost: 450, hp: 320, speed: 68, radius: 11, sight: 5, buildTime: 11, cargo: 170, harvests: 'alloy', desc: 'Hauls alloy ore to a Smelter. Alloy builds advanced units.' },
-  recon: { name: 'Recon Drone', cost: 150, hp: 78, speed: 140, radius: 8, sight: 9, buildTime: 6, dmg: 4, range: 96, rof: 0.4, desc: 'Fast scout quadcopter.' },
+  recon: { name: 'Recon Drone', cost: 150, hp: 78, speed: 140, radius: 8, sight: 9, buildTime: 6, dmg: 4, range: 96, rof: 0.4, air: true, desc: 'Fast scout quadcopter — flies over terrain; only AA can hit it.' },
   infantry: { name: 'Rifle Trooper', cost: 90, hp: 70, speed: 70, radius: 7, sight: 6, buildTime: 4, dmg: 5, range: 98, rof: 0.5, infantry: true, desc: 'Cheap massable foot soldier.' },
   rocket: { name: 'Rocket Trooper', cost: 180, hp: 90, speed: 62, radius: 7, sight: 7, buildTime: 7, dmg: 17, range: 152, rof: 1.5, antiAir: true, infantry: true, desc: 'Anti-armor & anti-air infantry.' },
   strike: { name: 'Hover Tank', cost: 300, hp: 155, speed: 96, radius: 10, sight: 7, buildTime: 9, dmg: 11, range: 124, rof: 0.8, desc: 'Backbone main battle tank.' },
