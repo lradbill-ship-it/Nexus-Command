@@ -362,8 +362,15 @@ function relayTick(dt: number) {
     const challengers = Object.keys(present).map(Number).filter(t => t !== r.owner);
     if (challengers.length === 1) {
       const team = challengers[0];
-      r.capBy = team; r.capT += dt / 7;
-      if (r.capT >= 1) captureRelay(r, team);
+      // a NEUTRAL relay is taken by presence; once OWNED it must be taken by force — the
+      // challenger has to be at war with the owner (so seizing a friend's relay means turning on them first)
+      if (r.owner && !isWar(team, r.owner)) {
+        r.capT = Math.max(0, r.capT - dt / 10);
+        if (team === PLAYER && game.t % 3 < dt) hint("That relay is " + FAC[r.owner].name + "'s — you must be at war to seize it");
+      } else {
+        r.capBy = team; r.capT += dt / 7;
+        if (r.capT >= 1) captureRelay(r, team);
+      }
     } else if (Object.keys(present).length === 0) {
       r.capT = Math.max(0, r.capT - dt / 12); if (r.capT === 0) r.capBy = 0;
     } else {
