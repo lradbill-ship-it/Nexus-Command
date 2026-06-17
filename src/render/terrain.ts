@@ -207,6 +207,20 @@ export function clearForestAt(tx: number, ty: number) {
   dirty = true;
 }
 
+/** A drained water tile dried to dirt — repaint it (passable) with a damp residue ring. */
+export function dryWaterAt(tx: number, ty: number) {
+  const px = tx * TILE, py = ty * TILE, v = Math.random();
+  tg.fillStyle = shade([97 + v * 20, 80 + v * 16, 55 + v * 10], 0.9 + v * 0.2);   // dirt, matching T_DIRT
+  tg.fillRect(px, py, TILE, TILE);
+  for (let i = 0; i < 12; i++) {
+    const x = px + Math.random() * TILE, y = py + Math.random() * TILE;
+    tg.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,.12)' : 'rgba(255,235,200,.06)';
+    tg.beginPath(); tg.arc(x, y, 1 + Math.random() * 2.5, 0, 7); tg.fill();
+  }
+  tg.strokeStyle = 'rgba(60,92,104,.32)'; tg.lineWidth = 2; tg.strokeRect(px + 3, py + 3, TILE - 6, TILE - 6);   // damp shoreline residue
+  dirty = true;
+}
+
 /** Burn a scorch mark into the terrain at a world position (called from sim on destroy). */
 export function scorch(x: number, y: number, r: number) {
   tg.fillStyle = 'rgba(8,6,4,.5)';

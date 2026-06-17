@@ -1,6 +1,6 @@
 import {
   TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, AIS, ALL_TEAMS, FAC, B, U, ABILITIES, COVERT,
-  BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD, T_FOREST, STYLES,
+  BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD, T_FOREST, T_WATER, STYLES,
   RELAY_INCOME, RELAY_HP,
   idx, inMap, clamp, dist,
 } from './constants';
@@ -20,6 +20,8 @@ let endHook: (win: boolean) => void = () => {};
 export function setEndHook(fn: (win: boolean) => void) { endHook = fn; }
 let clearForestHook: (tx: number, ty: number) => void = () => {};
 export function setClearForestHook(fn: (tx: number, ty: number) => void) { clearForestHook = fn; }
+let dryWaterHook: (tx: number, ty: number) => void = () => {};
+export function setDryWaterHook(fn: (tx: number, ty: number) => void) { dryWaterHook = fn; }
 
 // Transient module locals — reset on each new match.
 let nextId = 1;
@@ -456,7 +458,8 @@ function rofMult(e: Entity) { return defOf(e).coolant && game.overheat[e.team] ?
 
 function fireAt(src: Entity, target: Entity, dmg: number, rail: boolean, splash = 0) {
   dmg = dmg * (styleMod(src.team).combat ?? 1);          // Militarist hits harder, Mercantile/Populist softer
-  game.shots.push({ x: src.x, y: src.y, target, dmg, team: src.team, speed: rail ? 940 : 560, col: FAC[src.team].col, rail, splash });
+  const subsurface = src.kind === 'u' && !!U[(src as Unit).type].tunneler;
+  game.shots.push({ x: src.x, y: src.y, target, dmg, team: src.team, speed: rail ? 940 : 560, col: FAC[src.team].col, rail, splash, subsurface });
   src.lastShot = game.t;
   spawnParts('muzzle', src.x, src.y, 2, '255,235,180');
   sfx(rail ? 'rail' : 'shot', src.x);
@@ -653,6 +656,39 @@ function nearestNodePathable(u: Unit) {
   }
   return null;
 }
+// ── Coolant from water features (requires a Water Tower) ──────────────────────
+export function hasWaterTower(team: number) { return game.buildings.some(b => b.team === team && b.type === 'watertower' && b.progress >= 1); }
+/** Nearest drainable water tile (with a passable approach the tanker can reach) — mirrors the Logger's forest scan. */
+function nearestWaterTile(u: Unit): { tx: number; ty: number; approach: Vec; path: Vec[]; d: number } | null {
+  const utx = u.x / TILE | 0, uty = u.y / TILE | 0, R = 40;
+  const cand: { tx: number; ty: number; d: number }[] = [];
+  for (let ty = Math.max(1, uty - R); ty <= Math.min(MAPH - 2, uty + R); ty++)
+    for (let tx = Math.max(1, utx - R); tx <= Math.min(MAPW - 2, utx + R); tx++) {
+      if (game.terr[idx(tx, ty)] !== T_WATER || game.waterAmt[idx(tx, ty)] <= 0) continue;
+      if (!(passable(tx + 1, ty) || passable(tx - 1, ty) || passable(tx, ty + 1) || passable(tx, ty - 1))) continue;
+      cand.push({ tx, ty, d: (tx - utx) * (tx - utx) + (ty - uty) * (ty - uty) });
+    }
+  cand.sort((a, b) => a.d - b.d);
+  for (let i = 0; i < Math.min(6, cand.length); i++) {
+    const { tx, ty } = cand[i];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      if (!passable(tx + dx, ty + dy)) continue;
+      const ax = (tx + dx) * TILE + 16, ay = (ty + dy) * TILE + 16;
+      const p = findPath(u.x, u.y, ax, ay);
+      if (p) return { tx, ty, approach: { x: ax, y: ay }, path: p, d: Math.hypot((tx + 0.5) * TILE - u.x, (ty + 0.5) * TILE - u.y) };
+    }
+  }
+  return null;
+}
+/** A water tile, drained dry, becomes passable dirt — opening new crossings. */
+function dryWater(tx: number, ty: number) {
+  if (game.terr[idx(tx, ty)] !== T_WATER) return;
+  game.terr[idx(tx, ty)] = T_DIRT;
+  game.waterAmt[idx(tx, ty)] = 0;
+  game.waterTiles = game.waterTiles.filter(w => !(w.x === tx && w.y === ty));
+  spawnParts('steam', tx * TILE + 16, ty * TILE + 16, 3, '170,210,225');
+  dryWaterHook(tx, ty);
+}
 /** Nearest field of the right kind by straight distance, ignoring whether a surface route exists (for tunnelling). */
 function nearestNodeAny(u: Unit): ResourceNode | null {
   const kind = resOf(u);
@@ -677,9 +713,12 @@ function updateHarvester(u: Unit, dt: number) {
   const cap = U[u.type].cargo!;
   const kind = resOf(u);
   if (u.hState === 'find') {
-    u.tunnelT = 0;                                          // surface when planning a fresh leg
+    u.tunnelT = 0; u.chopTx = undefined; u.hNode = null;    // surface & clear last leg's target
     const got = nearestNodePathable(u);
-    if (got) { u.hNode = got.node; u.path = got.path; u.finalDest = { x: got.node.x, y: got.node.y }; u.hState = 'go'; }
+    const water = (kind === 'coolant' && hasWaterTower(u.team)) ? nearestWaterTile(u) : null;   // tankers tap water once a tower's up
+    const nodeD = got ? Math.hypot(got.node.x - u.x, got.node.y - u.y) : Infinity;
+    if (water && water.d <= nodeD) { u.chopTx = water.tx; u.chopTy = water.ty; u.path = water.path; u.finalDest = { ...water.approach }; u.hState = 'go'; }
+    else if (got) { u.hNode = got.node; u.path = got.path; u.finalDest = { x: got.node.x, y: got.node.y }; u.hState = 'go'; }
     else {
       const n = nearestNodeAny(u);                          // no surface route to any field → burrow straight to the nearest
       if (n) { u.hNode = n; u.finalDest = { x: n.x, y: n.y }; u.path = [{ x: n.x, y: n.y }]; u.tunnelT = 0.001; u.hState = 'go'; }
@@ -688,20 +727,35 @@ function updateHarvester(u: Unit, dt: number) {
   }
   if (u.hState === 'idlewait') { if (game.t % 2 < dt) u.hState = 'find'; u.moving = false; return; }
   if (u.hState === 'go') {
-    if (!u.hNode || u.hNode.amount <= 0) { u.hState = 'find'; return; }
-    if (dist(u, u.hNode) < 28) { u.hState = 'mine'; u.path = null; u.tunnelT = 0; }   // surfaced at the field
-    else followPath(u, dt);
+    if (u.chopTx !== undefined) {                            // heading to a water tile
+      if (game.waterAmt[idx(u.chopTx, u.chopTy!)] <= 0) { u.hState = 'find'; return; }
+      const wx = u.chopTx * TILE + 16, wy = u.chopTy! * TILE + 16;
+      if (dist(u, { x: wx, y: wy }) < TILE * 1.4) { u.hState = 'mine'; u.path = null; u.facing = Math.atan2(wy - u.y, wx - u.x); }
+      else followPath(u, dt);
+    } else {
+      if (!u.hNode || u.hNode.amount <= 0) { u.hState = 'find'; return; }
+      if (dist(u, u.hNode) < 28) { u.hState = 'mine'; u.path = null; u.tunnelT = 0; }   // surfaced at the field
+      else followPath(u, dt);
+    }
   } else if (u.hState === 'mine') {
     u.moving = false;
+    const toDepot = () => { u.hState = 'return'; const dep = nearestDepot(u); if (dep) setPath(u, dep.x, dep.y + dep.h / 2 + 14); };
+    if (u.chopTx !== undefined) {                            // draining a water feature → coolant
+      const i = idx(u.chopTx, u.chopTy!);
+      if (game.waterAmt[i] <= 0) { dryWater(u.chopTx, u.chopTy!); u.chopTx = undefined; if (u.cargo > 0) toDepot(); else u.hState = 'find'; return; }
+      const take = Math.min(62 * laborFactor(u.team) * dt, game.waterAmt[i], cap - u.cargo);
+      game.waterAmt[i] -= take; u.cargo += take;
+      if (Math.random() < dt * 6) spawnParts('spark', u.chopTx * TILE + 16, u.chopTy! * TILE + 12, 1, '150,220,235');
+      if (game.waterAmt[i] <= 0) { dryWater(u.chopTx, u.chopTy!); u.chopTx = undefined; }
+      if (u.cargo >= cap - 0.5) { u.chopTx = undefined; toDepot(); }
+      else if (u.chopTx === undefined) u.hState = 'find';
+      return;
+    }
     if (!u.hNode || u.hNode.amount <= 0) { u.hState = 'find'; return; }
     const take = Math.min(62 * laborFactor(u.team) * dt, u.hNode.amount, cap - u.cargo);
     u.hNode.amount -= take; u.cargo += take;
     if (Math.random() < dt * 6) spawnParts('spark', u.hNode.x, u.hNode.y - 4, 1, kind === 'crystal' ? '255,220,120' : '150,220,235');
-    if (u.cargo >= cap - 0.5) {
-      u.hState = 'return';
-      const dep = nearestDepot(u);
-      if (dep) setPath(u, dep.x, dep.y + dep.h / 2 + 14);
-    }
+    if (u.cargo >= cap - 0.5) toDepot();
   } else if (u.hState === 'return') {
     const dep = nearestDepot(u);
     if (!dep) { u.hState = 'idlewait'; return; }
@@ -893,7 +947,8 @@ function updateUnit(u: Unit, dt: number) {
     updateLogger(u, dt); return;
   }
   if (U[u.type].repair) { updateRepair(u, dt); return; }
-  if (u.target && u.target.dead) u.target = null;
+  // drop a target that's dead — or that dived underground (only a tunneler can keep hitting it)
+  if (u.target && (u.target.dead || (u.target.kind === 'u' && ((u.target as Unit).tunnelT ?? 0) > 0 && !U[u.type].tunneler))) u.target = null;
   if (u.order === 'guard') {
     const g = u.guard;
     if (!g || g.dead) { u.order = 'idle'; u.guard = null; u.path = null; }
@@ -981,7 +1036,7 @@ function updateBuilding(b: Building, dt: number) {
   if (b.disabledUntil > game.t) return;
   if (b.type === 'turret' || b.type === 'aaturret') {
     b.cooldown = Math.max(0, b.cooldown - dt);
-    if (b.target && (b.target.dead || dist(b, b.target) > d.range! + 30 || !eligibleTarget(b, b.target))) b.target = null;
+    if (b.target && (b.target.dead || dist(b, b.target) > d.range! + 30 || !eligibleTarget(b, b.target) || (b.target.kind === 'u' && ((b.target as Unit).tunnelT ?? 0) > 0))) b.target = null;   // turrets can't hit the underground
     if (!b.target) b.target = nearestHostile(b, d.range!, b.team, b.team === PLAYER);
     if (b.target) {
       const want = Math.atan2(b.target.y - b.y, b.target.x - b.x);
@@ -1037,6 +1092,7 @@ function updateShots(dt: number) {
         // area blast: falls off with distance, never friendly-fires the shooter's team
         for (const u of [...game.units]) {
           if (u.dead || u === s.target || isAllied(s.team, u.team)) continue;
+          if ((u.tunnelT ?? 0) > 0 && !s.subsurface) continue;        // underground units are shielded from surface blasts
           const dd = dist(u, { x: hx, y: hy });
           if (dd < s.splash) damage(u, s.dmg * (1 - dd / s.splash) * 0.7, s.team);
         }

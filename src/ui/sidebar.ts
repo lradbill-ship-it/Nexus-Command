@@ -12,7 +12,7 @@ import {
 let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
 
-const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'cyber', 'drillbay'];
+const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'cyber', 'drillbay'];
 const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'borer'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
@@ -27,6 +27,7 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'foundry') { g.fillRect(9, 6, 22, 14); g.strokeRect(9, 6, 22, 14); g.fillStyle = '#0a0f15'; g.fillRect(14, 12, 12, 8); }
     else if (type === 'turret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 9, cy - 5); g.stroke(); }
     else if (type === 'pump') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(127,214,234,.5)'; g.fill(); g.strokeStyle = '#7fd6ea'; g.stroke(); g.beginPath(); g.arc(cx, cy, 4, 0, 7); g.stroke(); }
+    else if (type === 'watertower') { g.fillStyle = 'rgba(127,214,234,.55)'; g.beginPath(); g.arc(cx, cy - 2, 6, 0, 7); g.fill(); g.strokeStyle = '#7fd6ea'; g.lineWidth = 1.4; g.stroke(); g.strokeStyle = '#9fb3c2'; g.beginPath(); g.moveTo(15, 21); g.lineTo(17, 8); g.moveTo(25, 21); g.lineTo(23, 8); g.stroke(); }
     else if (type === 'smelter') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(224,161,85,.55)'; g.fill(); g.strokeStyle = '#e0a155'; g.stroke(); g.fillStyle = '#2a2018'; g.fillRect(cx + 5, cy - 9, 3, 7); }
     else if (type === 'mill') { g.fillStyle = '#3a4f63'; g.fillRect(12, 11, 16, 9); g.strokeRect(12, 11, 16, 9); g.fillStyle = '#9c7338'; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(15 + i * 5, 16, 2.3, 0, 7); g.fill(); } g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.4; g.beginPath(); g.arc(24, 9, 4, 0, 7); g.stroke(); }
     else if (type === 'habitat') { g.fillStyle = '#3a4f63'; g.fillRect(13, 11, 14, 9); g.strokeRect(13, 11, 14, 9); g.fillStyle = '#9fd9cc'; g.beginPath(); g.moveTo(12, 11); g.lineTo(20, 5); g.lineTo(28, 11); g.closePath(); g.stroke(); g.fillStyle = '#69d84f'; g.fillRect(18, 15, 4, 5); }

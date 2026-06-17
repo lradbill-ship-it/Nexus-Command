@@ -182,6 +182,16 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     g.strokeStyle = '#7fd6ea'; g.lineWidth = 1.5;
     for (let rr2 = 5; rr2 < fw * 0.3; rr2 += 4) { g.beginPath(); g.arc(rcx, rcy, rr2, 0, 7); g.stroke(); }
     g.fillStyle = '#3a4650'; g.fillRect(rcx - 3, rcy - fh * 0.42, 6, fh * 0.3);  // intake pipe
+  } else if (type === 'watertower') {
+    // elevated spherical water tank on a lattice
+    g.strokeStyle = '#8aa0b0'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(rcx - fw * 0.2, rcy + fh * 0.34); g.lineTo(rcx - fw * 0.08, rcy - fh * 0.02);
+    g.moveTo(rcx + fw * 0.2, rcy + fh * 0.34); g.lineTo(rcx + fw * 0.08, rcy - fh * 0.02); g.stroke();   // legs
+    g.beginPath(); g.moveTo(rcx - fw * 0.16, rcy + fh * 0.16); g.lineTo(rcx + fw * 0.16, rcy + fh * 0.16); g.stroke();   // cross-brace
+    const wg = g.createRadialGradient(rcx - 2, rcy - fh * 0.12, 2, rcx, rcy - fh * 0.08, fw * 0.26);
+    wg.addColorStop(0, 'rgba(170,230,245,.95)'); wg.addColorStop(1, 'rgba(40,110,140,.75)');
+    g.fillStyle = wg; g.beginPath(); g.arc(rcx, rcy - fh * 0.08, fw * 0.24, 0, 7); g.fill();
+    g.strokeStyle = col; g.lineWidth = 1.6; g.beginPath(); g.arc(rcx, rcy - fh * 0.08, fw * 0.24, 0, 7); g.stroke();
   } else if (type === 'smelter') {
     // alloy smelter: glowing crucible + chimney
     const cr = g.createRadialGradient(rcx, rcy, 1, rcx, rcy, fw * 0.3);

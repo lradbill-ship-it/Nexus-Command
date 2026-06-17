@@ -133,7 +133,7 @@ export function generateMap() {
   for (let i = 0; i < MAPW; i++) { T[idx(i, 0)] = T_ROCK; T[idx(i, 1)] = T_ROCK; T[idx(i, MAPH - 1)] = T_ROCK; T[idx(i, MAPH - 2)] = T_ROCK; }
   for (let i = 0; i < MAPH; i++) { T[idx(0, i)] = T_ROCK; T[idx(1, i)] = T_ROCK; T[idx(MAPW - 1, i)] = T_ROCK; T[idx(MAPW - 2, i)] = T_ROCK; }
   // trees & water tile lists
-  game.trees.length = 0; game.waterTiles.length = 0;
+  game.trees.length = 0; game.waterTiles.length = 0; game.waterAmt.fill(0);
   for (let y = 0; y < MAPH; y++) for (let x = 0; x < MAPW; x++) {
     const t = T[idx(x, y)];
     if (t === T_FOREST) {
@@ -142,7 +142,7 @@ export function generateMap() {
         x: x * TILE + 8 + Math.random() * 16, y: y * TILE + 10 + Math.random() * 16,
         r: 9 + Math.random() * 5, pine, tone: Math.random(),
       });
-    } else if (t === T_WATER) game.waterTiles.push({ x, y });
+    } else if (t === T_WATER) { game.waterTiles.push({ x, y }); game.waterAmt[idx(x, y)] = 700; }   // coolant a Water Tower's tankers can drain
   }
   // resource fields (DESIGN_SPEC_v4 §2.3). Crystals (the currency) are present at every
   // base so no faction is starved; each base is RICH in its home secondary and SCARCE in
@@ -159,12 +159,13 @@ export function generateMap() {
     for (const k of SECONDARIES) {
       if (k === home) continue;
       const ox = s.x + (center.x - s.x) * f, oy = s.y + (center.y - s.y) * f;
-      spawnResourceField(k, ox + jit(), oy + jit(), 2, 1200, 30);
+      // coolant is now more plentiful (richer caches) — and tankers can also tap water features
+      spawnResourceField(k, ox + jit(), oy + jit(), k === 'coolant' ? 3 : 2, k === 'coolant' ? 2200 : 1200, k === 'coolant' ? 42 : 30);
       f += 0.14;
     }
   }
   spawnResourceField('crystal', center.x - 3, center.y - 1, 6, 4200, 66);      // contested centre,
-  spawnResourceField('coolant', center.x + 3, center.y + 1, 6, 4200, 66);      // rich in all three
+  spawnResourceField('coolant', center.x + 3, center.y + 1, 8, 5400, 72);      // rich in all three (coolant boosted)
   spawnResourceField('alloy', center.x, center.y - 4, 6, 4200, 60);
   const mids: [number, ResourceKind][] = [[7, 'alloy'], [8, 'coolant'], [9, 'crystal'], [10, 'alloy']];
   for (const [i, kind] of mids) {                                  // frontier sites

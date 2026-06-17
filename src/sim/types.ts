@@ -106,6 +106,7 @@ export interface Shot {
   col: string;
   rail: boolean;
   splash?: number;
+  subsurface?: boolean;   // fired by a tunneler → its blast can also reach underground units
   dead?: boolean;
 }
 
@@ -155,6 +156,7 @@ export interface GameState {
   relays: Relay[];
   trees: Tree[];
   waterTiles: { x: number; y: number }[];
+  waterAmt: Float32Array;                  // per-tile coolant remaining in water features (drained by tankers → dries up)
   terr: Uint8Array;
   occupied: Uint8Array;
   explored: Uint8Array;

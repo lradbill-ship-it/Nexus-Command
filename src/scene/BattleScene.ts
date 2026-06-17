@@ -4,9 +4,9 @@ import {
   idx, clamp, dist,
 } from '../sim/constants';
 import { game, resetState, isAllied } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
-import { renderTerrain, getTerrainCanvas, scorch, clearForestAt, terrainDirty, clearTerrainDirty } from '../render/terrain';
+import { renderTerrain, getTerrainCanvas, scorch, clearForestAt, dryWaterAt, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import { buildAllTextures, originOf } from '../render/textures';
 import { initAudio, sfx, setViewWidth, toggleMute } from '../audio';
 import type { Building, Unit, Entity } from '../sim/types';
@@ -50,6 +50,7 @@ export class BattleScene extends Phaser.Scene {
     buildAllTextures(this);
     setScorchHook(scorch);
     setClearForestHook(clearForestAt);
+    setDryWaterHook(dryWaterAt);
     setEndHook((win) => this.onEnd(win));
 
     this.cameras.main.setBackgroundColor('#0a0e08');

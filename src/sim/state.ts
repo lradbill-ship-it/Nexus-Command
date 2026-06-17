@@ -21,6 +21,7 @@ function createGame(): GameState {
     cam: { x: 0, y: 0 },
     buildings: [], units: [], shots: [], parts: [], nodes: [], settlements: [], relays: [], trees: [], waterTiles: [],
     terr: new Uint8Array(MAPW * MAPH),
+    waterAmt: new Float32Array(MAPW * MAPH),
     occupied: new Uint8Array(MAPW * MAPH),
     explored: new Uint8Array(MAPW * MAPH),
     visible: new Uint8Array(MAPW * MAPH),
