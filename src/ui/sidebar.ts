@@ -4,7 +4,7 @@ import {
 import type { LeaderStyle } from '../sim/constants';
 import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, setHintHook } from '../sim/state';
 import {
-  startPlacing, trainUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
+  startPlacing, trainUnit, cancelUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
   hasCyber, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
   setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, sellSelected, setAutoScout, getAutoScout,
 } from '../sim/sim';
@@ -75,7 +75,7 @@ export function makeUI() {
   for (const t of unitOrder) {
     const d = U[t];
     const btn = cmdButton('u_' + t, iconCanvas('u', t), d.name, '▣' + d.cost + (d.alloy ? ' ⬡' + d.alloy : ''));
-    btn.title = d.desc; btn.onclick = () => trainUnit(t); ug.appendChild(btn);
+    btn.title = d.desc + ' · right-click cancels one'; btn.onclick = () => trainUnit(t); btn.oncontextmenu = (e) => { e.preventDefault(); cancelUnit(t); }; ug.appendChild(btn);
   }
   const ag = $('abilityBtns');
   for (const k of Object.keys(ABILITIES)) {

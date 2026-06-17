@@ -1126,6 +1126,19 @@ export function tryPlace(wx: number, wy: number) {
   addBuilding(type, tx, ty, PLAYER, false);
   sfx('place', wx); game.placing = null; hint('');
 }
+export function cancelUnit(t: string) {
+  const fs = game.buildings.filter(b => b.team === PLAYER && b.type === 'foundry' && b.queue.includes(t));
+  if (!fs.length) { hint('Nothing of that type queued to cancel'); return; }
+  const f = fs[fs.length - 1];
+  const i = f.queue.lastIndexOf(t);
+  if (i < 0) return;
+  f.queue.splice(i, 1);
+  if (i === 0) f.queueT = 0;
+  game.money[PLAYER] += U[t].cost;
+  game.alloy[PLAYER] = (game.alloy[PLAYER] || 0) + alloyCost(PLAYER, U[t].alloy);
+  logMsg(U[t].name + ' production cancelled — refunded', 'good');
+  sfx('click');
+}
 export function trainUnit(t: string) {
   const fs = game.buildings.filter(b => b.team === PLAYER && b.type === 'foundry' && b.progress >= 1);
   if (!fs.length) { hint('Build a War Foundry first'); return; }

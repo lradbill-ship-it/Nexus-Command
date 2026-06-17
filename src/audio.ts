@@ -84,9 +84,10 @@ export function sfx(type: string, x?: number) {
         tone(pan, { w: 'triangle', f0: 2300, f1: 210, dur: 0.14, vol: 0.05 });
         tone(pan, { w: 'sine', f0: 130, f1: 55, dur: 0.18, vol: 0.07 }); break;
       case 'boom':
-        noiseHit(pan, { dur: 0.65, f0: 1000, f1: 90, vol: 0.5 });
-        tone(pan, { w: 'sine', f0: 105, f1: 36, dur: 0.5, vol: 0.4 });
-        noiseHit(pan, { dur: 0.18, f0: 5200, f1: 1500, vol: 0.1, type: 'highpass' }); break;
+        // sharp crack transient + punchy short body + tight low thump (no long farty descending sweep)
+        noiseHit(pan, { dur: 0.11, f0: 7000, f1: 1800, vol: 0.16, type: 'highpass' });
+        noiseHit(pan, { dur: 0.3, f0: 2200, f1: 240, vol: 0.44, type: 'lowpass' });
+        tone(pan, { w: 'triangle', f0: 170, f1: 58, dur: 0.17, vol: 0.3 }); break;
       case 'bigboom':
         noiseHit(pan, { dur: 1.0, f0: 800, f1: 60, vol: 0.6 });
         tone(pan, { w: 'sine', f0: 85, f1: 30, dur: 0.8, vol: 0.5 });
