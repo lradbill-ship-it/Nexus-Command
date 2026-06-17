@@ -71,6 +71,7 @@ export interface Unit {
   repathT: number;
   stuckT: number;
   acqT?: number;     // target-reacquisition throttle (don't scan every frame)
+  unstick?: number;  // consecutive stuck-repath count; escalates to a physical dislodge
   lx: number; ly: number;
   cooldown: number;
   disabledUntil: number;

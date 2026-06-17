@@ -9,7 +9,7 @@ import {
   game, dip, rk, getRel, setRel, addRel, isAllied, isWar, stateOf, logMsg, hint,
 } from './state';
 import type { Building, Unit, Entity, Vec, Particle, Settlement, Relay } from './types';
-import { findPath, passable } from './pathfind';
+import { findPath, passable, nearestPassableTile } from './pathfind';
 import { spawnResourceField } from './mapgen';
 import { sfx } from '../audio';
 
@@ -515,27 +515,48 @@ function stepToward(u: Unit, dx: number, dy: number, dt: number) {
   else if (!unitBlocked(nx, ny)) { u.x = nx; u.y = ny; }
   else if (!unitBlocked(nx, u.y)) { u.x = nx; }
   else if (!unitBlocked(u.x, ny)) { u.y = ny; }
-  else { const px = u.x + (-dy / len) * sp, py = u.y + (dx / len) * sp; if (!unitBlocked(px, py)) { u.x = px; u.y = py; } }
+  else { const slx = u.x + (-dy / len) * sp, sly = u.y + (dx / len) * sp, srx = u.x + (dy / len) * sp, sry = u.y + (-dx / len) * sp; if (!unitBlocked(slx, sly)) { u.x = slx; u.y = sly; } else if (!unitBlocked(srx, sry)) { u.x = srx; u.y = sry; } }
   u.x = clamp(u.x, 12, WORLD_W - 12); u.y = clamp(u.y, 12, WORLD_H - 12);
   return len < sp * 1.5;
 }
 export function setPath(u: Unit, wx: number, wy: number) {
+  if (!u.finalDest || u.finalDest.x !== wx || u.finalDest.y !== wy) u.unstick = 0;   // reset escalation only on a genuinely new destination
   u.path = U[u.type].air ? [{ x: wx, y: wy }] : findPath(u.x, u.y, wx, wy);   // fliers fly straight
   u.finalDest = { x: wx, y: wy };
   u.stuckT = 0;
 }
 function followPath(u: Unit, dt: number) {
-  if (!u.path || !u.path.length) {
-    if (u.finalDest) return stepToward(u, u.finalDest.x - u.x, u.finalDest.y - u.y, dt);
-    return true;
+  // escape if we ended up sitting on a blocked tile (e.g. a building was placed on us)
+  if (!U[u.type].air && unitBlocked(u.x, u.y)) {
+    const np = nearestPassableTile(u.x / TILE | 0, u.y / TILE | 0);
+    if (np) { u.x = np[0] * TILE + 16; u.y = np[1] * TILE + 16; }
   }
-  const p = u.path[0];
-  const arrived = stepToward(u, p.x - u.x, p.y - u.y, dt) || dist(u, p) < 13;
-  if (arrived) { u.path.shift(); return u.path.length === 0 && dist(u, u.finalDest || p) < 16; }
+  let arrived = false;
+  if (!u.path || !u.path.length) {
+    arrived = u.finalDest ? stepToward(u, u.finalDest.x - u.x, u.finalDest.y - u.y, dt) : true;
+  } else {
+    const p = u.path[0];
+    if (stepToward(u, p.x - u.x, p.y - u.y, dt) || dist(u, p) < 13) {
+      u.path.shift();
+      arrived = u.path.length === 0 && dist(u, u.finalDest || p) < 16;
+    }
+  }
+  if (arrived) return true;
+  // stuck detection — runs WITH or WITHOUT a path (the no-path straight-line case can wedge too)
   const moved = Math.hypot(u.x - u.lx, u.y - u.ly);
   if (moved < U[u.type].speed * dt * 0.25) u.stuckT += dt; else u.stuckT = 0;
   u.lx = u.x; u.ly = u.y;
-  if (u.stuckT > 1.3 && u.finalDest) { u.stuckT = 0; setPath(u, u.finalDest.x, u.finalDest.y); }
+  if (u.stuckT > 1.0 && u.finalDest) {
+    u.stuckT = 0;
+    const n = (u.unstick || 0) + 1; u.unstick = n;
+    if (n > 2) {
+      // wedged repeatedly → physically dislodge to a nearby open tile, then re-path
+      const np = nearestPassableTile((u.x / TILE | 0) + ((Math.random() * 3 | 0) - 1), (u.y / TILE | 0) + ((Math.random() * 3 | 0) - 1));
+      if (np) { u.x = np[0] * TILE + 16; u.y = np[1] * TILE + 16; }
+      u.unstick = 0;
+    }
+    setPath(u, u.finalDest.x, u.finalDest.y);
+  }
   return false;
 }
 function separation() {
