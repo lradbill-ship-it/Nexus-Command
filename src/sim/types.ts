@@ -63,7 +63,7 @@ export interface Unit {
   team: number;
   x: number; y: number;
   hpMax: number; hp: number;
-  order: 'idle' | 'move' | 'amove' | 'attack';
+  order: 'idle' | 'move' | 'amove' | 'attack' | 'guard';
   dest: Vec | null;
   target: Entity | null;
   path: Vec[] | null;
@@ -86,6 +86,7 @@ export interface Unit {
   lastShot: number;
   resume?: string | null;
   savedDest?: Vec | null;
+  guard?: Unit | null;   // friendly unit this one is escorting (order === 'guard')
   dead?: boolean;
 }
 

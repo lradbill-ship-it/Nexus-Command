@@ -662,6 +662,8 @@ function updateHarvester(u: Unit, dt: number) {
 }
 
 // ── Unit update ──────────────────────────────────────────────────────────────
+const GUARD_FOLLOW = 70;    // how close an escort stays to the unit it guards
+const GUARD_LEASH = 230;    // how far an escort chases a threat from the guarded unit before disengaging
 function updateUnit(u: Unit, dt: number) {
   if (u.disabledUntil > game.t) { u.moving = false; return; }
   const d = U[u.type];
@@ -679,6 +681,28 @@ function updateUnit(u: Unit, dt: number) {
     updateHarvester(u, dt); return;
   }
   if (u.target && u.target.dead) u.target = null;
+  if (u.order === 'guard') {
+    const g = u.guard;
+    if (!g || g.dead) { u.order = 'idle'; u.guard = null; u.path = null; }
+    else {
+      if (!u.target) {                                       // acquire a hostile near the guarded unit
+        u.acqT = (u.acqT || 0) - dt;
+        if (u.acqT <= 0) { u.acqT = 0.3; const t = nearestHostile(u, 200, u.team, u.team === PLAYER); if (t && dist(t, g) < GUARD_LEASH) u.target = t; }
+      }
+      if (u.target && dist(u.target, g) > GUARD_LEASH) u.target = null;   // threat strayed too far from the guarded unit
+      if (u.target) {
+        const tgt = u.target;
+        const r = (d.range || 0) + (tgt.kind === 'b' ? Math.max((tgt as Building).w, (tgt as Building).h) / 2 : U[(tgt as Unit).type].radius);
+        if (dist(u, tgt) <= r) {
+          u.moving = false; u.path = null; u.facing = Math.atan2(tgt.y - u.y, tgt.x - u.x);
+          if (u.cooldown <= 0 && Math.abs(da) < 0.5) { fireAt(u, tgt, d.dmg!, u.type === 'walker', d.splash || 0); u.cooldown = d.rof! * rofMult(u); }
+        } else { u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.7; setPath(u, tgt.x, tgt.y); } followPath(u, dt); }
+      } else if (dist(u, g) > GUARD_FOLLOW) {                 // no threat → stay close to the guarded unit
+        u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.5; setPath(u, g.x, g.y); } followPath(u, dt);
+      } else { u.moving = false; u.path = null; }
+      return;
+    }
+  }
   if (u.order === 'attack' && u.target) {
     const tgt = u.target;
     const r = (d.range || 0) + (tgt.kind === 'b' ? Math.max((tgt as Building).w, (tgt as Building).h) / 2 : U[(tgt as Unit).type].radius);
@@ -1165,6 +1189,12 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
   }
   let node = null;
   for (const n of game.nodes) { if (n.amount > 0 && dist(n, { x: wx, y: wy }) < 26) { node = n; break; } }
+  // clicking a friendly unit (not itself selected) → escort/guard it
+  let guardT: Unit | null = null;
+  if (!tgt) for (const u2 of game.units) {
+    if (!isAllied(PLAYER, u2.team) || sel.includes(u2)) continue;
+    if (tileVisible(u2.x, u2.y) && dist(u2, { x: wx, y: wy }) < U[u2.type].radius + 12) { guardT = u2; break; }
+  }
   if (tgt && !isWar(PLAYER, tgt.team)) {
     const key = 'ag' + tgt.team;
     if (!game.aggroT[key] || game.t - game.aggroT[key] > 10) {
@@ -1172,14 +1202,16 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
       logMsg('Attacking ' + FAC[tgt.team].name + ' — relations −10', 'war');
     }
   }
-  // attackers head to the target, harvesters to the node; everyone else deploys in a formation
+  // attackers → target, escorts → guard a friendly, harvesters → node, everyone else → formation
   const movers: Unit[] = [];
   for (const u of sel) {
     const harvester = !!U[u.type].harvests;
-    if (tgt && !harvester && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; setPath(u, tgt.x, tgt.y); }
+    if (tgt && !harvester && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; u.guard = null; setPath(u, tgt.x, tgt.y); }
+    else if (guardT && !harvester) { u.order = 'guard'; u.guard = guardT; u.target = null; u.path = null; }
     else if (node && harvester && node.kind === U[u.type].harvests) { u.hNode = node; u.hState = 'go'; u.order = 'idle'; setPath(u, node.x, node.y); }
-    else movers.push(u);
+    else if (!(guardT && harvester)) { u.guard = null; movers.push(u); }
   }
+  if (guardT && sel.some(s => !U[s.type].harvests)) hint('Escorting ' + U[guardT.type].name);
   const slots = formationSlots(movers, wx, wy);
   for (let k = 0; k < movers.length; k++) {
     const u = movers[k], harvester = !!U[u.type].harvests;
