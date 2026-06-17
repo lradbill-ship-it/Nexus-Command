@@ -1,6 +1,6 @@
 export interface Vec { x: number; y: number; }
 
-export type ResourceKind = 'crystal' | 'coolant' | 'alloy';
+export type ResourceKind = 'crystal' | 'coolant' | 'alloy' | 'wood';
 export interface ResourceNode {
   kind: ResourceKind;
   x: number; y: number;
@@ -80,6 +80,8 @@ export interface Unit {
   cargo: number;
   hNode: ResourceNode | null;
   hState: 'find' | 'go' | 'mine' | 'return' | 'idlewait';
+  chopTx?: number; chopTy?: number;   // forest tile a Logger is felling
+  chopT?: number;                     // chop progress (seconds) on the current tile
   facing: number;
   aim: number;
   bob: number;
@@ -132,6 +134,7 @@ export interface GameState {
   money: Record<number, number>;
   water: Record<number, number>;          // stored coolant reserve per team
   alloy: Record<number, number>;          // stored alloy stockpile per team (build-cost resource)
+  wood: Record<number, number>;           // stored wood stockpile per team (repair-rig fuel; logged from forests)
   overheat: Record<number, boolean>;      // true when a team's reserve is dry & in deficit
   pop: Record<number, number>;            // civilian population per faction (labor + conscription pool)
   happy: Record<number, number>;          // population happiness 0..100 per faction

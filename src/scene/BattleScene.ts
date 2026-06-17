@@ -4,9 +4,9 @@ import {
   idx, clamp, dist,
 } from '../sim/constants';
 import { game, resetState, isAllied } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
-import { renderTerrain, getTerrainCanvas, scorch, terrainDirty, clearTerrainDirty } from '../render/terrain';
+import { renderTerrain, getTerrainCanvas, scorch, clearForestAt, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import { buildAllTextures, originOf } from '../render/textures';
 import { initAudio, sfx, setViewWidth, toggleMute } from '../audio';
 import type { Building, Unit, Entity } from '../sim/types';
@@ -49,6 +49,7 @@ export class BattleScene extends Phaser.Scene {
   create() {
     buildAllTextures(this);
     setScorchHook(scorch);
+    setClearForestHook(clearForestAt);
     setEndHook((win) => this.onEnd(win));
 
     this.cameras.main.setBackgroundColor('#0a0e08');
@@ -519,9 +520,9 @@ export class BattleScene extends Phaser.Scene {
       const d = U[u.type], col = Phaser.Display.Color.HexStringToColor(FAC[u.team].col).color;
       if (sel.has(u)) drawBr(u.x, u.y, d.radius + 7);
       if (u.hp < u.hpMax || sel.has(u)) drawHp(u.x, u.y - d.radius - 9, 22, u.hp / u.hpMax, col);
-      if (d.harvests && u.cargo > 0) {
+      if ((d.harvests || d.logs) && u.cargo > 0) {
         const f = u.cargo / d.cargo!;
-        const cc = d.harvests === 'coolant' ? 0x7fe6f0 : d.harvests === 'alloy' ? 0xe0a155 : 0x9bd4ff;
+        const cc = d.logs ? 0x9ec24f : d.harvests === 'coolant' ? 0x7fe6f0 : d.harvests === 'alloy' ? 0xe0a155 : 0x9bd4ff;
         g.fillStyle(cc, 0.85); g.fillRect(u.x - 6, u.y + d.radius + 2, 12 * f, 2);
       }
     }

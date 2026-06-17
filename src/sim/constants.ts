@@ -103,6 +103,7 @@ export const B: Record<string, BuildingDef> = {
   turret: { name: 'Sentinel Turret', w: 1, h: 1, hp: 520, cost: 400, power: -10, buildTime: 8, sight: 7, hgt: 8, dmg: 13, range: 188, rof: 0.65, desc: 'Automated ground point-defense.' },
   pump: { name: 'Coolant Refinery', w: 2, h: 2, hp: 420, cost: 450, power: -15, buildTime: 11, sight: 4, hgt: 18, water: 6, accepts: 'coolant', freeUnit: 'tanker', desc: 'Coolant tanker drop-off. Free Tanker on completion. Cools heavy units.' },
   smelter: { name: 'Alloy Smelter', w: 2, h: 2, hp: 440, cost: 500, power: -15, buildTime: 11, sight: 4, hgt: 19, accepts: 'alloy', freeUnit: 'hauler', desc: 'Alloy hauler drop-off. Free Hauler on completion. Alloy builds advanced war machines.' },
+  mill: { name: 'Lumber Mill', w: 2, h: 2, hp: 460, cost: 400, power: -10, buildTime: 10, sight: 4, hgt: 18, accepts: 'wood', freeUnit: 'logger', desc: 'Logger drop-off. Free Logger on completion. Wood fuels Repair Rigs.' },
   aaturret: { name: 'Flak Cannon', w: 1, h: 1, hp: 460, cost: 500, power: -10, buildTime: 9, sight: 8, hgt: 8, dmg: 9, range: 210, rof: 0.42, antiAir: true, airOnly: true, coolant: 3, alloy: 150, desc: 'Anti-air flak. Engages aircraft only. Needs alloy.' },
   habitat: { name: 'Habitat Block', w: 2, h: 2, hp: 360, cost: 250, power: -5, buildTime: 8, sight: 3, hgt: 22, house: 45, civic: 2, desc: 'Housing for +45 citizens. Population = labor & conscripts.' },
   market: { name: 'Civic Market', w: 2, h: 2, hp: 340, cost: 350, power: -8, buildTime: 9, sight: 3, hgt: 18, civic: 16, desc: 'Meets civic needs (+happiness). Happy citizens work faster.' },
@@ -128,6 +129,8 @@ export interface UnitDef {
   coolant?: number;        // coolant consumed per second while alive
   infantry?: boolean;      // soft target rendered small; trained from the Foundry
   harvests?: ResourceKind; // resource this unit gathers (harvester=crystal, tanker=coolant, hauler=alloy)
+  logs?: boolean;          // fells & clears forest tiles for wood (Logger Rig)
+  repair?: boolean;        // mends friendly units & buildings, burning wood (Repair Rig)
   alloy?: number;          // alloy build-cost surcharge (advanced units)
   desc: string;
 }
@@ -136,6 +139,8 @@ export const U: Record<string, UnitDef> = {
   harvester: { name: 'Crystal Harvester', cost: 400, hp: 310, speed: 74, radius: 11, sight: 5, buildTime: 10, cargo: 200, harvests: 'crystal', desc: 'Gathers data crystals. Your economy.' },
   tanker: { name: 'Coolant Tanker', cost: 450, hp: 300, speed: 70, radius: 11, sight: 5, buildTime: 11, cargo: 180, harvests: 'coolant', desc: 'Draws coolant from wells to a Coolant Refinery.' },
   hauler: { name: 'Alloy Hauler', cost: 450, hp: 320, speed: 68, radius: 11, sight: 5, buildTime: 11, cargo: 170, harvests: 'alloy', desc: 'Hauls alloy ore to a Smelter. Alloy builds advanced units.' },
+  logger: { name: 'Logger Rig', cost: 250, hp: 300, speed: 72, radius: 11, sight: 5, buildTime: 9, cargo: 150, logs: true, desc: 'Fells & clears forest for wood — opening new ground. Delivers to a Lumber Mill or HQ.' },
+  repair: { name: 'Repair Rig', cost: 350, hp: 270, speed: 80, radius: 10, sight: 5, buildTime: 10, repair: true, desc: 'Mobile mender — heals friendly units & buildings, burning wood. Escort one (right-click) or it auto-seeks the wounded.' },
   recon: { name: 'Recon Drone', cost: 150, hp: 78, speed: 140, radius: 8, sight: 9, buildTime: 6, dmg: 4, range: 96, rof: 0.4, air: true, desc: 'Fast scout quadcopter — flies over terrain; only AA can hit it.' },
   infantry: { name: 'Rifle Trooper', cost: 90, hp: 70, speed: 70, radius: 7, sight: 6, buildTime: 4, dmg: 5, range: 98, rof: 0.5, infantry: true, desc: 'Cheap massable foot soldier.' },
   rocket: { name: 'Rocket Trooper', cost: 180, hp: 90, speed: 62, radius: 7, sight: 7, buildTime: 7, dmg: 17, range: 152, rof: 1.5, antiAir: true, infantry: true, desc: 'Anti-armor & anti-air infantry.' },

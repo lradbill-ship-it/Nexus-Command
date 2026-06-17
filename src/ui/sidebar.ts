@@ -12,8 +12,8 @@ import {
 let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
 
-const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'smelter', 'habitat', 'market', 'aaturret', 'cyber'];
-const unitOrder = ['harvester', 'tanker', 'hauler', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft'];
+const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'cyber'];
+const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -28,6 +28,7 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'turret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 9, cy - 5); g.stroke(); }
     else if (type === 'pump') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(127,214,234,.5)'; g.fill(); g.strokeStyle = '#7fd6ea'; g.stroke(); g.beginPath(); g.arc(cx, cy, 4, 0, 7); g.stroke(); }
     else if (type === 'smelter') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(224,161,85,.55)'; g.fill(); g.strokeStyle = '#e0a155'; g.stroke(); g.fillStyle = '#2a2018'; g.fillRect(cx + 5, cy - 9, 3, 7); }
+    else if (type === 'mill') { g.fillStyle = '#3a4f63'; g.fillRect(12, 11, 16, 9); g.strokeRect(12, 11, 16, 9); g.fillStyle = '#9c7338'; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(15 + i * 5, 16, 2.3, 0, 7); g.fill(); } g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.4; g.beginPath(); g.arc(24, 9, 4, 0, 7); g.stroke(); }
     else if (type === 'habitat') { g.fillStyle = '#3a4f63'; g.fillRect(13, 11, 14, 9); g.strokeRect(13, 11, 14, 9); g.fillStyle = '#9fd9cc'; g.beginPath(); g.moveTo(12, 11); g.lineTo(20, 5); g.lineTo(28, 11); g.closePath(); g.stroke(); g.fillStyle = '#69d84f'; g.fillRect(18, 15, 4, 5); }
     else if (type === 'market') { g.fillStyle = '#caa05a'; for (let i = 0; i < 4; i++) { g.fillRect(12 + i * 4, 8, 3, 4); } g.strokeStyle = '#e0c089'; g.strokeRect(12, 12, 16, 8); g.fillStyle = '#9fd9cc'; g.fillRect(14, 14, 3, 4); g.fillRect(23, 14, 3, 4); }
     else if (type === 'aaturret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - 2, cy); g.lineTo(cx + 5, cy - 8); g.moveTo(cx + 2, cy); g.lineTo(cx + 9, cy - 6); g.stroke(); }
@@ -36,6 +37,8 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     if (type === 'harvester') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#9bd4ff'; g.fillRect(16, 9, 8, 6); }
     else if (type === 'tanker') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#7fd6ea'; g.beginPath(); g.arc(20, 13, 5, 0, 7); g.fill(); g.strokeStyle = '#cfeef5'; g.beginPath(); g.moveTo(15, 13); g.lineTo(25, 13); g.stroke(); }
     else if (type === 'hauler') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#e0a155'; g.fillRect(15, 9, 10, 8); g.fillStyle = '#caa05a'; g.fillRect(16, 8, 3, 2); g.fillRect(21, 8, 3, 2); }
+    else if (type === 'logger') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#9c7338'; for (const [ox, oy] of [[17, 9], [22, 9], [17, 15], [22, 15]]) { g.beginPath(); g.arc(ox, oy, 2.2, 0, 7); g.fill(); } }
+    else if (type === 'repair') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#7fe07f'; g.fillRect(cx - 2, cy - 5, 4, 10); g.fillRect(cx - 5, cy - 2, 10, 4); }
     else if (type === 'recon') { g.strokeStyle = '#cfe6ee'; for (const [rx, ry] of [[-6, -4], [6, -4], [-6, 4], [6, 4]]) { g.beginPath(); g.arc(cx + rx, cy + ry, 3, 0, 7); g.stroke(); } }
     else if (type === 'infantry') { g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill(); g.fillStyle = '#2c3744'; g.fillRect(cx - 3, cy - 1, 6, 8); g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 7, cy - 6); g.stroke(); }
     else if (type === 'rocket') { g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill(); g.fillStyle = '#2c3744'; g.fillRect(cx - 3, cy - 1, 6, 8); g.strokeStyle = '#e8a33d'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 4, cy - 1); g.lineTo(cx + 8, cy - 7); g.stroke(); }
@@ -192,6 +195,7 @@ export function refresh() {
   $('uiWater').textContent = Math.floor(w.stored) + (w.net >= 0 ? ' +' + w.net : ' ' + w.net) + '/s';
   $('uiWaterWrap').className = 'stat' + (game.overheat[PLAYER] ? ' hot' : '');
   $('uiAlloy').textContent = String(Math.floor(game.alloy[PLAYER] || 0));
+  $('uiWood').textContent = String(Math.floor(game.wood[PLAYER] || 0));
   const pop = Math.floor(game.pop[PLAYER] || 0), cap = housingCap(PLAYER), hap = Math.round(game.happy[PLAYER] ?? 60);
   $('uiPop').textContent = String(pop);
   $('uiPopCap').textContent = String(cap);
@@ -277,6 +281,7 @@ function refreshSel() {
     if (sObj.kind === 'b' && (sObj as any).progress < 1) extra = `<br>Constructing ${Math.round((sObj as any).progress * 100)}%`;
     if (sObj.kind === 'b' && (sObj as any).type === 'foundry' && (sObj as any).queue.length) extra = `<br>Queue: ${(sObj as any).queue.length} (${U[(sObj as any).queue[0]].name})`;
     if (sObj.kind === 'u' && U[(sObj as any).type].harvests) extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${d.cargo} ${d.harvests}`;
+    if (sObj.kind === 'u' && U[(sObj as any).type].logs) extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${d.cargo} wood`;
     el.innerHTML = `<span class="nm">${d.name}</span><br>HP ${Math.ceil(sObj.hp)}/${sObj.hpMax}${extra}`;
   } else el.innerHTML = `<span class="nm">${game.selection.length} units</span> in command group`;
 }

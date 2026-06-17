@@ -1,6 +1,6 @@
 import {
   TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, AIS, ALL_TEAMS, FAC, B, U, ABILITIES, COVERT,
-  BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD, STYLES,
+  BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD, T_FOREST, STYLES,
   RELAY_INCOME, RELAY_HP,
   idx, inMap, clamp, dist,
 } from './constants';
@@ -18,6 +18,8 @@ let scorchHook: (x: number, y: number, r: number) => void = () => {};
 export function setScorchHook(fn: (x: number, y: number, r: number) => void) { scorchHook = fn; }
 let endHook: (win: boolean) => void = () => {};
 export function setEndHook(fn: (win: boolean) => void) { endHook = fn; }
+let clearForestHook: (tx: number, ty: number) => void = () => {};
+export function setClearForestHook(fn: (tx: number, ty: number) => void) { clearForestHook = fn; }
 
 // Transient module locals — reset on each new match.
 let nextId = 1;
@@ -28,7 +30,7 @@ let crystalT = 55;   // first new formation seeds ~55s in
 let autoScout = false;   // when on, idle Recon Drones auto-reveal the map (scouts-only auto-explore)
 let autoScoutT = 0;      // throttle accumulator for auto-scout order assignment
 let pendingStrikes: { x: number; y: number; at: number }[] = [];   // in-flight ballistic missiles → detonate when game.t >= at
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; pendingStrikes = []; }
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; pendingStrikes = []; lastWoodNag = -9; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -289,7 +291,7 @@ function societyTick(dt: number) {
     // revolt: sustained misery makes troops desert (recoverable, never an instant loss).
     // Probability scales with how miserable they are, so neglect compounds.
     if (h < 18 && Math.random() < dt * 0.14 * ((18 - h) / 18)) {
-      const army = game.units.filter(u => u.team === team && !U[u.type].harvests);
+      const army = game.units.filter(u => u.team === team && !isSupport(u.type));
       if (army.length > 3) {
         const u = army[Math.random() * army.length | 0]; destroy(u, 0);
         if (team === PLAYER) { logMsg('UNREST — a unit has deserted. Calm your population!', 'war'); sfx('war'); }
@@ -327,7 +329,7 @@ function settlementTick(dt: number) {
     const army: Record<number, number> = {}, civ: Record<number, number> = {};
     forNearbyUnits(s.x, s.y, SETTLE_R, (u) => {
       if (dist(u, s) > SETTLE_R) return;
-      if (U[u.type].harvests) civ[u.team] = (civ[u.team] || 0) + 1; else army[u.team] = (army[u.team] || 0) + 1;
+      if (isSupport(u.type)) civ[u.team] = (civ[u.team] || 0) + 1; else army[u.team] = (army[u.team] || 0) + 1;
     });
     const present = new Set<number>([...Object.keys(army), ...Object.keys(civ)].map(Number));
     const challengers = [...present].filter(t => t !== s.owner);
@@ -626,6 +628,10 @@ function separation() {
   }
 }
 
+// Non-combat economy/support units (harvesters, loggers, repair rigs) — never
+// desert in a revolt, count as civilians at settlements, and don't take attack orders.
+export const isSupport = (type: string) => !!(U[type].harvests || U[type].logs || U[type].repair);
+
 // ── Harvesting (resource-typed: harvester=crystal, tanker=coolant) ────────────
 const resOf = (u: Unit) => U[u.type].harvests!;
 function nearestNodePathable(u: Unit) {
@@ -685,6 +691,155 @@ function updateHarvester(u: Unit, dt: number) {
   }
 }
 
+// ── Logging: a Logger fells & clears forest tiles for wood (opens new ground) ──
+const CHOP_TIME = 2.6;        // seconds to fell one forest tile (before labor factor)
+const WOOD_PER_TILE = 50;     // wood gathered per cleared forest tile
+/** Fell a forest tile: it becomes passable grass, its trees vanish, the renderer repaints it. */
+function clearForest(tx: number, ty: number) {
+  if (game.terr[idx(tx, ty)] !== T_FOREST) return;
+  game.terr[idx(tx, ty)] = T_GRASS;                                  // now passable — routes open up
+  game.trees = game.trees.filter(t => !((t.x / TILE | 0) === tx && (t.y / TILE | 0) === ty));
+  const wx = tx * TILE + 16, wy = ty * TILE + 16;
+  spawnParts('debris', wx, wy, 6, '120,92,52');
+  game.parts.push({ type: 'ring', x: wx, y: wy, t: 0, life: 0.4, big: false });
+  clearForestHook(tx, ty);                                           // repaint the cleared patch
+  sfx('place', wx);
+}
+/** Nearest fellable forest tile (with a passable approach) the logger can path to. */
+function nearestForest(u: Unit): { tx: number; ty: number; approach: Vec; path: Vec[] } | null {
+  const utx = u.x / TILE | 0, uty = u.y / TILE | 0, R = 34;
+  const cand: { tx: number; ty: number; d: number }[] = [];
+  for (let ty = Math.max(1, uty - R); ty <= Math.min(MAPH - 2, uty + R); ty++)
+    for (let tx = Math.max(1, utx - R); tx <= Math.min(MAPW - 2, utx + R); tx++) {
+      if (game.terr[idx(tx, ty)] !== T_FOREST) continue;
+      if (!(passable(tx + 1, ty) || passable(tx - 1, ty) || passable(tx, ty + 1) || passable(tx, ty - 1))) continue;
+      cand.push({ tx, ty, d: (tx - utx) * (tx - utx) + (ty - uty) * (ty - uty) });
+    }
+  cand.sort((a, b) => a.d - b.d);
+  for (let i = 0; i < Math.min(6, cand.length); i++) {
+    const { tx, ty } = cand[i];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      if (!passable(tx + dx, ty + dy)) continue;
+      const ax = (tx + dx) * TILE + 16, ay = (ty + dy) * TILE + 16;
+      const p = findPath(u.x, u.y, ax, ay);
+      if (p) return { tx, ty, approach: { x: ax, y: ay }, path: p };
+    }
+  }
+  return null;
+}
+function nearestWoodDepot(u: Unit): Building | null {
+  let best: Building | null = null, bd = 1e9;
+  for (const b of game.buildings) {
+    if (b.team !== u.team || b.progress < 1) continue;
+    if (b.type !== 'hq' && B[b.type].accepts !== 'wood') continue;   // HQ takes any resource; Lumber Mill is the dedicated drop
+    const d = dist(u, b); if (d < bd) { bd = d; best = b; }
+  }
+  return best;
+}
+function updateLogger(u: Unit, dt: number) {
+  const cap = U[u.type].cargo!;
+  if (u.hState === 'find') {
+    const got = nearestForest(u);
+    if (got) { u.chopTx = got.tx; u.chopTy = got.ty; u.path = got.path; u.finalDest = { ...got.approach }; u.chopT = 0; u.hState = 'go'; }
+    else if (u.cargo > 0) u.hState = 'return';
+    else u.hState = 'idlewait';
+  }
+  if (u.hState === 'idlewait') { if (game.t % 2 < dt) u.hState = 'find'; u.moving = false; return; }
+  if (u.hState === 'go') {
+    if (u.chopTx === undefined || game.terr[idx(u.chopTx, u.chopTy!)] !== T_FOREST) { u.hState = 'find'; return; }
+    const fx = u.chopTx * TILE + 16, fy = u.chopTy! * TILE + 16;
+    if (dist(u, { x: fx, y: fy }) < TILE * 1.4) { u.hState = 'mine'; u.path = null; u.chopT = 0; u.facing = Math.atan2(fy - u.y, fx - u.x); }
+    else followPath(u, dt);
+  } else if (u.hState === 'mine') {
+    u.moving = false;
+    if (u.chopTx === undefined || game.terr[idx(u.chopTx, u.chopTy!)] !== T_FOREST) { u.hState = 'find'; return; }
+    u.chopT = (u.chopT || 0) + dt * laborFactor(u.team);
+    if (Math.random() < dt * 5) spawnParts('debris', u.chopTx * TILE + 16, u.chopTy! * TILE + 16, 1, '150,116,70');
+    if ((u.chopT || 0) >= CHOP_TIME) {
+      clearForest(u.chopTx, u.chopTy!);
+      u.cargo = Math.min(cap, u.cargo + WOOD_PER_TILE);
+      u.chopT = 0; u.chopTx = undefined;
+      u.hState = u.cargo >= cap - 0.5 ? 'return' : 'find';
+      if (u.hState === 'return') { const dep = nearestWoodDepot(u); if (dep) setPath(u, dep.x, dep.y + dep.h / 2 + 14); }
+    }
+  } else if (u.hState === 'return') {
+    const dep = nearestWoodDepot(u);
+    if (!dep) { u.hState = 'idlewait'; return; }
+    if (dist(u, dep) < Math.max(dep.w, dep.h) / 2 + 26) {
+      game.wood[u.team] = (game.wood[u.team] || 0) + Math.round(u.cargo);
+      u.cargo = 0; u.hState = 'find'; dep.unloadFx = game.t; u.moving = false; u.path = null;
+      if (u.team === PLAYER) sfx('cash', dep.x);
+    } else followPath(u, dt);
+  }
+}
+
+// ── Repair rigs: mobile menders that heal friendly units & buildings, burning wood ──
+const REPAIR_RANGE = 42;      // how close the rig must be to mend a target
+const REPAIR_RATE = 34;       // hp/sec restored
+const WOOD_PER_HP = 0.05;     // wood consumed per hp restored
+const REPAIR_SEEK = 360;      // idle auto-seek radius for the wounded
+const sizeOf = (e: Entity) => e.kind === 'b' ? Math.max((e as Building).w, (e as Building).h) / 2 : U[(e as Unit).type].radius;
+let lastWoodNag = -9;
+function nearestDamagedFriendly(u: Unit, range: number): Entity | null {
+  let best: Entity | null = null, bd = range * range;
+  forNearbyUnits(u.x, u.y, range, (o) => {
+    if (o === u || o.dead || U[o.type].air || !isAllied(u.team, o.team) || o.hp >= o.hpMax) return;
+    const d = (o.x - u.x) * (o.x - u.x) + (o.y - u.y) * (o.y - u.y); if (d < bd) { bd = d; best = o; }
+  });
+  for (const b of game.buildings) {
+    if (b.team !== u.team || b.dead || b.progress < 1 || b.hp >= b.hpMax) continue;
+    const d = (b.x - u.x) * (b.x - u.x) + (b.y - u.y) * (b.y - u.y); if (d < bd) { bd = d; best = b; }
+  }
+  return best;
+}
+/** Mend a target if in reach and the team has wood. Returns true while actively mending. */
+function healEntity(u: Unit, e: Entity, dt: number): boolean {
+  if (e.dead || e.hp >= e.hpMax) return false;
+  if (dist(u, e) - sizeOf(e) > REPAIR_RANGE) return false;
+  const wood = game.wood[u.team] || 0;
+  if (wood <= 0) {
+    if (u.team === PLAYER && game.t - lastWoodNag > 6) { lastWoodNag = game.t; hint('Repair Rigs need WOOD — build a Lumber Mill & log the forests'); }
+    return false;
+  }
+  const heal = Math.min(REPAIR_RATE * dt, e.hpMax - e.hp, wood / WOOD_PER_HP);
+  if (heal <= 0) return false;
+  e.hp += heal; game.wood[u.team] = Math.max(0, wood - heal * WOOD_PER_HP);
+  u.moving = false; u.facing = Math.atan2(e.y - u.y, e.x - u.x);
+  if (Math.random() < dt * 9) spawnParts('spark', e.x + (Math.random() * 18 - 9), e.y + (Math.random() * 18 - 9), 1, '150,235,160');
+  return true;
+}
+function updateRepair(u: Unit, dt: number) {
+  if (u.order === 'guard') {
+    const g = u.guard;
+    if (!g || g.dead) { u.order = 'idle'; u.guard = null; u.path = null; }
+    else {
+      const tgt: Entity | null = g.hp < g.hpMax ? g : nearestDamagedFriendly(u, 160);
+      if (tgt && dist(u, tgt) - sizeOf(tgt) <= REPAIR_RANGE) { u.path = null; healEntity(u, tgt, dt); }
+      else if (dist(u, g) > GUARD_FOLLOW) { u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.5; setPath(u, g.x, g.y); } followPath(u, dt); }
+      else if (tgt) { u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.5; setPath(u, tgt.x, tgt.y); } followPath(u, dt); }
+      else { u.moving = false; u.path = null; }
+      return;
+    }
+  }
+  if ((u.order === 'move' || u.order === 'amove') && u.dest) {
+    if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; }
+    return;
+  }
+  // idle → seek out and mend the nearest wounded friendly
+  if (u.order === 'idle') {
+    if (!u.target || u.target.dead || u.target.hp >= u.target.hpMax) {
+      u.target = null;
+      u.acqT = (u.acqT || 0) - dt;
+      if (u.acqT <= 0) { u.acqT = 0.5; u.target = nearestDamagedFriendly(u, REPAIR_SEEK); }
+    }
+    const tgt = u.target;
+    if (tgt) {
+      if (dist(u, tgt) - sizeOf(tgt) <= REPAIR_RANGE) { u.path = null; healEntity(u, tgt, dt); }
+      else { u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.6; setPath(u, tgt.x, tgt.y); } followPath(u, dt); }
+    } else { u.moving = false; u.path = null; }
+  }
+}
+
 // ── Unit update ──────────────────────────────────────────────────────────────
 const GUARD_FOLLOW = 70;    // how close an escort stays to the unit it guards
 const GUARD_LEASH = 230;    // how far an escort chases a threat from the guarded unit before disengaging
@@ -704,6 +859,14 @@ function updateUnit(u: Unit, dt: number) {
     }
     updateHarvester(u, dt); return;
   }
+  if (U[u.type].logs) {
+    if (u.order === 'move' && u.dest) {
+      if (followPath(u, dt)) { u.order = 'idle'; u.hState = 'find'; u.dest = null; }
+      return;
+    }
+    updateLogger(u, dt); return;
+  }
+  if (U[u.type].repair) { updateRepair(u, dt); return; }
   if (u.target && u.target.dead) u.target = null;
   if (u.order === 'guard') {
     const g = u.guard;
@@ -1082,7 +1245,7 @@ function aiUpdate(team: number, dt: number) {
     else if (hasCoolantDepot && tankers < 2 && game.money[team] > 800) { foundries[0].queue.push('tanker'); game.money[team] -= U.tanker.cost; }
     else if (hasAlloyDepot && haulers < 2 && game.money[team] > 800) { foundries[0].queue.push('hauler'); game.money[team] -= U.hauler.cost; }
   }
-  const army = game.units.filter(u => u.team === team && !U[u.type].harvests);
+  const army = game.units.filter(u => u.team === team && !isSupport(u.type));
   const countType = (t: string) => game.units.reduce((s, u) => s + (u.team === team && u.type === t ? 1 : 0), 0);
   if (foundries.length && game.money[team] > 900) {
     const f = foundries.find(fo => fo.queue.length < 2);
@@ -1226,20 +1389,21 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
       logMsg('Attacking ' + FAC[tgt.team].name + ' — relations −10', 'war');
     }
   }
-  // attackers → target, escorts → guard a friendly, harvesters → node, everyone else → formation
+  // attackers → target, escorts → guard a friendly (military or Repair Rig), harvesters → node, everyone else → formation
   const movers: Unit[] = [];
   for (const u of sel) {
     const harvester = !!U[u.type].harvests;
-    if (tgt && !harvester && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; u.guard = null; setPath(u, tgt.x, tgt.y); }
-    else if (guardT && !harvester) { u.order = 'guard'; u.guard = guardT; u.target = null; u.path = null; }
+    const support = isSupport(u.type);
+    if (tgt && !support && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; u.guard = null; setPath(u, tgt.x, tgt.y); }
+    else if (guardT && (!support || U[u.type].repair)) { u.order = 'guard'; u.guard = guardT; u.target = null; u.path = null; }
     else if (node && harvester && node.kind === U[u.type].harvests) { u.hNode = node; u.hState = 'go'; u.order = 'idle'; setPath(u, node.x, node.y); }
-    else if (!(guardT && harvester)) { u.guard = null; movers.push(u); }
+    else if (!(guardT && support)) { u.guard = null; movers.push(u); }
   }
-  if (guardT && sel.some(s => !U[s.type].harvests)) hint('Escorting ' + U[guardT.type].name);
+  if (guardT && sel.some(s => !isSupport(s.type) || U[s.type].repair)) hint((sel.some(s => U[s.type].repair) ? 'Repairing & escorting ' : 'Escorting ') + U[guardT.type].name);
   const slots = formationSlots(movers, wx, wy);
   for (let k = 0; k < movers.length; k++) {
-    const u = movers[k], harvester = !!U[u.type].harvests;
-    u.dest = slots[k]; u.order = fromAmove && !harvester ? 'amove' : 'move'; u.target = null;
+    const u = movers[k], support = isSupport(u.type);
+    u.dest = slots[k]; u.order = fromAmove && !support ? 'amove' : 'move'; u.target = null;
     setPath(u, slots[k].x, slots[k].y);
   }
   sfx('click');

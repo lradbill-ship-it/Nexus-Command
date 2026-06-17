@@ -164,6 +164,49 @@ function paintTree(x: number, y: number, r: number, pine: boolean, tone: number)
   }
 }
 
+/** Repaint a single ground tile (grass, or forest-floor under surviving canopy) + speckle/tufts. */
+function paintGroundTile(tx: number, ty: number, stumps: boolean) {
+  const t = game.terr[idx(tx, ty)], px = tx * TILE, py = ty * TILE, v = Math.random();
+  if (t === T_FOREST) tg.fillStyle = shade([38, 58, 32], 0.92 + v * 0.16);   // keep dark forest floor under canopy
+  else tg.fillStyle = `rgb(${(52 + v * 22) | 0},${(76 + v * 18) | 0},${(42 + v * 12) | 0})`;
+  tg.fillRect(px, py, TILE, TILE);
+  for (let i = 0; i < 14; i++) {
+    const x = px + Math.random() * TILE, y = py + Math.random() * TILE;
+    tg.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,.10)' : 'rgba(255,255,230,.05)';
+    tg.beginPath(); tg.arc(x, y, 1 + Math.random() * 3, 0, 7); tg.fill();
+  }
+  if (t !== T_FOREST) for (let i = 0; i < 6; i++) {
+    const x = px + Math.random() * TILE, y = py + Math.random() * TILE;
+    tg.strokeStyle = `rgba(${90 + Math.random() * 50 | 0},${130 + Math.random() * 50 | 0},60,.35)`;
+    tg.lineWidth = 1; tg.beginPath(); tg.moveTo(x, y); tg.lineTo(x + (Math.random() * 4 - 2), y - 3 - Math.random() * 3); tg.stroke();
+  }
+  if (stumps) for (let i = 0; i < 2; i++) {     // freshly-cut stumps so the clearing reads
+    const x = px + 8 + Math.random() * (TILE - 16), y = py + 8 + Math.random() * (TILE - 16);
+    tg.fillStyle = '#4a3722'; tg.beginPath(); tg.arc(x, y, 2.6, 0, 7); tg.fill();
+    tg.fillStyle = '#6a5234'; tg.beginPath(); tg.arc(x, y - 0.6, 1.5, 0, 7); tg.fill();
+  }
+}
+
+/** A Logger felled a forest tile: repaint it (and grass/forest neighbours) and re-bake surviving trees. */
+export function clearForestAt(tx: number, ty: number) {
+  const tiles: [number, number][] = [];
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const x = tx + dx, y = ty + dy; if (!inMapT(x, y)) continue;
+    const t = game.terr[idx(x, y)];
+    if (t === T_GRASS || t === T_FOREST) tiles.push([x, y]);    // only over-paint natural ground; leave rock/road/water
+  }
+  let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
+  for (const [x, y] of tiles) {
+    paintGroundTile(x, y, x === tx && y === ty);
+    minx = Math.min(minx, x * TILE); miny = Math.min(miny, y * TILE);
+    maxx = Math.max(maxx, x * TILE + TILE); maxy = Math.max(maxy, y * TILE + TILE);
+  }
+  // re-bake any surviving trees whose canopy overlaps the repainted region (sorted for overlap)
+  const trees = [...game.trees].sort((a, b) => a.y - b.y);
+  for (const tr of trees) if (tr.x > minx - 20 && tr.x < maxx + 20 && tr.y > miny - 8 && tr.y < maxy + 30) paintTree(tr.x, tr.y, tr.r, tr.pine, tr.tone);
+  dirty = true;
+}
+
 /** Burn a scorch mark into the terrain at a world position (called from sim on destroy). */
 export function scorch(x: number, y: number, r: number) {
   tg.fillStyle = 'rgba(8,6,4,.5)';

@@ -211,6 +211,15 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(rcx, rcy, fw * 0.4, 0, 7); g.stroke();
     g.fillStyle = '#11161d'; g.beginPath(); g.arc(rcx, rcy, fw * 0.2, 0, 7); g.fill();
     g.fillStyle = '#c9d6e0'; for (const [ox, oy] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) g.fillRect(rcx + ox - 1, rcy + oy - 1, 2, 2);
+  } else if (type === 'mill') {
+    // lumber mill: stacked logs + a circular saw blade
+    g.fillStyle = '#2a2018'; rr(g, rcx - fw * 0.3, rcy - fh * 0.18, fw * 0.6, fh * 0.4, 3); g.fill();
+    g.fillStyle = '#6a4a28';
+    for (const [lx, ly] of [[-9, 6], [-2, 6], [5, 6]]) { g.beginPath(); g.arc(rcx + lx, rcy + ly, 3.6, 0, 7); g.fill(); }
+    g.fillStyle = '#9c7338'; for (const [lx, ly] of [[-9, 6], [-2, 6], [5, 6]]) { g.beginPath(); g.arc(rcx + lx, rcy + ly, 1.7, 0, 7); g.fill(); }
+    g.strokeStyle = '#c9d6e0'; g.lineWidth = 1.6; g.beginPath(); g.arc(rcx + 4, rcy - 6, 6, 0, 7); g.stroke();   // saw blade
+    g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(rcx + 4, rcy - 6, 2, 0, 7); g.fill();
+    g.fillStyle = '#9ec24f'; g.fillRect(rcx - fw * 0.18, rcy + fh * 0.26, 5, 4);   // green log-pile marker
   }
   return [c, cx, cy];
 }
@@ -247,6 +256,20 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillStyle = '#caa05a'; for (const [ox, oy] of [[-4, -4], [3, -5], [-1, 0], [4, 2]]) { g.beginPath(); g.arc(cx + ox, cy + oy, 1.8, 0, 7); g.fill(); }
     g.fillStyle = `rgba(${rgb},.8)`; g.fillRect(cx - 12, cy + 4, 2.5, 5); g.fillRect(cx + 9.5, cy + 4, 2.5, 5);
     g.fillStyle = '#e0a155'; g.fillRect(cx - 6, cy - 16, 12, 4);
+  } else if (type === 'logger') {
+    // logger rig: flatbed stacked with felled logs + a saw mast
+    rr(g, cx - 10, cy - 13, 20, 26, 5); g.fill(); g.stroke();
+    g.fillStyle = '#6a4a28'; for (const [ox, oy] of [[-4, -3], [2, -3], [-2, 4], [4, 4]]) { g.beginPath(); g.arc(cx + ox, cy + oy, 3.2, 0, 7); g.fill(); }
+    g.fillStyle = '#9c7338'; for (const [ox, oy] of [[-4, -3], [2, -3], [-2, 4], [4, 4]]) { g.beginPath(); g.arc(cx + ox, cy + oy, 1.4, 0, 7); g.fill(); }
+    g.strokeStyle = '#cdd9e3'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, cy - 14); g.lineTo(cx, cy - 8); g.stroke();   // saw arm
+    g.fillStyle = `rgba(${rgb},.8)`; g.fillRect(cx - 12, cy + 4, 2.5, 5); g.fillRect(cx + 9.5, cy + 4, 2.5, 5);
+    g.fillStyle = '#9ec24f'; g.fillRect(cx - 6, cy - 16, 12, 4);
+  } else if (type === 'repair') {
+    // repair rig: utility hull with a glowing green mend-cross
+    rr(g, cx - 10, cy - 12, 20, 24, 5); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(127,224,127,.95)'; g.fillRect(cx - 2.4, cy - 7, 4.8, 14); g.fillRect(cx - 7, cy - 2.4, 14, 4.8);
+    g.fillStyle = `rgba(${rgb},.8)`; g.fillRect(cx - 12, cy + 4, 2.5, 5); g.fillRect(cx + 9.5, cy + 4, 2.5, 5);
+    g.fillStyle = '#9fb6c8'; g.fillRect(cx - 6, cy - 15, 12, 4);
   } else if (type === 'recon') {
     // quadcopter: 4 rotor rings + slim core
     g.strokeStyle = 'rgba(200,225,235,.5)'; g.lineWidth = 1.4;
