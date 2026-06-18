@@ -152,6 +152,15 @@ The sim is engine‑independent and **never touches the DOM/renderer** — it ta
    - **Bug fixed:** non‑Borers could still hit burrowing/underground units (helicopters, turrets, splash). Now only a `tunneler` keeps an underground target — units & turrets **drop** a target that dives, and surface **splash** is shielded from buried units via `Shot.subsurface` (set when a tunneler fires). Acquisition was already gated.
    - **Coolant from water (Lane):** **Water Tower** (`B.watertower`, 450cr) unlocks **Coolant Tankers drawing coolant straight from rivers & lakes**. Each water tile holds coolant in `game.waterAmt` (Float32Array, 700/tile, set in `mapgen`); tankers drain it (mirrors the Logger's tile‑work via `nearestWaterTile`), and an **emptied tile DRIES to passable dirt** (`dryWater` → `dryWaterAt` repaint hook) so lakes drain shoreline‑inward and open crossings. The tower is also a coolant drop‑off (+4/s). `hasWaterTower()` gates it; **player‑only** (AI sticks to coolant nodes). Coolant nodes are also more plentiful now (richer caches + bigger central field). Tuning: `waterAmt` 700/tile, draw 62/s.
 
+   **HEROES (roadmap #6 — commit `2ea703c`, main + live):** the full excavate‑a‑hero loop.
+   - **Hero Vaults** (`game.vaults`, `Vault` type) — buried in mountain **rock**, placed in `mapgen` away from bases, one per archetype. Hidden until **surveyed**.
+   - **Survey Hunter** (`U.hunter`, airborne, light weapon, `survey:true`, gated on `drillbay`) — its big `SURVEY_R` sense locates vaults (`vaultTick`); discovery clears local fog so the vault shows.
+   - **Excavation** — right‑click a discovered vault with a **Borer** → `order:'dig'` → `excavate()` drills **pay‑as‑you‑drill** (`DIG_CR_RATE` 50 cr/s + `DIG_AL_RATE` 12 alloy/s over `DIG_TIME` 18s; stalls if you can't pay). At 100% it spawns the hero at a free spot.
+   - **3 hero archetypes** (`hero:true`, golden crown render, never desert): **`titan`** (brawler, 1700hp + heavy cannon), **`siegelord`/Devastator** (artillery, 300 range, 95 dmg, big splash, fragile), **`warden`** (heal‑aura support via `auraHeal` 16 hp/s, `auraTick`). Excavated only — NOT in the build menu; map‑limited (3 vaults).
+   - Render: `BattleScene.drawSettlements` draws discovered vaults (glow + dig ring) + minimap diamonds. Player‑only.
+   - ⚠️ Compile‑verified only — playtest: Hunter reveals vaults, Borer digs & drains resources, each hero spawns and behaves (Warden aura heals, Devastator out‑ranges, Titan tanks).
+   - **Tuning:** vault count (3, in `mapgen`), `DIG_TIME`/`DIG_CR_RATE`/`DIG_AL_RATE`, `SURVEY_R` (14 tiles), hero stats in `constants.ts`, `AURA_R` 130 / Warden `auraHeal` 16.
+
 **Big remaining roadmap item:**
 
 4. **#9 Naval / oceans** — the last item from Lane's original 10. Add ocean terrain on the big maps + sea units for **combat, transport, and harvesting (oil + fish as sea resources)**. Depends on the 3× maps (done). This is a large, multi‑part feature — scope it with Lane.
