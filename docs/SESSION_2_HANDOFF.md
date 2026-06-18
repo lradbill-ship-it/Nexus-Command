@@ -165,7 +165,9 @@ The sim is engine‑independent and **never touches the DOM/renderer** — it ta
 
 **Continuous:**
 
-4. **#10 Polish** — Lane wants it "much better looking & functioning." Biggest visual win = **real CC0 art assets** (Kenney.nl / OpenGameArt) replacing the procedural canvas sprites, + Phaser lighting/particles. Lane has noted wanting UI polish interleaved with features.
+4. **#10 Polish** — Lane wants it "much better looking & functioning." Biggest remaining visual win = **real CC0 art assets** (Kenney.nl / OpenGameArt) replacing the procedural canvas sprites, + Phaser lighting/particles.
+   - ✅ **Polish pass 1 (commit `a77f55d`, main + live):** combat FX — explosion **embers** + slower outer **shockwave**, glowing **tracer heads** (new `ember`/`mote`/`shock` particle types in `spawnParts`/`drawFx`); cinematic **vignette** (`BattleScene.makeVignette`, camera‑fixed depth 10500); faint **ambient dust motes** (spawned in `update` within the worldView). HUD: topbar readouts in **legibility chips** + **fixed the mobile topbar overflow** (collided with the sidebar at ≤375px) — now `flex-wrap` + `min-height`, compacted chips on mobile.
+   - **Preview note (updated):** this session the headless preview actually **did render the WebGL canvas** (terrain/HQ/units visible) alongside the DOM HUD — so UI/layout *is* screenshot‑verifiable here (used it to catch & fix the topbar overflow at 375px). Sim/combat behaviour still wants Lane's playtest.
 
 **Smaller follow‑ups noted during Session 1:**
 - Dedicated **Missile Silo** building (the nuke is currently gated on the Cyber Ops Center as a v1).
