@@ -161,9 +161,7 @@ The sim is engine‑independent and **never touches the DOM/renderer** — it ta
    - ⚠️ Compile‑verified only — playtest: Hunter reveals vaults, Borer digs & drains resources, each hero spawns and behaves (Warden aura heals, Devastator out‑ranges, Titan tanks).
    - **Tuning:** vault count (3, in `mapgen`), `DIG_TIME`/`DIG_CR_RATE`/`DIG_AL_RATE`, `SURVEY_R` (14 tiles), hero stats in `constants.ts`, `AURA_R` 130 / Warden `auraHeal` 16.
 
-**Big remaining roadmap item:**
-
-4. **#9 Naval / oceans** — the last item from Lane's original 10. Add ocean terrain on the big maps + sea units for **combat, transport, and harvesting (oil + fish as sea resources)**. Depends on the 3× maps (done). This is a large, multi‑part feature — scope it with Lane.
+**~~#9 Naval / oceans~~ — SCRAPPED (Lane, 2026‑06‑18).** Do not build naval/sea units/ocean terrain. Removed from the roadmap.
 
 **Continuous:**
 
