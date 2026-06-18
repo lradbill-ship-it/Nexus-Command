@@ -6,7 +6,10 @@ import {
 import { game, resetState, isAllied } from '../sim/state';
 import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, spawnParts } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
-import { renderTerrain, getTerrainCanvas, scorch, clearForestAt, dryWaterAt, terrainDirty, clearTerrainDirty } from '../render/terrain';
+import { renderTerrain, getTerrainCanvas, scorch, clearForestAt, dryWaterAt, setTerrainTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
+import grassTex from '../assets/terrain/grass.jpg?inline';
+import rockTex from '../assets/terrain/rock.jpg?inline';
+import dirtTex from '../assets/terrain/dirt.jpg?inline';
 import { buildAllTextures, originOf } from '../render/textures';
 import { initAudio, sfx, setViewWidth, toggleMute } from '../audio';
 import type { Building, Unit, Entity } from '../sim/types';
@@ -47,8 +50,19 @@ export class BattleScene extends Phaser.Scene {
 
   constructor() { super('battle'); }
 
+  preload() {
+    this.load.image('tex_grass', grassTex);     // CC0 ground textures (ambientCG) — loaded before the first terrain bake
+    this.load.image('tex_rock', rockTex);
+    this.load.image('tex_dirt', dirtTex);
+  }
+
   create() {
     buildAllTextures(this);
+    setTerrainTextures(                          // hand the loaded source images to the terrain renderer
+      this.textures.get('tex_grass').getSourceImage() as HTMLImageElement,
+      this.textures.get('tex_rock').getSourceImage() as HTMLImageElement,
+      this.textures.get('tex_dirt').getSourceImage() as HTMLImageElement,
+    );
     setScorchHook(scorch);
     setClearForestHook(clearForestAt);
     setDryWaterHook(dryWaterAt);

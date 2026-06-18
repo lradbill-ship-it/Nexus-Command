@@ -17,6 +17,14 @@ export function clearTerrainDirty() { dirty = false; }
 const inMapT = (x: number, y: number) => x >= 0 && y >= 0 && x < MAPW && y < MAPH;
 function shade(rgb: number[], k: number) { return `rgb(${rgb.map(c => Math.max(0, Math.min(255, c * k | 0))).join(',')})`; }
 
+// Real CC0 ground textures (ambientCG), blended over the stylized base for surface detail.
+let patGrass: CanvasPattern | null = null, patRock: CanvasPattern | null = null, patDirt: CanvasPattern | null = null;
+export function setTerrainTextures(grass: CanvasImageSource, rock: CanvasImageSource, dirt: CanvasImageSource) {
+  patGrass = tg.createPattern(grass, 'repeat');
+  patRock = tg.createPattern(rock, 'repeat');
+  patDirt = tg.createPattern(dirt, 'repeat');
+}
+
 /** Paint the full natural battlefield (ported from wip-v3/p2-systems renderTerrain) + baked trees. */
 export function renderTerrain() {
   const T = game.terr;
@@ -45,6 +53,19 @@ export function renderTerrain() {
     } else if (t === T_BRIDGE) {
       tg.fillStyle = shade([26, 68, 92], 0.9); tg.fillRect(px, py, TILE, TILE);
     }
+  }
+  // real CC0 ground texture, overlaid on the stylized base for genuine surface detail
+  if (patGrass && patRock && patDirt) {
+    tg.save();
+    tg.globalCompositeOperation = 'overlay';
+    tg.globalAlpha = 0.8;
+    for (let y = 0; y < MAPH; y++) for (let x = 0; x < MAPW; x++) {
+      const t = T[idx(x, y)];
+      const pat = t === T_GRASS || t === T_FOREST ? patGrass : t === T_ROCK ? patRock : (t === T_DIRT || t === T_ROAD) ? patDirt : null;
+      if (!pat) continue;
+      tg.fillStyle = pat; tg.fillRect(x * TILE, y * TILE, TILE, TILE);
+    }
+    tg.restore();
   }
   // soft organic speckle
   for (let i = 0; i < 14000; i++) {
