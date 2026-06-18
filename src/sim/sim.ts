@@ -525,10 +525,12 @@ function damage(e: Entity, amt: number, fromTeam: number) { e.hp -= amt; if (e.h
 function destroy(e: Entity, fromTeam: number) {
   if (e.dead) return; e.dead = true;
   const big = e.kind === 'b';
-  spawnParts('fire', e.x, e.y, big ? 26 : 12, '255,160,60');
+  spawnParts('fire', e.x, e.y, big ? 30 : 13, '255,160,60');
+  spawnParts('ember', e.x, e.y, big ? 22 : 10, '255,198,104');
   spawnParts('debris', e.x, e.y, big ? 14 : 7, '120,120,128');
-  spawnParts('smoke', e.x, e.y, big ? 12 : 5, '70,70,76');
+  spawnParts('smoke', e.x, e.y, big ? 16 : 6, '70,70,76');
   game.parts.push({ type: 'ring', x: e.x, y: e.y, t: 0, life: 0.7, big });
+  if (big) game.parts.push({ type: 'shock', x: e.x, y: e.y, t: 0, life: 0.85, big });   // slower outer shockwave
   game.parts.push({ type: 'flash', x: e.x, y: e.y, t: 0, life: 0.16, big });
   scorchHook(e.x, e.y, big ? Math.max((e as Building).w, (e as Building).h) * 0.6 : 15);
   game.shake = Math.min(11, game.shake + (big ? 7 : 2));
@@ -1134,14 +1136,16 @@ export function spawnParts(type: string, x: number, y: number, n: number, rgb: s
   for (let i = 0; i < n; i++) {
     const a = Math.random() * 7;
     const sp = type === 'fire' ? 50 + Math.random() * 190 : type === 'debris' ? 70 + Math.random() * 200 :
+      type === 'ember' ? 60 + Math.random() * 230 : type === 'mote' ? 4 + Math.random() * 10 :
       type === 'smoke' ? 8 + Math.random() * 26 : type === 'steam' ? 6 + Math.random() * 14 : 20 + Math.random() * 70;
     const part: Particle = {
-      type, x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - (type === 'debris' ? 60 : 0),
+      type, x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - (type === 'debris' || type === 'ember' ? 70 : 0),
       t: 0,
       life: type === 'smoke' ? 1.3 + Math.random() * 0.9 : type === 'steam' ? 1.4 + Math.random() :
-        type === 'debris' ? 0.6 + Math.random() * 0.5 : type === 'fire' ? 0.35 + Math.random() * 0.35 : 0.3 + Math.random() * 0.25,
-      rgb, size: type === 'smoke' || type === 'steam' ? 5 + Math.random() * 8 : 1.5 + Math.random() * 2.5,
-      grav: type === 'debris' ? 340 : 0,
+        type === 'debris' ? 0.6 + Math.random() * 0.5 : type === 'fire' ? 0.35 + Math.random() * 0.35 :
+        type === 'ember' ? 0.55 + Math.random() * 0.7 : type === 'mote' ? 3.5 + Math.random() * 3 : 0.3 + Math.random() * 0.25,
+      rgb, size: type === 'smoke' || type === 'steam' ? 5 + Math.random() * 8 : type === 'mote' ? 0.8 + Math.random() * 1.2 : 1.5 + Math.random() * 2.5,
+      grav: type === 'debris' ? 340 : type === 'ember' ? 210 : 0,
     };
     game.parts.push(part);
   }

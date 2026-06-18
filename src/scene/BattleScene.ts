@@ -4,7 +4,7 @@ import {
   idx, clamp, dist,
 } from '../sim/constants';
 import { game, resetState, isAllied } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, spawnParts } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, scorch, clearForestAt, dryWaterAt, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import { buildAllTextures, originOf } from '../render/textures';
@@ -31,6 +31,7 @@ export class BattleScene extends Phaser.Scene {
   private fxNorm!: Phaser.GameObjects.Graphics;
   private settleGfx!: Phaser.GameObjects.Graphics;
   private overlay!: Phaser.GameObjects.Graphics;
+  private vignette!: Phaser.GameObjects.Image;
   private recs = new Map<number, SpriteRec>();
   private crystals = new Map<object, { spr: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image }>();
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
@@ -63,6 +64,7 @@ export class BattleScene extends Phaser.Scene {
     this.fxNorm = this.add.graphics().setDepth(9000);
     this.fxAdd = this.add.graphics().setDepth(9001).setBlendMode(Phaser.BlendModes.ADD);
     this.fogImg = this.add.image(0, 0, '__DEFAULT').setOrigin(0, 0).setDepth(10000);
+    this.makeVignette();                                   // cinematic edge darkening (screen-space)
     this.overlay = this.add.graphics().setDepth(11000);
 
     // fog texture (84x84, soft-filtered)
@@ -85,12 +87,27 @@ export class BattleScene extends Phaser.Scene {
     this.setupKeys();
 
     setViewWidth(this.scale.width);
-    this.scale.on('resize', () => setViewWidth(this.scale.width));
+    this.scale.on('resize', () => { setViewWidth(this.scale.width); this.vignette.setDisplaySize(this.scale.width, this.scale.height); });
 
     this.newMatch(false);
   }
 
   setEndHandler(fn: (win: boolean) => void) { this.onEnd = fn; }
+
+  /** Screen-space vignette — subtle edge darkening for cinematic depth. */
+  private makeVignette() {
+    const key = 'vignette';
+    if (!this.textures.exists(key)) {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+      const g = c.getContext('2d')!;
+      const grd = g.createRadialGradient(128, 128, 64, 128, 128, 184);
+      grd.addColorStop(0, 'rgba(0,0,0,0)'); grd.addColorStop(0.68, 'rgba(0,0,0,0)'); grd.addColorStop(1, 'rgba(3,6,9,0.5)');
+      g.fillStyle = grd; g.fillRect(0, 0, 256, 256);
+      this.textures.addCanvas(key, c);
+    }
+    this.vignette = this.add.image(0, 0, key).setOrigin(0, 0).setScrollFactor(0).setDepth(10500);
+    this.vignette.setDisplaySize(this.scale.width, this.scale.height);
+  }
 
   /** Regenerate a fresh battlefield. start=true skips the intro (used by restart). */
   newMatch(start: boolean) {
@@ -261,6 +278,10 @@ export class BattleScene extends Phaser.Scene {
     if (game.started && !game.over) {
       this.panCamera(dt);
       stepWorld(dt);
+      if (game.parts.length < 180 && Math.random() < 0.3) {     // faint ambient dust drifting across the view
+        const wv = this.cameras.main.worldView;
+        spawnParts('mote', wv.x + Math.random() * wv.width, wv.y + Math.random() * wv.height, 1, '198,210,196');
+      }
     }
     // sync game.cam for audio panning
     game.cam.x = this.cameras.main.scrollX; game.cam.y = this.cameras.main.scrollY;
@@ -473,17 +494,25 @@ export class BattleScene extends Phaser.Scene {
       const col = Phaser.Display.Color.HexStringToColor(s.col).color;
       a.lineStyle(s.rail ? 5 : 3, col, 0.35); a.beginPath(); a.moveTo(x0, y0); a.lineTo(s.x, s.y); a.strokePath();
       a.lineStyle(s.rail ? 2 : 1.2, 0xffffff, 0.95); a.beginPath(); a.moveTo(x0, y0); a.lineTo(s.x, s.y); a.strokePath();
+      a.fillStyle(col, 0.5); a.fillCircle(s.x, s.y, s.rail ? 5 : 3.4);                  // tracer head glow
+      a.fillStyle(0xffffff, 0.95); a.fillCircle(s.x, s.y, s.rail ? 2.4 : 1.7);
     }
     for (const p of game.parts) {
       const k = 1 - p.t / p.life;
       if (p.type === 'ring') {
         const r = (p.big ? 16 : 9) + p.t * (p.big ? 170 : 95);
         a.lineStyle(3, 0xffb46e, k); a.strokeCircle(p.x, p.y, r);
+      } else if (p.type === 'shock') {
+        const r = 20 + p.t * 96;                                                        // slower outer shockwave
+        a.lineStyle(2, 0xfff0d2, k * 0.55); a.strokeCircle(p.x, p.y, r);
       } else if (p.type === 'emp') {
         const r = p.t / p.life * 132;
         a.lineStyle(2, 0x96c3ff, k); a.strokeCircle(p.x, p.y, r); a.strokeCircle(p.x, p.y, r * 0.55);
       } else if (p.type === 'flash') {
         a.fillStyle(0xffffff, k); a.fillCircle(p.x, p.y, (p.big ? 26 : 13) * (0.5 + p.t / p.life));
+      } else if (p.type === 'mote') {
+        const c = Phaser.Display.Color.RGBStringToColor('rgb(' + (p.rgb || '200,210,200') + ')').color;
+        a.fillStyle(c, 0.13 * k); a.fillCircle(p.x, p.y, (p.size || 1) + 0.3);          // faint ambient drift
       } else if (p.type === 'smoke' || p.type === 'steam') {
         const c = Phaser.Display.Color.RGBStringToColor('rgb(' + (p.rgb || '90,90,100') + ')').color;
         n.fillStyle(c, 0.3 * k); n.fillCircle(p.x, p.y, (p.size || 6) * (1 + p.t));
