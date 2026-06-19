@@ -6,10 +6,12 @@ import {
 import { game, resetState, isAllied } from '../sim/state';
 import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, spawnParts } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
-import { renderTerrain, getTerrainCanvas, scorch, clearForestAt, dryWaterAt, setTerrainTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
+import { renderTerrain, getTerrainCanvas, scorch, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import grassTex from '../assets/terrain/grass.jpg?inline';
 import rockTex from '../assets/terrain/rock.jpg?inline';
 import dirtTex from '../assets/terrain/dirt.jpg?inline';
+import pineTex from '../assets/trees/pine.png?inline';
+import treeTex from '../assets/trees/tree.png?inline';
 import { buildAllTextures, originOf } from '../render/textures';
 import { initAudio, sfx, setViewWidth, toggleMute } from '../audio';
 import type { Building, Unit, Entity } from '../sim/types';
@@ -54,6 +56,8 @@ export class BattleScene extends Phaser.Scene {
     this.load.image('tex_grass', grassTex);     // CC0 ground textures (ambientCG) — loaded before the first terrain bake
     this.load.image('tex_rock', rockTex);
     this.load.image('tex_dirt', dirtTex);
+    this.load.image('tex_pine', pineTex);        // CC0 tree sprites (Kenney foliage)
+    this.load.image('tex_tree', treeTex);
   }
 
   create() {
@@ -62,6 +66,10 @@ export class BattleScene extends Phaser.Scene {
       this.textures.get('tex_grass').getSourceImage() as HTMLImageElement,
       this.textures.get('tex_rock').getSourceImage() as HTMLImageElement,
       this.textures.get('tex_dirt').getSourceImage() as HTMLImageElement,
+    );
+    setTreeTextures(
+      this.textures.get('tex_pine').getSourceImage() as HTMLImageElement,
+      this.textures.get('tex_tree').getSourceImage() as HTMLImageElement,
     );
     setScorchHook(scorch);
     setClearForestHook(clearForestAt);

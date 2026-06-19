@@ -24,6 +24,9 @@ export function setTerrainTextures(grass: CanvasImageSource, rock: CanvasImageSo
   patRock = tg.createPattern(rock, 'repeat');
   patDirt = tg.createPattern(dirt, 'repeat');
 }
+// Real CC0 tree sprites (Kenney foliage) — replace the procedural canopy blobs.
+let imgPine: HTMLImageElement | null = null, imgTree: HTMLImageElement | null = null;
+export function setTreeTextures(pine: HTMLImageElement, tree: HTMLImageElement) { imgPine = pine; imgTree = tree; }
 
 /** Paint the full natural battlefield (ported from wip-v3/p2-systems renderTerrain) + baked trees. */
 export function renderTerrain() {
@@ -160,6 +163,18 @@ function paintTree(x: number, y: number, r: number, pine: boolean, tone: number)
   // ground shadow
   tg.fillStyle = 'rgba(0,0,0,.32)';
   tg.beginPath(); tg.ellipse(x + 3, y + r * 0.7, r * 1.05, r * 0.42, 0, 0, 7); tg.fill();
+  // real CC0 tree sprite (with per-tree flip + size variety so forests don't look copy-pasted)
+  const img = pine ? imgPine : imgTree;
+  if (img && img.width) {
+    const h = r * 3.5 * (0.85 + tone * 0.4);
+    const w = h * img.width / img.height;
+    tg.save();
+    tg.translate(x, y + r * 0.7);
+    tg.scale(tone > 0.5 ? -1 : 1, 1);
+    tg.drawImage(img, -w / 2, -h, w, h);
+    tg.restore();
+    return;
+  }
   // trunk
   tg.fillStyle = '#3a2c1d';
   tg.fillRect(x - 1.6, y - 1, 3.2, r * 0.8);
