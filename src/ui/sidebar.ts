@@ -12,8 +12,8 @@ import {
 let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
 
-const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'cyber', 'drillbay'];
-const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'hunter', 'borer'];
+const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'idome', 'cyber', 'silo', 'drillbay'];
+const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'aegis', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'hunter', 'borer'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -35,6 +35,8 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'aaturret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - 2, cy); g.lineTo(cx + 5, cy - 8); g.moveTo(cx + 2, cy); g.lineTo(cx + 9, cy - 6); g.stroke(); }
     else if (type === 'cyber') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(155,111,232,.5)'; g.fill(); g.strokeStyle = '#b07dff'; g.stroke(); }
     else if (type === 'drillbay') { g.fillStyle = '#1a2735'; g.fillRect(12, 11, 16, 9); g.strokeRect(12, 11, 16, 9); g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(15, 20); g.lineTo(20, 7); g.lineTo(25, 20); g.stroke(); g.fillStyle = '#9fb3c2'; g.beginPath(); g.moveTo(20, 10); g.lineTo(23, 17); g.lineTo(17, 17); g.closePath(); g.fill(); }
+    else if (type === 'silo') { g.fillStyle = '#11161d'; g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fill(); g.strokeStyle = '#e8b64c'; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.stroke(); g.fillStyle = '#cdd9e3'; g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fill(); g.fillStyle = '#e8483a'; g.beginPath(); g.arc(cx, cy, 1.5, 0, 7); g.fill(); }
+    else if (type === 'idome') { g.fillStyle = 'rgba(150,210,255,.6)'; g.beginPath(); g.arc(cx, cy + 3, 8, Math.PI, 0); g.fill(); g.strokeStyle = '#9fdcff'; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy + 3, 8, Math.PI, 0); g.stroke(); g.strokeStyle = '#c9d6e0'; g.beginPath(); g.moveTo(cx - 3, cy + 2); g.lineTo(cx - 6, cy - 4); g.moveTo(cx + 3, cy + 2); g.lineTo(cx + 6, cy - 4); g.stroke(); }
   } else {
     if (type === 'harvester') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#9bd4ff'; g.fillRect(16, 9, 8, 6); }
     else if (type === 'tanker') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#7fd6ea'; g.beginPath(); g.arc(20, 13, 5, 0, 7); g.fill(); g.strokeStyle = '#cfeef5'; g.beginPath(); g.moveTo(15, 13); g.lineTo(25, 13); g.stroke(); }
@@ -51,6 +53,7 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'harrier') { g.fillStyle = '#1a2735'; g.beginPath(); g.moveTo(cx, cy - 9); g.lineTo(cx + 3, cy + 7); g.lineTo(cx - 3, cy + 7); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = '#cfe6ee'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx - 8, cy + 2); g.lineTo(cx, cy - 3); g.lineTo(cx + 8, cy + 2); g.stroke(); }
     else if (type === 'borer') { g.fillRect(13, 8, 14, 12); g.strokeRect(13, 8, 14, 12); g.fillStyle = '#dde7ef'; g.beginPath(); g.moveTo(20, 2); g.lineTo(25, 8); g.lineTo(15, 8); g.closePath(); g.fill(); g.strokeStyle = '#1a232e'; g.lineWidth = 1; g.beginPath(); g.moveTo(18, 4); g.lineTo(20, 8); g.moveTo(22, 4); g.lineTo(20, 8); g.stroke(); }
     else if (type === 'hunter') { g.fillStyle = '#1a2735'; g.beginPath(); g.moveTo(cx, cy - 8); g.lineTo(cx + 5, cy + 6); g.lineTo(cx - 5, cy + 6); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = '#9ce6a4'; g.lineWidth = 1.4; g.beginPath(); g.arc(cx, cy, 4, 0, 7); g.stroke(); }
+    else if (type === 'aegis') { g.fillRect(13, 7, 14, 13); g.strokeRect(13, 7, 14, 13); g.fillStyle = 'rgba(150,210,255,.7)'; g.beginPath(); g.arc(cx, cy, 5, 0, 7); g.fill(); g.strokeStyle = '#9fdcff'; g.lineWidth = 1.3; g.beginPath(); g.arc(cx, cy, 5, 0, 7); g.stroke(); }
   }
   return c;
 }
@@ -89,9 +92,10 @@ export function makeUI() {
   for (const k of Object.keys(ABILITIES)) {
     const a = ABILITIES[k];
     const ic = document.createElement('canvas'); ic.width = 40; ic.height = 26;
-    const g = ic.getContext('2d')!; g.strokeStyle = k === 'emp' ? '#96c3ff' : '#b07dff'; g.lineWidth = 1.6;
+    const g = ic.getContext('2d')!; g.strokeStyle = k === 'emp' ? '#96c3ff' : k === 'nuke' ? '#e9a93d' : k === 'thermo' ? '#e8483a' : '#b07dff'; g.lineWidth = 1.6;
     g.beginPath(); g.arc(20, 13, 8, 0, 7); g.stroke(); g.beginPath(); g.arc(20, 13, 4, 0, 7); g.stroke();
-    const btn = cmdButton('a_' + k, ic, a.name, '▣' + a.cost + ' · ' + a.cd + 's', a.key);
+    if (k === 'thermo') { g.fillStyle = '#e8483a'; g.beginPath(); g.arc(20, 13, 2, 0, 7); g.fill(); }
+    const btn = cmdButton('a_' + k, ic, a.name, '▣' + a.cost + (a.alloy ? ' ⬡' + a.alloy : '') + ' · ' + a.cd + 's', a.key);
     btn.title = a.desc; btn.onclick = () => tryAbility(k); ag.appendChild(btn);
   }
   const ch = $('covChips');
@@ -241,9 +245,10 @@ export function refresh() {
   }
   for (const k of Object.keys(ABILITIES)) {
     const btn = $('a_' + k) as HTMLButtonElement;
-    btn.disabled = !hc || game.money[PLAYER] < ABILITIES[k].cost || game.cooldowns[k] > 0;
+    const ab = ABILITIES[k];
+    btn.disabled = !hasBuilding(ab.requires || 'cyber') || game.money[PLAYER] < ab.cost || (ab.alloy || 0) > alloyHave || game.cooldowns[k] > 0;
     btn.classList.toggle('armed', game.armed === k);
-    (btn.querySelector('.cd') as HTMLElement).style.width = (game.cooldowns[k] > 0 ? game.cooldowns[k] / ABILITIES[k].cd * 100 : 0) + '%';
+    (btn.querySelector('.cd') as HTMLElement).style.width = (game.cooldowns[k] > 0 ? game.cooldowns[k] / ab.cd * 100 : 0) + '%';
   }
   for (const k of covertOrder) {
     const btn = $('c_' + k) as HTMLButtonElement;

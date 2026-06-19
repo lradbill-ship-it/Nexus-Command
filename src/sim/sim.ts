@@ -31,7 +31,9 @@ let lastHintT = 0;
 let crystalT = 55;   // first new formation seeds ~55s in
 let autoScout = false;   // when on, idle Recon Drones auto-reveal the map (scouts-only auto-explore)
 let autoScoutT = 0;      // throttle accumulator for auto-scout order assignment
-let pendingStrikes: { x: number; y: number; at: number }[] = [];   // in-flight ballistic missiles → detonate when game.t >= at
+type Strike = { x: number; y: number; at: number; team: number; kind: 'nuke' | 'thermo' };
+let pendingStrikes: Strike[] = [];   // in-flight missiles → detonate when game.t >= at (unless intercepted)
+export function pendingStrikeList(): readonly Strike[] { return pendingStrikes; }
 export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; pendingStrikes = []; lastWoodNag = -9; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
@@ -702,7 +704,7 @@ function separation() {
 
 // Non-combat economy/support units (harvesters, loggers, repair rigs) — never
 // desert in a revolt, count as civilians at settlements, and don't take attack orders.
-export const isSupport = (type: string) => !!(U[type].harvests || U[type].logs || U[type].repair);
+export const isSupport = (type: string) => !!(U[type].harvests || U[type].logs || U[type].repair || U[type].shield);
 
 // ── Harvesting (resource-typed: harvester=crystal, tanker=coolant) ────────────
 const resOf = (u: Unit) => U[u.type].harvests!;
@@ -1007,6 +1009,11 @@ function updateUnit(u: Unit, dt: number) {
     updateLogger(u, dt); return;
   }
   if (U[u.type].repair) { updateRepair(u, dt); return; }
+  if (U[u.type].shield) {                                               // Aegis — mobile missile interceptor (no weapon); cooldown ticks above
+    if ((u.order === 'move' || u.order === 'amove') && u.dest) { if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; } }
+    else u.moving = false;
+    return;
+  }
   // drop a target that's dead — or that dived underground (only a tunneler can keep hitting it)
   if (u.target && (u.target.dead || (u.target.kind === 'u' && ((u.target as Unit).tunnelT ?? 0) > 0 && !U[u.type].tunneler))) u.target = null;
   if (u.order === 'dig') {                                              // Borer excavating a Hero Vault
@@ -1101,6 +1108,7 @@ function updateBuilding(b: Building, dt: number) {
     return;
   }
   if (b.disabledUntil > game.t) return;
+  if (b.type === 'idome') b.cooldown = Math.max(0, b.cooldown - dt);   // Iron Dome interceptor recharge
   if (b.type === 'turret' || b.type === 'aaturret') {
     b.cooldown = Math.max(0, b.cooldown - dt);
     if (b.target && (b.target.dead || dist(b, b.target) > d.range! + 30 || !eligibleTarget(b, b.target) || (b.target.kind === 'u' && ((b.target as Unit).tunnelT ?? 0) > 0))) b.target = null;   // turrets can't hit the underground
@@ -1190,10 +1198,12 @@ export function hasCyber() { return game.buildings.some(b => b.team === PLAYER &
 export function hasBuilding(type: string) { return game.buildings.some(b => b.team === PLAYER && b.type === type && b.progress >= 1); }
 export function tryAbility(key: string) {
   if (game.over) return;
-  if (!hasCyber()) { hint('Requires a Cyber Ops Center'); sfx('click'); return; }
   const a = ABILITIES[key];
+  const req = a.requires || 'cyber';
+  if (!hasBuilding(req)) { hint('Requires a ' + B[req].name); sfx('click'); return; }
   if (game.cooldowns[key] > 0) { hint(a.name + ' recharging'); return; }
   if (game.money[PLAYER] < a.cost) { hint('Insufficient crystals'); return; }
+  if ((a.alloy || 0) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy'); return; }
   game.armed = key; game.placing = null;
   hint(a.name + ': click a target');
 }
@@ -1224,33 +1234,88 @@ export function castAbility(key: string, wx: number, wy: number) {
     logMsg(U[best.type].name + ' hijacked — it\'s ours now', 'hot');
   } else if (key === 'nuke') {
     game.money[PLAYER] -= a.cost; game.cooldowns.nuke = a.cd * (styleMod(PLAYER).cdMul ?? 1);
-    pendingStrikes.push({ x: wx, y: wy, at: game.t + NUKE_TRAVEL });
+    pendingStrikes.push({ x: wx, y: wy, at: game.t + NUKE_TRAVEL, team: PLAYER, kind: 'nuke' });
     sfx('rail', wx);
     logMsg('☢ Ballistic missile launched — impact in ' + NUKE_TRAVEL + 's', 'war');
+  } else if (key === 'thermo') {
+    game.money[PLAYER] -= a.cost; game.alloy[PLAYER] = (game.alloy[PLAYER] || 0) - (a.alloy || 0);
+    game.cooldowns.thermo = a.cd * (styleMod(PLAYER).cdMul ?? 1);
+    pendingStrikes.push({ x: wx, y: wy, at: game.t + THERMO_TRAVEL, team: PLAYER, kind: 'thermo' });
+    sfx('rail', wx); game.shake = Math.min(9, game.shake + 5);
+    logMsg('☢☢ THERMONUCLEAR LAUNCH — impact in ' + THERMO_TRAVEL + 's. May the targets be clustered.', 'war');
   }
   game.armed = null;
 }
-const NUKE_TRAVEL = 4;     // seconds from launch to impact
-const NUKE_R = 150;        // blast radius (px)
-function detonateNuke(x: number, y: number) {
-  const hitFac: Record<number, number> = {};
-  for (const u of [...game.units]) { const d = dist(u, { x, y }); if (d < NUKE_R) { if (!isAllied(PLAYER, u.team)) hitFac[u.team] = 1; damage(u, 1100 * (1 - d / NUKE_R) + 120, 0); } }
-  for (const b of [...game.buildings]) { const d = dist(b, { x, y }); if (d < NUKE_R) { if (!isAllied(PLAYER, b.team)) hitFac[b.team] = 1; damage(b, 1600 * (1 - d / NUKE_R) + 260, 0); } }
-  for (const f in hitFac) if (!isWar(PLAYER, +f)) addRel(PLAYER, +f, -20);
-  spawnParts('fire', x, y, 64, '255,170,70'); spawnParts('smoke', x, y, 44, '80,80,86'); spawnParts('debris', x, y, 30, '120,120,128');
+const NUKE_TRAVEL = 4;       // seconds from launch to impact
+const NUKE_R = 150;          // ballistic blast radius (px)
+const THERMO_TRAVEL = 7;     // thermonuclear flight time (longer — react / intercept window)
+const THERMO_R = 440;        // thermonuclear blast radius (px) — covers a clustered base → faction-killer
+// ── Iron Dome interception ────────────────────────────────────────────────────
+const IDOME_R = 7 * TILE;    // Iron Dome building intercept radius
+const IDOME_CD = 9;          // seconds to recharge an interceptor
+const AEGIS_R = 5.5 * TILE;  // mobile Aegis intercept radius
+const AEGIS_CD = 10;
+function interceptFX(s: Strike, bx: number, by: number) {
+  spawnParts('muzzle', bx, by, 7, '150,220,255');                              // battery launches an interceptor
+  game.parts.push({ type: 'ring', x: s.x, y: s.y, t: 0, life: 0.5, big: false });
+  game.parts.push({ type: 'flash', x: s.x, y: s.y, t: 0, life: 0.16, big: false });
+  spawnParts('spark', s.x, s.y, 14, '160,225,255'); spawnParts('fire', s.x, s.y, 5, '255,225,160');
+  sfx('boom', s.x);
+}
+/** A ready, non-allied Iron Dome (building) or Aegis (unit) covering the impact knocks the missile down. */
+function tryIntercept(s: Strike): boolean {
+  for (const b of game.buildings) {
+    if (b.type !== 'idome' || b.progress < 1 || b.cooldown > 0 || isAllied(b.team, s.team)) continue;
+    if (dist(b, s) <= IDOME_R) {
+      b.cooldown = IDOME_CD; interceptFX(s, b.x, b.y);
+      if (isAllied(PLAYER, b.team)) { logMsg('🛡 Iron Dome INTERCEPTED an inbound ' + (s.kind === 'thermo' ? 'THERMONUCLEAR' : 'ballistic') + ' missile', 'good'); sfx('chime'); }
+      else if (s.team === PLAYER) logMsg('Our missile was intercepted by ' + FAC[b.team].name + ' defenses', 'war');
+      return true;
+    }
+  }
+  for (const u of game.units) {
+    if (!U[u.type].shield || u.dead || u.cooldown > 0 || isAllied(u.team, s.team)) continue;
+    if (dist(u, s) <= AEGIS_R) {
+      u.cooldown = AEGIS_CD; interceptFX(s, u.x, u.y);
+      if (isAllied(PLAYER, u.team)) { logMsg('🛡 Aegis Shield INTERCEPTED an inbound ' + (s.kind === 'thermo' ? 'THERMONUCLEAR' : 'ballistic') + ' missile', 'good'); sfx('chime'); }
+      else if (s.team === PLAYER) logMsg('Our missile was intercepted by ' + FAC[u.team].name + ' defenses', 'war');
+      return true;
+    }
+  }
+  return false;
+}
+function detonate(x: number, y: number, byTeam: number, r: number, uDmg: number, bDmg: number) {
+  for (const u of [...game.units]) { const d = dist(u, { x, y }); if (d < r) damage(u, uDmg * (1 - d / r) + uDmg * 0.18, byTeam); }
+  for (const b of [...game.buildings]) { const d = dist(b, { x, y }); if (d < r) damage(b, bDmg * (1 - d / r) + bDmg * 0.22, byTeam); }
+}
+function detonateNuke(x: number, y: number, byTeam: number) {
+  detonate(x, y, byTeam, NUKE_R, 1180, 1700);
+  spawnParts('fire', x, y, 64, '255,170,70'); spawnParts('ember', x, y, 30, '255,200,110'); spawnParts('smoke', x, y, 44, '80,80,86'); spawnParts('debris', x, y, 30, '120,120,128');
   game.parts.push({ type: 'ring', x, y, t: 0, life: 1.3, big: true });
+  game.parts.push({ type: 'shock', x, y, t: 0, life: 1.0, big: true });
   game.parts.push({ type: 'flash', x, y, t: 0, life: 0.35, big: true });
-  scorchHook(x, y, NUKE_R * 0.7);
-  game.shake = Math.min(22, game.shake + 18);
-  sfx('bigboom', x);
-  logMsg('☢ Missile detonation', 'war');
+  scorchHook(x, y, NUKE_R * 0.7); game.shake = Math.min(22, game.shake + 18); sfx('bigboom', x);
+  logMsg(byTeam === PLAYER ? '☢ Missile detonation' : '☢ ' + FAC[byTeam].name + ' missile detonation', 'war');
+}
+function detonateThermo(x: number, y: number, byTeam: number) {
+  detonate(x, y, byTeam, THERMO_R, 4200, 7000);                                 // colossal — flattens a clustered base
+  spawnParts('fire', x, y, 140, '255,180,80'); spawnParts('ember', x, y, 80, '255,210,120'); spawnParts('smoke', x, y, 120, '70,68,72'); spawnParts('debris', x, y, 70, '120,120,128');
+  game.parts.push({ type: 'ring', x, y, t: 0, life: 1.8, big: true });
+  game.parts.push({ type: 'shock', x, y, t: 0, life: 1.3, big: true });
+  game.parts.push({ type: 'shock', x, y, t: 0, life: 1.9, big: true });        // second, slower shockwave
+  game.parts.push({ type: 'flash', x, y, t: 0, life: 0.6, big: true });
+  scorchHook(x, y, THERMO_R * 0.6); game.shake = Math.min(40, game.shake + 36); sfx('bigboom', x);
+  logMsg('☢☢ THERMONUCLEAR DETONATION — ' + (byTeam === PLAYER ? 'target erased' : FAC[byTeam].name + ' unleashes a thermonuke'), 'war');
 }
 function processStrikes() {
   if (!pendingStrikes.length) return;
   const due = pendingStrikes.filter(s => s.at <= game.t);
   if (!due.length) return;
   pendingStrikes = pendingStrikes.filter(s => s.at > game.t);
-  for (const s of due) detonateNuke(s.x, s.y);
+  for (const s of due) {
+    if (tryIntercept(s)) continue;
+    if (s.kind === 'thermo') detonateThermo(s.x, s.y, s.team); else detonateNuke(s.x, s.y, s.team);
+  }
 }
 export function runCovert(key: string) {
   if (game.over) return;
@@ -1384,6 +1449,18 @@ function aiUpdate(team: number, dt: number) {
   if (game.t > 320) game.money[team] += 6 * dt;
   if (persona === 'merchant') game.money[team] += 4 * dt;
   if (persona === 'industrial') game.money[team] += 6 * dt;   // builder economy: steady production edge
+  // late-game: aggressive factions lob the occasional ballistic missile at a rival → makes Iron Dome matter
+  if (game.t > 540 && Math.random() < dt * (persona === 'warlord' ? 0.006 : 0.003)) {
+    const enemies = ALL_TEAMS.filter(f => f !== team && !game.eliminated[f] && isWar(team, f) && game.buildings.some(b => b.team === f));
+    if (enemies.length) {
+      const tgt = (enemies.includes(PLAYER) && Math.random() < 0.6) ? PLAYER : enemies[Math.random() * enemies.length | 0];
+      const hq = game.buildings.find(b => b.team === tgt && b.type === 'hq') || game.buildings.find(b => b.team === tgt);
+      if (hq) {
+        pendingStrikes.push({ x: hq.x + (Math.random() * 90 - 45), y: hq.y + (Math.random() * 90 - 45), at: game.t + NUKE_TRAVEL + 2, team, kind: 'nuke' });
+        if (tgt === PLAYER || isAllied(PLAYER, tgt)) { logMsg('⚠ INBOUND BALLISTIC MISSILE from ' + FAC[team].name + ' — intercept or scatter!', 'war'); sfx('war'); }
+      }
+    }
+  }
   // conscript from a surplus population when short on crystals (the people as a reserve)
   if ((game.pop[team] || 0) > 34 && game.money[team] < 500 && Math.random() < dt * 0.25) conscript(team);
   const harv = game.units.filter(u => u.team === team && u.type === 'harvester').length;

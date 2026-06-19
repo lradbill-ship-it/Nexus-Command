@@ -240,6 +240,24 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     const dg = g.createLinearGradient(rcx, rcy - 4, rcx, rcy + 8);                                       // suspended drill bit
     dg.addColorStop(0, '#cdd9e3'); dg.addColorStop(1, '#5a6573');
     g.fillStyle = dg; g.beginPath(); g.moveTo(rcx, rcy + 8); g.lineTo(rcx + 4, rcy - 3); g.lineTo(rcx - 4, rcy - 3); g.closePath(); g.fill();
+  } else if (type === 'silo') {
+    // missile silo: open blast hatch + missile nosecone, hazard rim
+    g.fillStyle = '#11161d'; g.beginPath(); g.arc(rcx, rcy, fw * 0.3, 0, 7); g.fill();
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(rcx, rcy, fw * 0.3, 0, 7); g.stroke();
+    g.strokeStyle = 'rgba(150,160,175,.5)'; g.lineWidth = 1;
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; g.beginPath(); g.moveTo(rcx, rcy); g.lineTo(rcx + Math.cos(a) * fw * 0.3, rcy + Math.sin(a) * fw * 0.3); g.stroke(); }
+    g.fillStyle = '#e8b64c'; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; g.fillRect(rcx + Math.cos(a) * fw * 0.33 - 1.5, rcy + Math.sin(a) * fw * 0.33 - 1.5, 3, 3); }
+    g.fillStyle = '#cdd9e3'; g.beginPath(); g.arc(rcx, rcy, 4.5, 0, 7); g.fill();
+    g.fillStyle = '#e8483a'; g.beginPath(); g.arc(rcx, rcy, 2.2, 0, 7); g.fill();
+  } else if (type === 'idome') {
+    // iron dome: glass radome + angled interceptor rails
+    const dg = g.createRadialGradient(rcx - 3, rcy - 4, 2, rcx, rcy, fw * 0.3);
+    dg.addColorStop(0, 'rgba(150,210,255,.85)'); dg.addColorStop(1, 'rgba(40,90,140,.5)');
+    g.fillStyle = dg; g.beginPath(); g.arc(rcx, rcy + 2, fw * 0.28, Math.PI, 0); g.fill();
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(rcx, rcy + 2, fw * 0.28, Math.PI, 0); g.stroke();
+    g.fillStyle = '#2a3340'; g.fillRect(rcx - fw * 0.3, rcy + 2, fw * 0.6, 3);
+    g.strokeStyle = '#c9d6e0'; g.lineWidth = 2; g.beginPath(); g.moveTo(rcx - 5, rcy); g.lineTo(rcx - 10, rcy - 9); g.moveTo(rcx + 5, rcy); g.lineTo(rcx + 10, rcy - 9); g.stroke();
+    g.fillStyle = '#9fdcff'; g.beginPath(); g.arc(rcx - 10, rcy - 9, 1.7, 0, 7); g.fill(); g.beginPath(); g.arc(rcx + 10, rcy - 9, 1.7, 0, 7); g.fill();
   }
   return [c, cx, cy];
 }
@@ -326,6 +344,15 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillStyle = body; g.strokeStyle = col; g.lineWidth = 1.8; rr(g, cx - 10, cy - 11, 20, 22, 6); g.fill(); g.stroke();
     g.fillStyle = 'rgba(127,224,127,.95)'; g.fillRect(cx - 2.6, cy - 7, 5.2, 14); g.fillRect(cx - 7, cy - 2.6, 14, 5.2);
     g.strokeStyle = 'rgba(150,235,160,.5)'; g.lineWidth = 1.2; g.beginPath(); g.arc(cx, cy, 9, 0, 7); g.stroke();
+  } else if (type === 'aegis') {
+    // mobile interceptor: hull + glass radome + interceptor pods
+    rr(g, cx - 10, cy - 12, 20, 24, 5); g.fill(); g.stroke();
+    const dg = g.createRadialGradient(cx - 2, cy - 3, 1, cx, cy - 1, 7);
+    dg.addColorStop(0, 'rgba(150,210,255,.9)'); dg.addColorStop(1, 'rgba(40,90,140,.55)');
+    g.fillStyle = dg; g.beginPath(); g.arc(cx, cy - 1, 6, 0, 7); g.fill();
+    g.strokeStyle = '#9fdcff'; g.lineWidth = 1.2; g.beginPath(); g.arc(cx, cy - 1, 6, 0, 7); g.stroke();
+    g.fillStyle = `rgba(${rgb},.85)`; g.fillRect(cx - 12, cy + 4, 2.5, 5); g.fillRect(cx + 9.5, cy + 4, 2.5, 5);
+    g.fillStyle = '#cdd9e3'; g.fillRect(cx - 3, cy - 13, 6, 3);
   } else if (type === 'recon') {
     // quadcopter: 4 rotor rings + slim core
     g.strokeStyle = 'rgba(200,225,235,.5)'; g.lineWidth = 1.4;

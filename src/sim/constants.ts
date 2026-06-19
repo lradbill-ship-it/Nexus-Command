@@ -110,6 +110,8 @@ export const B: Record<string, BuildingDef> = {
   market: { name: 'Civic Market', w: 2, h: 2, hp: 340, cost: 350, power: -8, buildTime: 9, sight: 3, hgt: 18, civic: 16, desc: 'Meets civic needs (+happiness). Happy citizens work faster.' },
   cyber: { name: 'Cyber Ops Center', w: 2, h: 2, hp: 740, cost: 800, power: -20, buildTime: 14, sight: 6, hgt: 20, alloy: 300, desc: 'Unlocks cyber abilities & covert missions. Needs alloy.' },
   drillbay: { name: 'Deep Bore Facility', w: 3, h: 2, hp: 980, cost: 1200, power: -25, buildTime: 18, sight: 5, hgt: 22, alloy: 300, desc: 'Hallmark works. Unlocks the Subterranean Borer — a burrowing assault drill. Needs alloy.' },
+  silo: { name: 'Missile Silo', w: 2, h: 2, hp: 820, cost: 1400, power: -25, buildTime: 16, sight: 5, hgt: 24, alloy: 400, desc: 'Launch platform. Unlocks Ballistic & Thermonuclear missile strikes. Needs alloy.' },
+  idome: { name: 'Iron Dome', w: 2, h: 2, hp: 560, cost: 900, power: -20, buildTime: 12, sight: 6, hgt: 16, alloy: 250, desc: 'Intercepts inbound ballistic & thermonuclear missiles over a wide radius. Recharges between intercepts.' },
 };
 
 // ── Units ────────────────────────────────────────────────────────────────────
@@ -134,6 +136,7 @@ export interface UnitDef {
   logs?: boolean;          // fells & clears forest tiles for wood (Logger Rig)
   repair?: boolean;        // mends friendly units & buildings, burning wood (Repair Rig)
   tunneler?: boolean;      // burrows through any terrain AND can strike underground units (Subterranean Borer)
+  shield?: boolean;        // mobile missile interceptor — no weapon (Aegis Shield)
   survey?: boolean;        // long-range sense that locates buried Hero Vaults (Survey Hunter)
   hero?: boolean;          // unique excavated super-unit (golden render; never deserts)
   auraHeal?: number;       // hp/sec healed to nearby allies (Warden hero aura)
@@ -162,13 +165,15 @@ export const U: Record<string, UnitDef> = {
   titan: { name: 'Colossus Titan', cost: 0, hp: 1700, speed: 58, radius: 15, sight: 7, buildTime: 0, dmg: 46, range: 128, rof: 0.9, splash: 30, coolant: 3, hero: true, desc: 'HERO — a towering brawler. Massive armour and a crushing short-range cannon.' },
   siegelord: { name: 'Devastator', cost: 0, hp: 760, speed: 54, radius: 13, sight: 8, buildTime: 0, dmg: 95, range: 300, rof: 3.2, splash: 72, coolant: 4, hero: true, desc: 'HERO — siege artillery. Annihilating long-range splash; fragile up close.' },
   warden: { name: 'Warden', cost: 0, hp: 1100, speed: 70, radius: 12, sight: 8, buildTime: 0, dmg: 18, range: 140, rof: 0.7, hero: true, auraHeal: 16, desc: 'HERO — battlefield guardian. Constantly mends nearby allies with a healing aura; steady weapon.' },
+  aegis: { name: 'Aegis Shield', cost: 700, hp: 320, speed: 66, radius: 11, sight: 7, buildTime: 14, alloy: 200, shield: true, requires: 'idome', desc: 'Mobile interceptor — shields nearby units from inbound missiles. Recharges between intercepts. Needs an Iron Dome.' },
 };
 
-export interface AbilityDef { name: string; cost: number; cd: number; key: string; desc: string; }
+export interface AbilityDef { name: string; cost: number; cd: number; key: string; requires?: string; alloy?: number; desc: string; }
 export const ABILITIES: Record<string, AbilityDef> = {
-  emp: { name: 'EMP Pulse', cost: 300, cd: 60, key: 'E', desc: 'Disable non-allied units & turrets in a zone for 8s. Hitting neutrals angers them.' },
-  hijack: { name: 'System Hijack', cost: 600, cd: 90, key: 'H', desc: 'Seize one enemy unit permanently. A hostile act against neutrals.' },
-  nuke: { name: 'Ballistic Missile', cost: 2000, cd: 150, key: 'N', desc: 'Long-range nuclear strike — a devastating area blast at the target after a short flight. Needs a Cyber Ops Center.' },
+  emp: { name: 'EMP Pulse', cost: 300, cd: 60, key: 'E', requires: 'cyber', desc: 'Disable non-allied units & turrets in a zone for 8s. Hitting neutrals angers them.' },
+  hijack: { name: 'System Hijack', cost: 600, cd: 90, key: 'H', requires: 'cyber', desc: 'Seize one enemy unit permanently. A hostile act against neutrals.' },
+  nuke: { name: 'Ballistic Missile', cost: 2000, cd: 150, key: 'N', requires: 'silo', desc: 'Long-range strike — a devastating area blast after a short flight. Needs a Missile Silo. Interceptable by Iron Dome.' },
+  thermo: { name: 'Thermonuclear Missile', cost: 9000, alloy: 2500, cd: 360, key: 'B', requires: 'silo', desc: 'CONTINENT-CRACKER — a colossal blast that can erase an entire faction in one strike. Staggering cost; needs a Missile Silo. Interceptable by Iron Dome.' },
 };
 
 export interface CovertDef { name: string; cost: number; cd: number; chance: number; desc: string; }

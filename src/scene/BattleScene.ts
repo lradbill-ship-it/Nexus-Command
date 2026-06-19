@@ -4,7 +4,7 @@ import {
   idx, clamp, dist,
 } from '../sim/constants';
 import { game, resetState, isAllied } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, spawnParts } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, spawnParts, pendingStrikeList } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, scorch, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import grassTex from '../assets/terrain/grass.jpg?inline';
@@ -262,6 +262,8 @@ export class BattleScene extends Phaser.Scene {
       if (k === 'escape') { game.placing = null; game.armed = null; }
       else if (k === 'e') tryAbility('emp');
       else if (k === 'h') tryAbility('hijack');
+      else if (k === 'n') tryAbility('nuke');
+      else if (k === 'b') tryAbility('thermo');
       else if (k === 'm') toggleMute();
       else if (k === 't') { if (game.selection.some(s => s.kind === 'u')) game.armed = 'amove'; }
       else if (k === 'c') conscript(PLAYER);
@@ -577,6 +579,7 @@ export class BattleScene extends Phaser.Scene {
       }
       if (b.hp < b.hpMax || sel.has(b)) drawHp(b.x, b.y - b.h / 2 - B[b.type].hgt * 0.4 - 6, b.w * 0.85, b.hp / b.hpMax, col);
       if (sel.has(b)) drawBr(b.x, b.y, Math.max(b.w, b.h) / 2 + 5);
+      if (sel.has(b) && b.type === 'idome') { g.lineStyle(1.5, 0x9fdcff, 0.5); g.strokeCircle(b.x, b.y, 7 * TILE); }   // intercept coverage
       if (sel.has(b) && b.type === 'foundry' && b.rally) {
         g.lineStyle(1, 0x3ec8b4, 0.6); g.lineBetween(b.x, b.y, b.rally.x, b.rally.y);
         g.fillStyle(0x3ec8b4, 0.8); g.fillCircle(b.rally.x, b.rally.y, 4);
@@ -586,6 +589,7 @@ export class BattleScene extends Phaser.Scene {
       if (!canSee(u)) continue;
       const d = U[u.type], col = Phaser.Display.Color.HexStringToColor(FAC[u.team].col).color;
       if (sel.has(u)) drawBr(u.x, u.y, d.radius + 7);
+      if (sel.has(u) && d.shield) { g.lineStyle(1.5, 0x9fdcff, 0.5); g.strokeCircle(u.x, u.y, 5.5 * TILE); }   // Aegis intercept coverage
       if (u.hp < u.hpMax || sel.has(u)) drawHp(u.x, u.y - d.radius - 9, 22, u.hp / u.hpMax, col);
       if ((d.harvests || d.logs) && u.cargo > 0) {
         const f = u.cargo / d.cargo!;
@@ -612,6 +616,16 @@ export class BattleScene extends Phaser.Scene {
       const x = Math.min(this.dragStart.x, p.worldX), y = Math.min(this.dragStart.y, p.worldY);
       const w = Math.abs(p.worldX - this.dragStart.x), h = Math.abs(p.worldY - this.dragStart.y);
       g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h);
+    }
+    // inbound-missile warning reticles (pulsing target rings at each in-flight strike)
+    for (const s of pendingStrikeList()) {
+      const big = s.kind === 'thermo';
+      const col = big ? 0xff3030 : 0xffa040;
+      const pulse = 0.45 + 0.55 * Math.abs(Math.sin(game.t * 6));
+      const r = big ? 64 : 34;
+      g.lineStyle(big ? 3 : 2, col, pulse);
+      g.strokeCircle(s.x, s.y, r); g.strokeCircle(s.x, s.y, r * 0.55);
+      g.lineBetween(s.x - r * 1.2, s.y, s.x + r * 1.2, s.y); g.lineBetween(s.x, s.y - r * 1.2, s.x, s.y + r * 1.2);
     }
   }
 
