@@ -176,8 +176,15 @@ The sim is engine‑independent and **never touches the DOM/renderer** — it ta
    - ✅ **Hybrid art #2 — real CC0 tree sprites (commit `8138f9a`, deploy `db1440a`, live):** Lane picked trees next. **Kenney Foliage Pack** (CC0, via archive.org) — conifer (foliagePack_004) + deciduous (foliagePack_010), downscaled to 96px → `src/assets/trees/*.png`, inlined `?inline` (`*.png?inline` declared in `vite-env.d.ts`). `setTreeTextures()` in `terrain.ts`; `paintTree` now `drawImage`s the sprite with per‑tree **flip + size variety** (driven by the `tone` field), falls back to procedural canopy if unloaded. Loaded in `BattleScene.preload`. **Single‑file artifact verified to boot+render via `nexus-dist`:4173** (not just dev). Couldn't frame a forest in preview (base clearing removes nearby forest; rest in fog) — Lane should glance at a forest in playtest.
    - **Hybrid art — still open (Lane to steer):** (a) real CC0 **explosion/smoke sprite sheets** on deaths — higher effort, hard to verify headlessly; (b) **richer unit/building sprites** (procedural; small at game zoom so low verifiability); (c) water shimmer. Download pipeline (curl ambientCG/archive.org → unzip → `sips`) is proven; `nexus-dist` artifact verification is now the pre‑deploy gate.
 
+**✅ Missile & defense system (2026‑06‑19, main + live) — Lane's big batch:**
+- **Missile Silo** (`B.silo`, 1400cr+400 alloy) now GATES missiles. Abilities use a generic `requires` building + `alloy` cost (`tryAbility`/`castAbility`): emp/hijack=`cyber`, nuke/thermo=`silo`.
+- **Thermonuclear Missile** (`ABILITIES.thermo`, **9000cr + 2500 alloy**, 360s cd, key `B`): `THERMO_R` 440px colossal blast (`detonateThermo`, 7000 bld dmg) — flattens a clustered base → can erase a faction. 7s flight.
+- **Iron Dome** (`B.idome`, 900cr+250 alloy): intercepts inbound ballistic/thermo missiles within `IDOME_R` 7 tiles, recharges `IDOME_CD` 9s. **Aegis Shield** (`U.aegis`, requires `idome`, no weapon, `shield:true`): mobile interceptor, `AEGIS_R` 5.5 tiles / 10s. `tryIntercept` in `processStrikes` knocks a missile down if a ready, non‑allied dome/aegis covers the impact. `pendingStrikes` carry `team`+`kind`; `pendingStrikeList()` exported for render.
+- **AI lobs ballistic missiles** at rivals after t>540 (warlord more often) so the dome matters; **inbound‑missile warning reticles** render on in‑flight strikes (red=thermo, orange=ballistic); dome/aegis intercept‑radius rings on selection; `N`/`B` hotkeys.
+- ⚠️ Compile + **artifact‑verified** (boots, gating correct); the interception/thermo‑wipe/AI‑missile *behaviour* needs Lane's playtest.
+- **Tuning knobs:** thermo cost/`THERMO_R`, `NUKE_R`, `IDOME_R`/`IDOME_CD`, `AEGIS_R`/`AEGIS_CD`, AI launch rate (`dt*0.006` warlord / `0.003`).
+
 **Smaller follow‑ups noted during Session 1:**
-- Dedicated **Missile Silo** building (the nuke is currently gated on the Cyber Ops Center as a v1).
 - Population/society layer "feels pointless" (Lane, round‑2 note #2) — deepen its function/interaction; relates to letting neutral populations grow into an emergent faction (note #3) and richer settlement absorption (note #7).
 - Explicit per‑unit relay targeting (currently relays are auto‑assaulted by present non‑owner military, not click‑targeted).
 
