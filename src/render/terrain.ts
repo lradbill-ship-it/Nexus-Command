@@ -57,19 +57,32 @@ export function renderTerrain() {
       tg.fillStyle = shade([26, 68, 92], 0.9); tg.fillRect(px, py, TILE, TILE);
     }
   }
-  // real CC0 ground texture, overlaid on the stylized base for genuine surface detail
+  // real CC0 ground texture, overlaid on the stylized base for genuine surface detail.
+  // Two passes: 'overlay' adds contrast detail, a faint 'soft-light' deepens it.
   if (patGrass && patRock && patDirt) {
-    tg.save();
-    tg.globalCompositeOperation = 'overlay';
-    tg.globalAlpha = 0.8;
-    for (let y = 0; y < MAPH; y++) for (let x = 0; x < MAPW; x++) {
-      const t = T[idx(x, y)];
-      const pat = t === T_GRASS || t === T_FOREST ? patGrass : t === T_ROCK ? patRock : (t === T_DIRT || t === T_ROAD) ? patDirt : null;
-      if (!pat) continue;
-      tg.fillStyle = pat; tg.fillRect(x * TILE, y * TILE, TILE, TILE);
-    }
-    tg.restore();
+    const paintTex = (op: GlobalCompositeOperation, alpha: number) => {
+      tg.save(); tg.globalCompositeOperation = op; tg.globalAlpha = alpha;
+      for (let y = 0; y < MAPH; y++) for (let x = 0; x < MAPW; x++) {
+        const t = T[idx(x, y)];
+        const pat = t === T_GRASS || t === T_FOREST ? patGrass : t === T_ROCK ? patRock : (t === T_DIRT || t === T_ROAD) ? patDirt : null;
+        if (!pat) continue;
+        tg.fillStyle = pat; tg.fillRect(x * TILE, y * TILE, TILE, TILE);
+      }
+      tg.restore();
+    };
+    paintTex('overlay', 0.92);
+    paintTex('soft-light', 0.5);
   }
+  // macro light & shadow — large soft gradients break up the flat uniform ground (natural lighting / cloud shadow)
+  tg.save();
+  for (let i = 0; i < 80; i++) {
+    const x = Math.random() * WORLD_W, y = Math.random() * WORLD_H, r = 220 + Math.random() * 460;
+    const g2 = tg.createRadialGradient(x, y, 0, x, y, r);
+    if (Math.random() < 0.5) { g2.addColorStop(0, 'rgba(255,243,206,.07)'); g2.addColorStop(1, 'rgba(255,243,206,0)'); }
+    else { g2.addColorStop(0, 'rgba(6,11,16,.11)'); g2.addColorStop(1, 'rgba(6,11,16,0)'); }
+    tg.fillStyle = g2; tg.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  tg.restore();
   // soft organic speckle
   for (let i = 0; i < 14000; i++) {
     const x = Math.random() * WORLD_W, y = Math.random() * WORLD_H;
