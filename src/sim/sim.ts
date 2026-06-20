@@ -1707,14 +1707,15 @@ function endGame(win: boolean) {
   endHook(win);
 }
 
-// ── Auto-scout: idle Recon Drones auto-reveal the map when enabled (scouts-only) ──
+// ── Auto-scout (toggled Recon Drones) + auto-hunt (always-on Survey Hunters) ──
 export function setAutoScout(on: boolean) { autoScout = on; }
 export function getAutoScout() { return autoScout; }
 function nearestUnexplored(u: Unit): Vec | null {
   let best: Vec | null = null, bestD = Infinity;
+  const flies = !!U[u.type].air;                         // fliers reveal over any terrain (incl. rock where vaults hide)
   for (let i = 0; i < 90; i++) {
     const tx = Math.random() * MAPW | 0, ty = Math.random() * MAPH | 0;
-    if (game.explored[idx(tx, ty)] || !passable(tx, ty)) continue;
+    if (game.explored[idx(tx, ty)] || (!flies && !passable(tx, ty))) continue;
     const wx = tx * TILE + 16, wy = ty * TILE + 16;
     const d = (wx - u.x) * (wx - u.x) + (wy - u.y) * (wy - u.y);
     if (d < bestD) { bestD = d; best = { x: wx, y: wy }; }
@@ -1725,9 +1726,11 @@ function autoScoutTick(dt: number) {
   autoScoutT += dt;
   if (autoScoutT < 1.2) return;
   autoScoutT = 0;
-  if (!autoScout) return;
   for (const u of game.units) {
-    if (u.team !== PLAYER || u.type !== 'recon' || u.order !== 'idle' || u.path) continue;
+    if (u.team !== PLAYER || u.order !== 'idle' || u.path) continue;
+    const hunt = !!U[u.type].survey;                     // Survey Hunters ALWAYS auto-hunt for Hero Vaults
+    const scout = u.type === 'recon' && autoScout;       // Recon Drones scout only when toggled on
+    if (!hunt && !scout) continue;
     const t = nearestUnexplored(u);
     if (t) { u.order = 'move'; u.dest = t; setPath(u, t.x, t.y); }
   }
