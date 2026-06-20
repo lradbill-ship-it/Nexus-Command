@@ -1,6 +1,10 @@
 # CLAUDE.md — Project Stratadug
 
-> ⚡ **Session 2+ START HERE:** read **`docs/SESSION_2_HANDOFF.md`** first — current state, where the repo/hosting now live (moved to `lradbill-ship-it/Nexus-Command`), everything shipped in Session 1, pending work (repair units, wood/trees, naval), conventions, and gotchas. The notes below are the original v1 mission/spec (still useful background).
+> ⚡ **Session 3+ START HERE:** read **`docs/SESSION_3_HANDOFF.md`** first (then `docs/TODO.md`, the living backlog).
+> It has the current state, the deploy process + gotchas, the full system inventory, and — important —
+> **the workflow rule: at session start and after every task, present Lane the entire TODO as multiple‑choice
+> cards (`AskUserQuestion`) and let him pick what's next.** Session‑2 per‑feature detail is in
+> `docs/SESSION_2_HANDOFF.md`; the notes below are the original v1 mission/spec (still useful background).
 
 You are picking up an in-progress game project. Read this file, then `docs/DESIGN_SPEC.md`, then skim `playable/nexus-command-v2.html` (the current best playable build) before writing any code.
 
