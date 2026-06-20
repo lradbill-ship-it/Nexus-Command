@@ -294,6 +294,8 @@ function refreshSel() {
     if (sObj.kind === 'b' && (sObj as any).type === 'foundry' && (sObj as any).queue.length) extra = `<br>Queue: ${(sObj as any).queue.length} (${U[(sObj as any).queue[0]].name})`;
     if (sObj.kind === 'u' && U[(sObj as any).type].harvests) extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${d.cargo} ${d.harvests}`;
     if (sObj.kind === 'u' && U[(sObj as any).type].logs) extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${d.cargo} wood`;
-    el.innerHTML = `<span class="nm">${d.name}</span><br>HP ${Math.ceil(sObj.hp)}/${sObj.hpMax}${extra}`;
+    const vet = sObj.kind === 'u' ? ((sObj as any).vet || 0) : 0;
+    const rank = vet >= 2 ? ' <b style="color:#ffd95a">★ ELITE</b>' : vet >= 1 ? ' <b style="color:#ffd95a">▲ VETERAN</b>' : '';
+    el.innerHTML = `<span class="nm">${d.name}</span>${rank}<br>HP ${Math.ceil(sObj.hp)}/${sObj.hpMax}${extra}`;
   } else el.innerHTML = `<span class="nm">${game.selection.length} units</span> in command group`;
 }

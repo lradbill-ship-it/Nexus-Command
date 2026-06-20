@@ -517,8 +517,10 @@ function rofMult(e: Entity) { return defOf(e).coolant && game.overheat[e.team] ?
 
 function fireAt(src: Entity, target: Entity, dmg: number, rail: boolean, splash = 0) {
   dmg = dmg * (styleMod(src.team).combat ?? 1);          // Militarist hits harder, Mercantile/Populist softer
+  const byUnit = src.kind === 'u' ? (src as Unit) : undefined;
+  if (byUnit) dmg *= vetDmg(byUnit.vet || 0);            // veterans/elites hit harder
   const subsurface = src.kind === 'u' && !!U[(src as Unit).type].tunneler;
-  game.shots.push({ x: src.x, y: src.y, target, dmg, team: src.team, speed: rail ? 940 : 560, col: FAC[src.team].col, rail, splash, subsurface });
+  game.shots.push({ x: src.x, y: src.y, target, dmg, team: src.team, speed: rail ? 940 : 560, col: FAC[src.team].col, rail, splash, subsurface, by: byUnit });
   src.lastShot = game.t;
   spawnParts('muzzle', src.x, src.y, 2, '255,235,180');
   sfx(rail ? 'rail' : 'shot', src.x);
@@ -552,6 +554,26 @@ function checkElimination(team: number) {
     game.eliminated[team] = true;
     logMsg(FAC[team].name + ' has been wiped from the battlefield', 'war'); sfx('war');
   }
+}
+
+// ── Veterancy: units that rack up kills get promoted (more damage + tougher) ───
+const VET_VETERAN = 2, VET_ELITE = 5;                     // kills to reach each rank
+const vetDmg = (v: number) => v >= 2 ? 1.5 : v >= 1 ? 1.2 : 1;
+const vetHp = (v: number) => v >= 2 ? 1.5 : v >= 1 ? 1.2 : 1;
+function promote(u: Unit, lvl: number) {
+  const base = U[u.type].hp, prev = vetHp(u.vet || 0);
+  u.vet = lvl;
+  u.hpMax = Math.round(base * vetHp(lvl));
+  u.hp = Math.min(u.hpMax, u.hp + base * (vetHp(lvl) - prev) + base * 0.15);   // grow + a heal on promotion
+  spawnParts('spark', u.x, u.y, 9, '255,222,120');
+  game.parts.push({ type: 'ring', x: u.x, y: u.y, t: 0, life: 0.5, big: false });
+  if (u.team === PLAYER) { logMsg(U[u.type].name + ' promoted — ' + (lvl >= 2 ? 'ELITE' : 'VETERAN'), 'good'); sfx('chime', u.x); }
+}
+function creditKill(killer: Unit) {
+  if (killer.dead || U[killer.type].hero) return;        // heroes are already peerless
+  killer.kills = (killer.kills || 0) + 1;
+  const lvl = killer.kills >= VET_ELITE ? 2 : killer.kills >= VET_VETERAN ? 1 : 0;
+  if (lvl > (killer.vet || 0)) promote(killer, lvl);
 }
 /** Sell the player's selected structure(s): refund half the invested cost, free the footprint. */
 export function sellSelected() {
@@ -989,6 +1011,7 @@ function updateUnit(u: Unit, dt: number) {
   u.cooldown = Math.max(0, u.cooldown - dt);
   if (U[u.type].tunneler && u.moving && Math.random() < dt * 7) spawnParts('debris', u.x, u.y + 6, 1, '120,100,72');   // burrow spoil trail
   if (U[u.type].auraHeal) auraTick(u, dt);                              // Warden hero — constant heal aura
+  if ((u.vet || 0) >= 2 && u.hp < u.hpMax) u.hp = Math.min(u.hpMax, u.hp + 4 * dt);   // Elite units self-repair slowly
   // turret aim smoothing
   let want = u.facing;
   if (u.target && !u.target.dead) want = Math.atan2(u.target.y - u.y, u.target.x - u.x);
@@ -1164,7 +1187,9 @@ function updateShots(dt: number) {
     const dx = s.target.x - s.x, dy = s.target.y - s.y, l = Math.hypot(dx, dy), step = s.speed * dt;
     if (l <= step) {
       const hx = s.target.x, hy = s.target.y;
+      const wasAlive = !s.target.dead, victim = s.target;
       damage(s.target, s.dmg, s.team); s.dead = true;
+      if (wasAlive && victim.dead && s.by && !s.by.dead && s.by.team !== victim.team) creditKill(s.by);   // veterancy
       if (s.splash) {
         // area blast: falls off with distance, never friendly-fires the shooter's team
         for (const u of [...game.units]) {

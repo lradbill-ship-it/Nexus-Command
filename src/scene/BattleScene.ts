@@ -591,6 +591,10 @@ export class BattleScene extends Phaser.Scene {
       if (sel.has(u)) drawBr(u.x, u.y, d.radius + 7);
       if (sel.has(u) && d.shield) { g.lineStyle(1.5, 0x9fdcff, 0.5); g.strokeCircle(u.x, u.y, 5.5 * TILE); }   // Aegis intercept coverage
       if (u.hp < u.hpMax || sel.has(u)) drawHp(u.x, u.y - d.radius - 9, 22, u.hp / u.hpMax, col);
+      if (u.vet) {                                                                              // veterancy rank chevrons (gold)
+        g.lineStyle(1.5, 0xffd95a, 0.95);
+        for (let i = 0; i < u.vet; i++) { const yy = u.y - d.radius - 13 - i * 3; g.beginPath(); g.moveTo(u.x - 3.5, yy + 2); g.lineTo(u.x, yy - 0.5); g.lineTo(u.x + 3.5, yy + 2); g.strokePath(); }
+      }
       if ((d.harvests || d.logs) && u.cargo > 0) {
         const f = u.cargo / d.cargo!;
         const cc = d.logs ? 0x9ec24f : d.harvests === 'coolant' ? 0x7fe6f0 : d.harvests === 'alloy' ? 0xe0a155 : 0x9bd4ff;

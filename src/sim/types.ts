@@ -107,6 +107,8 @@ export interface Unit {
   resume?: string | null;
   savedDest?: Vec | null;
   guard?: Unit | null;   // friendly unit this one is escorting (order === 'guard')
+  kills?: number;        // confirmed kills (drives veterancy)
+  vet?: number;          // rank: 0 rookie · 1 veteran · 2 elite
   dead?: boolean;
 }
 
@@ -122,6 +124,7 @@ export interface Shot {
   rail: boolean;
   splash?: number;
   subsurface?: boolean;   // fired by a tunneler → its blast can also reach underground units
+  by?: Unit;              // the firing unit (for veterancy kill credit); undefined for buildings
   dead?: boolean;
 }
 
