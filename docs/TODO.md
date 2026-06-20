@@ -18,7 +18,6 @@ Last updated: **2026‑06‑19** (Session 3 — perf + AI parity Phase 1&2 shipp
 - [ ] **Wood‑palisade walls** (optional) — a cheap **wood‑cost** wall/gate variant as a 2nd wood sink (Walls + team‑aware Gates already shipped).
 - [ ] **Society layer depth** — make population & settlements actually matter (round‑2 notes #2/#3/#7).
 - [ ] **Deeper perf — Web Worker sim** — if late‑game still bites on device, move the sim off the main thread (big architectural change; playtest‑gate it).
-- [ ] **AI parity — leftovers** — AI Water Tower + AI System Hijack + AI builds Walls at chokepoints (minor; AI already uses domes/silos/wood/repair/borer/heroes/EMP).
 
 ## Backlog — Features
 - [ ] **Emergent factions** — neutral civilian populations coalesce into a NEW faction that can grow into a real threat (note #3).
@@ -51,6 +50,7 @@ Last updated: **2026‑06‑19** (Session 3 — perf + AI parity Phase 1&2 shipp
 ---
 
 ## ✅ Shipped in Session 3 (newest first)
+- **AI parity — defensive + Hijack**: the AI now builds a **Water Tower**, fortifies its front with **Walls + a Blast Gate** (sparse so it never walls itself in — verified its units can still path out), and casts **System Hijack** to steal an enemy combat unit (pays the cost). With EMP (already shipped) the AI now uses the full cyber kit. Headless‑verified.
 - **Blast Gates (team‑aware)** — a doorway in your wall line: your units + allies path through freely, enemies are blocked and route around (or smash it). Done properly via team‑aware pathfinding: new `passableFor(tx,ty,team)` + per‑tile `game.gate` owner grid; `findPath`, `unitBlocked`, movement & separation all thread the unit's team. An enemy gate reads as a wall to you. Verified headlessly (owner path 0‑tile deviation through the gate; enemy detours 7 tiles around).
 - **Fortified Walls** — new cheap, tough 1×1 barrier building (`B.wall`, 70cr / 1200hp / no power). Impassable (units path around it automatically — buildings already block via `game.occupied`), sellable, crenellated sprite + sidebar icon. Funnel attackers into your turrets. (Gates + wood‑palisades remain — see Up next.)
 - **Pause + game speed** — Space = pause/resume; `[` / `]` (or `-` / `+`) cycle 1×→2×→3×. Implemented as fixed sub‑steps per frame (stable movement/pathing, not one big dt). On‑screen badge + feed messages; resets on new match.

@@ -112,7 +112,7 @@ export function setupBases() {
       s = freeSpotNear((bi.tx + 6 * bi.sx) * TILE, (bi.ty + 5 * bi.sy) * TILE); addUnit('strike', s.x, s.y, team);
       s = freeSpotNear((bi.tx + 4 * bi.sx) * TILE, (bi.ty + 6 * bi.sy) * TILE); addUnit('strike', s.x, s.y, team);
     }
-    game.ai[team] = { builtIdx: 0, nextWave: 0, waveN: 0, covertT: 120 + Math.random() * 60, missileT: 480 + Math.random() * 120, techT: 0, empT: 300 + Math.random() * 120 };
+    game.ai[team] = { builtIdx: 0, nextWave: 0, waveN: 0, covertT: 120 + Math.random() * 60, missileT: 480 + Math.random() * 120, techT: 0, empT: 300 + Math.random() * 120, hijackT: 380 + Math.random() * 140 };
     game.ai[team].nextWave = FAC[team].persona === 'warlord' ? 130 + Math.random() * 40 : 180 + Math.random() * 60;
   }
 }
@@ -1481,8 +1481,12 @@ function aiTech(team: number) {
     if (!aiPlace(team, t, dx, dy, false)) return false;
     game.money[team] -= B[t].cost; game.alloy[team] -= ba; return true;
   };
-  // Lumber Mill needs no alloy → build it regardless (gifts a Logger; feeds Repair Rigs with wood).
-  if (game.t > 200 && !count('mill') && place('mill', -6, 8, 700)) return;
+  // Alloy-free builds (no Smelter needed): wood economy, water draw, and a fortified front.
+  if (game.t > 200 && !count('mill') && place('mill', -6, 8, 700)) return;          // wood → Repair Rigs
+  if (game.t > 250 && !count('watertower') && place('watertower', -3, 7, 800)) return;
+  // a short rampart of Walls + a Blast Gate toward the front (its own units pass the gate; sparse → no self-trap)
+  if (game.t > 230 && count('wall') < 4 && place('wall', 4 + count('wall') * 2, 11, 350)) return;
+  if (game.t > 250 && !count('gate') && place('gate', 8, 11, 500)) return;
   if (!game.buildings.some(b => b.team === team && b.type === 'smelter')) return;   // alloy-gated tech below needs a Smelter
   // Warlords reach for the offensive Silo first; everyone else shields up with an Iron Dome first.
   if (FAC[team].persona === 'warlord') {
@@ -1565,6 +1569,17 @@ function aiUpdate(team: number, dt: number) {
       game.parts.push({ type: 'emp', x: c.x, y: c.y, t: 0, life: 0.85 });
       if (isAllied(PLAYER, c.team) || tileVisible(c.x, c.y)) { logMsg(FAC[team].name + ' unleashed an EMP pulse — systems offline', 'war'); sfx('emp', c.x); }
     } else ai.empT = game.t + 15;
+  }
+  // Cyber: System Hijack — the AI permanently steals an enemy combat unit (pays the cost).
+  if (game.t >= ai.hijackT && game.money[team] >= ABILITIES.hijack.cost && game.buildings.some(b => b.team === team && b.type === 'cyber' && b.progress >= 1)) {
+    const foes = game.units.filter(u => isWar(team, u.team) && !isSupport(u.type) && !U[u.type].hero);
+    if (foes.length) {
+      const v = foes[Math.random() * foes.length | 0]; const was = v.team;
+      game.money[team] -= ABILITIES.hijack.cost; ai.hijackT = game.t + 95 + Math.random() * 70;
+      v.team = team; v.order = 'idle'; v.target = null; v.path = null; v.hState = 'find'; v.hNode = null; v.guard = null;
+      game.parts.push({ type: 'emp', x: v.x, y: v.y, t: 0, life: 0.8 });
+      if (was === PLAYER || isAllied(PLAYER, was)) { logMsg(FAC[team].name + ' HIJACKED our ' + U[v.type].name + '!', 'war'); sfx('covert', v.x); }
+    } else ai.hijackT = game.t + 20;
   }
   // conscript from a surplus population when short on crystals (the people as a reserve)
   if ((game.pop[team] || 0) > 34 && game.money[team] < 500 && Math.random() < dt * 0.25) conscript(team);

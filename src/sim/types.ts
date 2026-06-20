@@ -148,6 +148,7 @@ export interface AIState {
   missileT: number;   // next time this AI may launch a missile (needs its own Silo)
   techT: number;      // throttle for the conditional advanced-build pass (domes/silo/etc.)
   empT: number;       // next time this AI may fire an EMP (needs a Cyber Ops Center)
+  hijackT: number;    // next time this AI may hijack an enemy unit (needs a Cyber Ops Center)
 }
 
 export interface GameState {
