@@ -258,6 +258,13 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     g.fillStyle = '#2a3340'; g.fillRect(rcx - fw * 0.3, rcy + 2, fw * 0.6, 3);
     g.strokeStyle = '#c9d6e0'; g.lineWidth = 2; g.beginPath(); g.moveTo(rcx - 5, rcy); g.lineTo(rcx - 10, rcy - 9); g.moveTo(rcx + 5, rcy); g.lineTo(rcx + 10, rcy - 9); g.stroke();
     g.fillStyle = '#9fdcff'; g.beginPath(); g.arc(rcx - 10, rcy - 9, 1.7, 0, 7); g.fill(); g.beginPath(); g.arc(rcx + 10, rcy - 9, 1.7, 0, 7); g.fill();
+  } else if (type === 'wall') {
+    // crenellated battlement notches along the top + a heavy faction-tinted course
+    g.fillStyle = '#39434f';
+    for (let bx = fx + 2; bx < fx + fw - 2; bx += 8) g.fillRect(bx, roofY - 3, 5, 4);
+    g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(fx + 2, roofY + fh / 2); g.lineTo(fx + fw - 2, roofY + fh / 2); g.stroke();
+    g.fillStyle = col; g.globalAlpha = 0.6; g.fillRect(fx + 2, roofY + fh - 5, fw - 4, 2); g.globalAlpha = 1;
   }
   return [c, cx, cy];
 }

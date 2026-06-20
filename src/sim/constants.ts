@@ -112,6 +112,7 @@ export const B: Record<string, BuildingDef> = {
   drillbay: { name: 'Deep Bore Facility', w: 3, h: 2, hp: 980, cost: 1200, power: -25, buildTime: 18, sight: 5, hgt: 22, alloy: 300, desc: 'Hallmark works. Unlocks the Subterranean Borer — a burrowing assault drill. Needs alloy.' },
   silo: { name: 'Missile Silo', w: 2, h: 2, hp: 820, cost: 1400, power: -25, buildTime: 16, sight: 5, hgt: 24, alloy: 400, desc: 'Launch platform. Unlocks Ballistic & Thermonuclear missile strikes. Needs alloy.' },
   idome: { name: 'Iron Dome', w: 2, h: 2, hp: 560, cost: 900, power: -20, buildTime: 12, sight: 6, hgt: 16, alloy: 250, desc: 'Intercepts inbound ballistic & thermonuclear missiles over a wide radius. Recharges between intercepts.' },
+  wall: { name: 'Fortified Wall', w: 1, h: 1, hp: 1200, cost: 70, power: 0, buildTime: 4, sight: 2, hgt: 13, desc: 'Impassable barrier. Cheap and tough; no power. Build lines to funnel attackers into your turrets.' },
 };
 
 // ── Units ────────────────────────────────────────────────────────────────────

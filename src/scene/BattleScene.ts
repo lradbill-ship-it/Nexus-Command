@@ -3,7 +3,7 @@ import {
   TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, FAC, B, U, BASE_INFO,
   idx, clamp, dist,
 } from '../sim/constants';
-import { game, resetState, isAllied } from '../sim/state';
+import { game, resetState, isAllied, logMsg } from '../sim/state';
 import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, spawnParts, pendingStrikeList } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, scorch, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
@@ -57,6 +57,7 @@ export class BattleScene extends Phaser.Scene {
   private mmTerrainData!: ImageData;
   private fogData!: ImageData;                  // persistent fog buffer — reused each update (no per-frame getImageData alloc)
   private hudAccum = 999;                       // throttle accumulator for the heavy full-map fog + minimap passes
+  private speedBadge?: HTMLDivElement;          // on-screen pause / game-speed indicator
 
   constructor() { super('battle'); }
 
@@ -123,6 +124,10 @@ export class BattleScene extends Phaser.Scene {
 
     setViewWidth(this.scale.width);
     this.scale.on('resize', () => { setViewWidth(this.scale.width); this.vignette.setDisplaySize(this.scale.width, this.scale.height); });
+
+    const badge = document.createElement('div');
+    badge.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:50;padding:3px 11px;border-radius:5px;background:rgba(8,12,16,.82);color:#cfe6ee;font:600 12px ui-monospace,monospace;letter-spacing:.5px;border:1px solid rgba(120,200,180,.4);pointer-events:none;display:none';
+    document.body.appendChild(badge); this.speedBadge = badge;
 
     this.newMatch(false);
   }
@@ -281,6 +286,9 @@ export class BattleScene extends Phaser.Scene {
       else if (k === 't') { if (game.selection.some(s => s.kind === 'u')) game.armed = 'amove'; }
       else if (k === 'c') conscript(PLAYER);
       else if (k === 'delete' || k === 'backspace') { e.preventDefault(); sellSelected(); }
+      else if (k === ' ') { e.preventDefault(); game.paused = !game.paused; logMsg(game.paused ? '⏸ Paused' : '▶ Resumed'); }
+      else if (k === ']' || k === '+' || k === '=') { game.speed = Math.min(3, (game.speed || 1) + 1); game.paused = false; logMsg('▶▶ Game speed ' + game.speed + '×'); }
+      else if (k === '[' || k === '-' || k === '_') { game.speed = Math.max(1, (game.speed || 1) - 1); logMsg('▶ Game speed ' + game.speed + '×'); }
       else if (k >= '1' && k <= '9') this.controlGroup(+k, e.ctrlKey || e.metaKey, e.shiftKey);
     });
   }
@@ -314,7 +322,10 @@ export class BattleScene extends Phaser.Scene {
     const dt = clamp(delta / 1000, 0, 0.05);
     if (game.started && !game.over) {
       this.panCamera(dt);
-      stepWorld(dt);
+      // Pause = 0 sub-steps; 2×/3× = that many fixed sub-steps (each at the real frame dt, so movement &
+      // pathfinding stay stable rather than taking one oversized step).
+      const subSteps = game.paused ? 0 : (game.speed || 1);
+      for (let i = 0; i < subSteps; i++) stepWorld(dt);
       if (game.parts.length < 180 && Math.random() < 0.3) {     // faint ambient dust drifting across the view
         const wv = this.cameras.main.worldView;
         spawnParts('mote', wv.x + Math.random() * wv.width, wv.y + Math.random() * wv.height, 1, '198,210,196');
@@ -322,6 +333,12 @@ export class BattleScene extends Phaser.Scene {
     }
     // sync game.cam for audio panning
     game.cam.x = this.cameras.main.scrollX; game.cam.y = this.cameras.main.scrollY;
+
+    if (this.speedBadge) {
+      const show = game.started && !game.over && (game.paused || game.speed > 1);
+      this.speedBadge.style.display = show ? 'block' : 'none';
+      if (show) this.speedBadge.textContent = game.paused ? '⏸ PAUSED · Space' : '▶▶ ' + game.speed + '× · [ / ]';
+    }
 
     this.syncCrystals();
     this.drawSettlements();

@@ -154,6 +154,8 @@ export interface GameState {
   started: boolean;
   over: boolean;
   won: boolean;
+  paused: boolean;     // sim frozen (camera/selection still work)
+  speed: number;       // sim speed multiplier: 1 / 2 / 3
   t: number;
   money: Record<number, number>;
   water: Record<number, number>;          // stored coolant reserve per team

@@ -70,7 +70,7 @@ function tone(pan: number, { w = 'sine' as OscillatorType, f0 = 440, f1 = null a
 export function sfx(type: string, x?: number) {
   if (muted || !AC) return;
   const now = performance.now();
-  const minGap = ({ shot: 45, boom: 70, cash: 120 } as Record<string, number>)[type] || 30;
+  const minGap = ({ shot: 45, boom: 70, cash: 120, klaxon: 1500 } as Record<string, number>)[type] || 30;
   if (sfxLast[type] && now - sfxLast[type] < minGap) return;
   sfxLast[type] = now;
   const pan = panFor(x);
@@ -108,6 +108,11 @@ export function sfx(type: string, x?: number) {
       case 'war':
         tone(0, { w: 'square', f0: 330, dur: 0.16, vol: 0.055 });
         tone(0, { w: 'square', f0: 262, dur: 0.22, vol: 0.055, delay: 0.18 }); break;
+      case 'klaxon':
+        // urgent air-raid siren — two rising/falling wails over a low bed (inbound missile)
+        tone(0, { w: 'sawtooth', f0: 360, f1: 740, dur: 0.36, vol: 0.07 });
+        tone(0, { w: 'sawtooth', f0: 740, f1: 360, dur: 0.36, vol: 0.07, delay: 0.36 });
+        tone(0, { w: 'square', f0: 150, dur: 0.74, vol: 0.03 }); break;
       case 'covert': tone(pan, { w: 'triangle', f0: 360, f1: 120, dur: 0.2, vol: 0.05 }); break;
     }
   } catch (e) { /* ignore */ }

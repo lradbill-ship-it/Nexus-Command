@@ -4,7 +4,7 @@ import type { LeaderStyle } from './constants';
 
 function createGame(): GameState {
   return {
-    started: false, over: false, won: false, t: 0,
+    started: false, over: false, won: false, paused: false, speed: 1, t: 0,
     money: { 1: 1500, 2: 2200, 3: 2200, 4: 2200, 5: 2200, 6: 2200 },
     water: { 1: 60, 2: 60, 3: 60, 4: 60, 5: 60, 6: 60 },
     alloy: { 1: 120, 2: 160, 3: 160, 4: 160, 5: 160, 6: 160 },

@@ -1546,7 +1546,7 @@ function aiUpdate(team: number, dt: number) {
           const travel = kind === 'thermo' ? THERMO_TRAVEL : NUKE_TRAVEL;
           pendingStrikes.push({ x: hq.x + (Math.random() * 90 - 45), y: hq.y + (Math.random() * 90 - 45), at: game.t + travel + 2, team, kind });
           ai.missileT = game.t + a.cd * 0.8 + Math.random() * 45;
-          if (tgt === PLAYER || isAllied(PLAYER, tgt)) { logMsg('⚠ INBOUND ' + (kind === 'thermo' ? 'THERMONUCLEAR' : 'BALLISTIC') + ' MISSILE from ' + FAC[team].name + ' — intercept or scatter!', 'war'); sfx('war'); }
+          if (tgt === PLAYER || isAllied(PLAYER, tgt)) { logMsg('⚠ INBOUND ' + (kind === 'thermo' ? 'THERMONUCLEAR' : 'BALLISTIC') + ' MISSILE from ' + FAC[team].name + ' — intercept or scatter!', 'war'); sfx('klaxon'); }
         } else {
           ai.missileT = game.t + 20;   // can't afford yet — re-check soon
         }
