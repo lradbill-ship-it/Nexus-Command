@@ -50,6 +50,7 @@ Last updated: **2026‑06‑19** (Session 3 — AI parity Phase 1 shipped).
 ---
 
 ## ✅ Shipped in Session 3 (newest first)
+- **Performance — Safari lag on the 3× maps**: the per‑frame **fog** and **minimap** passes (each touching all 336²=112,896 tiles every frame) were the bottleneck. Now: both throttled to ~14Hz (vision changes a few×/s, not 60×); fog reuses a persistent buffer with alpha‑only writes (no per‑frame `getImageData` allocation); minimap terrain is a cached ImageData blit instead of up to 112k `fillRect` calls/frame; overlay is viewport‑culled with cached faction colours. ⚠ FPS unmeasurable headlessly (Phaser pauses RAF when backgrounded) — Lane to confirm on device.
 - **AI parity Phase 1 — missile/defense counterplay**: the AI now conditionally builds **Iron Domes** + **Missile Silos** (new `aiTech` pass, robust to timing — builds each once as money/alloy allow; warlords reach for the Silo first, others shield up first). AI missile launches are now **gated on owning a Silo**, cost money/alloy, respect a per‑AI cooldown, and escalate to **thermonuclear** when flush — so the player's nuke is no longer an auto‑win and the player's own Iron Dome earns its keep on defense. Verified headlessly (intercept + control + AI‑builds + AI‑launches all pass); ⚠ feel needs Lane's playtest.
 
 ## ✅ Shipped in Session 2 (newest first) — detail in `docs/SESSION_3_HANDOFF.md`

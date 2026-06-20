@@ -26,6 +26,9 @@ interface SpriteRec {
 }
 const ALT = 17;                        // render altitude (px) for flying units
 const hasRotor = (t: string) => t === 'aircraft' || t === 'recon' || t === 'hunter';
+// Faction colours are static — parse the hex once and cache the int (was re-parsed per entity per frame).
+const _facCol: Record<number, number> = {};
+const facCol = (team: number) => _facCol[team] ?? (_facCol[team] = Phaser.Display.Color.HexStringToColor(FAC[team].col).color);
 
 export class BattleScene extends Phaser.Scene {
   private terrainImg!: Phaser.GameObjects.Image;
@@ -49,6 +52,11 @@ export class BattleScene extends Phaser.Scene {
   private onEnd: (win: boolean) => void = () => {};
   private mm!: HTMLCanvasElement;
   private mmCtx!: CanvasRenderingContext2D;
+  private mmTerrain!: HTMLCanvasElement;        // offscreen explored-terrain layer (MAPW×MAPH), blitted+scaled to the minimap
+  private mmTerrainCtx!: CanvasRenderingContext2D;
+  private mmTerrainData!: ImageData;
+  private fogData!: ImageData;                  // persistent fog buffer — reused each update (no per-frame getImageData alloc)
+  private hudAccum = 999;                       // throttle accumulator for the heavy full-map fog + minimap passes
 
   constructor() { super('battle'); }
 
@@ -89,14 +97,19 @@ export class BattleScene extends Phaser.Scene {
     this.makeVignette();                                   // cinematic edge darkening (screen-space)
     this.overlay = this.add.graphics().setDepth(11000);
 
-    // fog texture (84x84, soft-filtered)
+    // fog texture (MAPW×MAPH, soft-filtered). Persistent buffer: RGB written once, only alpha rewritten per update.
     this.fogTex = this.textures.createCanvas('fog', MAPW, MAPH)!;
     this.fogTex.setFilter(Phaser.Textures.FilterMode.LINEAR);
     this.fogImg.setTexture('fog').setDisplaySize(WORLD_W, WORLD_H);
+    this.fogData = this.fogTex.context.createImageData(MAPW, MAPH);
+    { const px = this.fogData.data; for (let i = 0; i < MAPW * MAPH; i++) { const o = i * 4; px[o] = 2; px[o + 1] = 4; px[o + 2] = 3; } }
 
-    // minimap
+    // minimap (+ an offscreen explored-terrain layer we blit instead of drawing 100k+ rects per frame)
     this.mm = document.getElementById('minimap') as HTMLCanvasElement;
     this.mmCtx = this.mm.getContext('2d')!;
+    this.mmTerrain = document.createElement('canvas'); this.mmTerrain.width = MAPW; this.mmTerrain.height = MAPH;
+    this.mmTerrainCtx = this.mmTerrain.getContext('2d')!;
+    this.mmTerrainData = this.mmTerrainCtx.createImageData(MAPW, MAPH);
     this.mm.addEventListener('mousedown', (e) => this.minimapJump(e));
     this.mm.addEventListener('mousemove', (e) => { if (e.buttons & 1) this.minimapJump(e); });
     this.mm.addEventListener('touchstart', (e) => { e.preventDefault(); this.minimapJumpTouch(e); }, { passive: false });
@@ -315,8 +328,10 @@ export class BattleScene extends Phaser.Scene {
     this.syncEntities();
     this.drawFx();
     this.drawOverlay();
-    this.updateFog();
-    this.drawMinimap();
+    // Fog + minimap are full-map (336²) passes — far too heavy for 60fps and vision changes only a few
+    // times a second, so refresh them on a ~14Hz throttle instead of every frame.
+    this.hudAccum += delta;
+    if (this.hudAccum >= 70) { this.hudAccum = 0; this.updateFog(); this.drawMinimap(); }
     if (terrainDirty()) { this.terrainTex.refresh(); clearTerrainDirty(); }
 
     // screen shake
@@ -566,9 +581,10 @@ export class BattleScene extends Phaser.Scene {
       }
     };
     const sel = new Set(game.selection);
+    const wv = this.cameras.main.worldView;                          // viewport culling — skip off-screen overlays
     for (const b of game.buildings) {
-      if (!canSee(b)) continue;
-      const col = Phaser.Display.Color.HexStringToColor(FAC[b.team].col).color;
+      if (!canSee(b) || b.x < wv.x - 64 || b.x > wv.right + 64 || b.y < wv.y - 64 || b.y > wv.bottom + 64) continue;
+      const col = facCol(b.team);
       if (b.progress < 1) {
         g.fillStyle(0x000000, 0.5); g.fillRect(b.x - b.w / 2, b.y - b.h / 2 - 9, b.w, 4);
         g.fillStyle(0xe9a93d, 1); g.fillRect(b.x - b.w / 2, b.y - b.h / 2 - 9, b.w * b.progress, 4);
@@ -586,8 +602,8 @@ export class BattleScene extends Phaser.Scene {
       }
     }
     for (const u of game.units) {
-      if (!canSee(u)) continue;
-      const d = U[u.type], col = Phaser.Display.Color.HexStringToColor(FAC[u.team].col).color;
+      if (!canSee(u) || u.x < wv.x - 48 || u.x > wv.right + 48 || u.y < wv.y - 48 || u.y > wv.bottom + 48) continue;
+      const d = U[u.type], col = facCol(u.team);
       if (sel.has(u)) drawBr(u.x, u.y, d.radius + 7);
       if (sel.has(u) && d.shield) { g.lineStyle(1.5, 0x9fdcff, 0.5); g.strokeCircle(u.x, u.y, 5.5 * TILE); }   // Aegis intercept coverage
       if (u.hp < u.hpMax || sel.has(u)) drawHp(u.x, u.y - d.radius - 9, 22, u.hp / u.hpMax, col);
@@ -635,23 +651,24 @@ export class BattleScene extends Phaser.Scene {
 
   // ── fog texture ──────────────────────────────────────────────────────────────
   private updateFog() {
-    const ctx = this.fogTex.context;
-    const img = ctx.getImageData(0, 0, MAPW, MAPH);
-    const px = img.data;
-    for (let i = 0; i < MAPW * MAPH; i++) {
-      const o = i * 4; px[o] = 2; px[o + 1] = 4; px[o + 2] = 3;
-      px[o + 3] = game.visible[i] ? 0 : (game.explored[i] ? 125 : 255);
-    }
-    ctx.putImageData(img, 0, 0);
+    const px = this.fogData.data;                          // reused buffer; RGB set once at create, only alpha changes
+    for (let i = 0; i < MAPW * MAPH; i++) px[i * 4 + 3] = game.visible[i] ? 0 : (game.explored[i] ? 125 : 255);
+    this.fogTex.context.putImageData(this.fogData, 0, 0);
     this.fogTex.refresh();
   }
 
   // ── minimap ──────────────────────────────────────────────────────────────────
   private drawMinimap() {
     const ctx = this.mmCtx, s = this.mm.width / MAPW;
-    ctx.fillStyle = '#04070c'; ctx.fillRect(0, 0, this.mm.width, this.mm.height);
-    ctx.fillStyle = '#1a2b1e';
-    for (let y = 0; y < MAPH; y++) for (let x = 0; x < MAPW; x++) if (game.explored[idx(x, y)]) ctx.fillRect(x * s, y * s, s + 0.5, s + 0.5);
+    // explored-terrain layer via a single ImageData blit (was up to 112,896 fillRect calls per frame)
+    const tp = this.mmTerrainData.data;
+    for (let i = 0; i < MAPW * MAPH; i++) {
+      const o = i * 4, ex = game.explored[i];
+      tp[o] = ex ? 26 : 4; tp[o + 1] = ex ? 43 : 7; tp[o + 2] = ex ? 30 : 12; tp[o + 3] = 255;
+    }
+    this.mmTerrainCtx.putImageData(this.mmTerrainData, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.mmTerrain, 0, 0, MAPW, MAPH, 0, 0, this.mm.width, this.mm.height);
     for (const nd of game.nodes) if (nd.amount > 0 && game.explored[idx(nd.x / TILE | 0, nd.y / TILE | 0)]) {
       ctx.fillStyle = nd.kind === 'coolant' ? '#7fe6f0' : nd.kind === 'alloy' ? '#e0a155' : '#9bd4ff';
       ctx.fillRect(nd.x / TILE * s - 1, nd.y / TILE * s - 1, 3, 3);
