@@ -9,12 +9,12 @@
 > so: put the 3–4 best candidates on cards, and **always also paste the full list (below) in the message**
 > so nothing is hidden — Lane can pick a card or name any other item. Then update this file.
 
-Last updated: **2026‑06‑19** (end of Session 2).
+Last updated: **2026‑06‑19** (Session 3 — AI parity Phase 1 shipped).
 
 ---
 
 ## ▶ Up next — top candidates (curate to 3–5; these go on the cards first)
-- [ ] **AI parity / counterplay** — the AI should build & use the Session‑2 systems (esp. **Iron Domes** + **Missile Silos**, so the player's thermonuke isn't an auto‑win; also wood/repair, water towers, borer/heroes). Today they're all player‑only.
+- [ ] **AI parity — Phase 2 (economy/tech)** — the AI now builds Iron Domes + Missile Silos and lobs ballistic/thermo missiles (Phase 1 ✅). Still player‑only: **wood/repair** (Lumber Mill → Logger + Repair Rigs), **water** (Water Tower → coolant draw), **Deep Bore Facility → Borer**, **hero hunt/excavation**, and **cyber abilities** (EMP/Hijack from a Cyber Ops Center). Make the AI build + use these too.
 - [ ] **Real CC0 audio** — swap the procedural SFX for real CC0 sound: explosions, weapons, UI, and an **inbound‑nuke klaxon**. Original hard‑requirement #5 ("PS5‑level sound"). Download pipeline is proven. ⚠ can't verify by ear headlessly.
 - [ ] **Defensive structures** — walls / gates / sandbags to shape chokepoints and make base defense deliberate.
 - [ ] **Society layer depth** — make population & settlements actually matter (round‑2 notes #2/#3/#7).
@@ -48,6 +48,9 @@ Last updated: **2026‑06‑19** (end of Session 2).
 - [ ] **Tree/terrain art** on a real device; late‑game framerate on the 3× maps.
 
 ---
+
+## ✅ Shipped in Session 3 (newest first)
+- **AI parity Phase 1 — missile/defense counterplay**: the AI now conditionally builds **Iron Domes** + **Missile Silos** (new `aiTech` pass, robust to timing — builds each once as money/alloy allow; warlords reach for the Silo first, others shield up first). AI missile launches are now **gated on owning a Silo**, cost money/alloy, respect a per‑AI cooldown, and escalate to **thermonuclear** when flush — so the player's nuke is no longer an auto‑win and the player's own Iron Dome earns its keep on defense. Verified headlessly (intercept + control + AI‑builds + AI‑launches all pass); ⚠ feel needs Lane's playtest.
 
 ## ✅ Shipped in Session 2 (newest first) — detail in `docs/SESSION_3_HANDOFF.md`
 - Unit **veterancy** (kills → Veteran/Elite, +dmg/HP, chevrons).

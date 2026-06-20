@@ -144,6 +144,8 @@ export interface AIState {
   nextWave: number;
   waveN: number;
   covertT: number;
+  missileT: number;   // next time this AI may launch a missile (needs its own Silo)
+  techT: number;      // throttle for the conditional advanced-build pass (domes/silo/etc.)
 }
 
 export interface GameState {

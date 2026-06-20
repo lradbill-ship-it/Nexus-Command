@@ -110,7 +110,7 @@ export function setupBases() {
       s = freeSpotNear((bi.tx + 6 * bi.sx) * TILE, (bi.ty + 5 * bi.sy) * TILE); addUnit('strike', s.x, s.y, team);
       s = freeSpotNear((bi.tx + 4 * bi.sx) * TILE, (bi.ty + 6 * bi.sy) * TILE); addUnit('strike', s.x, s.y, team);
     }
-    game.ai[team] = { builtIdx: 0, nextWave: 0, waveN: 0, covertT: 120 + Math.random() * 60 };
+    game.ai[team] = { builtIdx: 0, nextWave: 0, waveN: 0, covertT: 120 + Math.random() * 60, missileT: 480 + Math.random() * 120, techT: 0 };
     game.ai[team].nextWave = FAC[team].persona === 'warlord' ? 130 + Math.random() * 40 : 180 + Math.random() * 60;
   }
 }
@@ -1459,10 +1459,37 @@ function diplomacyTick() {
     lastStates[k] = st;
   }
 }
+/** Conditional advanced-build pass — fields the Session-2 tech (Iron Dome, Missile Silo, …) when the
+ *  AI's economy can support it. Robust to timing unlike the fixed AI_SCRIPT: it builds each once, as
+ *  money + alloy allow, so the player's missiles meet domes and the AI can threaten back. */
+function aiTech(team: number) {
+  const ai = game.ai[team];
+  if (game.t < ai.techT) return;
+  ai.techT = game.t + 6 + Math.random() * 5;
+  if (!game.buildings.some(b => b.team === team && b.type === 'smelter')) return;   // alloy-gated tech needs a Smelter first
+  const count = (t: string) => game.buildings.filter(b => b.team === team && b.type === t).length;
+  const place = (t: string, dx: number, dy: number, moneyBuf: number): boolean => {
+    const ba = alloyCost(team, B[t].alloy);
+    if (game.money[team] < B[t].cost + moneyBuf || ba > (game.alloy[team] || 0)) return false;
+    if (!aiPlace(team, t, dx, dy, false)) return false;
+    game.money[team] -= B[t].cost; game.alloy[team] -= ba; return true;
+  };
+  // Warlords reach for the offensive Silo first; everyone else shields up with an Iron Dome first.
+  if (FAC[team].persona === 'warlord') {
+    if (game.t > 360 && !count('silo') && place('silo', 7, 4, 900)) return;
+    if (game.t > 300 && !count('idome') && place('idome', 5, 6, 600)) return;
+  } else {
+    if (game.t > 300 && !count('idome') && place('idome', 5, 6, 600)) return;
+    if (game.t > 420 && !count('silo') && place('silo', 7, 4, 1100)) return;
+  }
+  if (game.t > 600 && count('idome') < 2 && place('idome', 8, 7, 1400)) return;     // a 2nd dome for a sprawling base
+}
+
 function aiUpdate(team: number, dt: number) {
   if (game.eliminated[team]) return;
   const ai = game.ai[team];
   const persona = FAC[team].persona;
+  aiTech(team);
   const tShift = persona === 'warlord' ? -25 : (persona === 'merchant' ? 30 : persona === 'industrial' ? -10 : 0);
   while (ai.builtIdx < AI_SCRIPT.length && game.t >= AI_SCRIPT[ai.builtIdx].t + tShift) {
     const step = AI_SCRIPT[ai.builtIdx]; ai.builtIdx++;
@@ -1474,15 +1501,26 @@ function aiUpdate(team: number, dt: number) {
   if (game.t > 320) game.money[team] += 6 * dt;
   if (persona === 'merchant') game.money[team] += 4 * dt;
   if (persona === 'industrial') game.money[team] += 6 * dt;   // builder economy: steady production edge
-  // late-game: aggressive factions lob the occasional ballistic missile at a rival → makes Iron Dome matter
-  if (game.t > 540 && Math.random() < dt * (persona === 'warlord' ? 0.006 : 0.003)) {
+  // Missile offense — parity with the player: the AI must own a Missile Silo, pay the cost, and respect a
+  // cooldown. It goes thermonuclear when flush, else ballistic → the player's Iron Dome earns its keep.
+  if (game.t >= ai.missileT && game.buildings.some(b => b.team === team && b.type === 'silo' && b.progress >= 1)) {
     const enemies = ALL_TEAMS.filter(f => f !== team && !game.eliminated[f] && isWar(team, f) && game.buildings.some(b => b.team === f));
     if (enemies.length) {
       const tgt = (enemies.includes(PLAYER) && Math.random() < 0.6) ? PLAYER : enemies[Math.random() * enemies.length | 0];
       const hq = game.buildings.find(b => b.team === tgt && b.type === 'hq') || game.buildings.find(b => b.team === tgt);
       if (hq) {
-        pendingStrikes.push({ x: hq.x + (Math.random() * 90 - 45), y: hq.y + (Math.random() * 90 - 45), at: game.t + NUKE_TRAVEL + 2, team, kind: 'nuke' });
-        if (tgt === PLAYER || isAllied(PLAYER, tgt)) { logMsg('⚠ INBOUND BALLISTIC MISSILE from ' + FAC[team].name + ' — intercept or scatter!', 'war'); sfx('war'); }
+        const canThermo = game.money[team] >= ABILITIES.thermo.cost && (game.alloy[team] || 0) >= (ABILITIES.thermo.alloy || 0);
+        const kind: 'nuke' | 'thermo' = (canThermo && Math.random() < (persona === 'warlord' ? 0.55 : 0.4)) ? 'thermo' : 'nuke';
+        const a = ABILITIES[kind];
+        if (game.money[team] >= a.cost && (game.alloy[team] || 0) >= (a.alloy || 0)) {
+          game.money[team] -= a.cost; game.alloy[team] -= (a.alloy || 0);
+          const travel = kind === 'thermo' ? THERMO_TRAVEL : NUKE_TRAVEL;
+          pendingStrikes.push({ x: hq.x + (Math.random() * 90 - 45), y: hq.y + (Math.random() * 90 - 45), at: game.t + travel + 2, team, kind });
+          ai.missileT = game.t + a.cd * 0.8 + Math.random() * 45;
+          if (tgt === PLAYER || isAllied(PLAYER, tgt)) { logMsg('⚠ INBOUND ' + (kind === 'thermo' ? 'THERMONUCLEAR' : 'BALLISTIC') + ' MISSILE from ' + FAC[team].name + ' — intercept or scatter!', 'war'); sfx('war'); }
+        } else {
+          ai.missileT = game.t + 20;   // can't afford yet — re-check soon
+        }
       }
     }
   }
