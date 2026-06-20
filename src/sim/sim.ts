@@ -31,10 +31,12 @@ let lastHintT = 0;
 let crystalT = 55;   // first new formation seeds ~55s in
 let autoScout = false;   // when on, idle Recon Drones auto-reveal the map (scouts-only auto-explore)
 let autoScoutT = 0;      // throttle accumulator for auto-scout order assignment
+let aiAccum = 0;         // throttle accumulator for the strategic AI pass (build/train/wave) — not needed at 60Hz
+let visionAccum = 0;     // throttle accumulator for player fog-of-war recompute (~15Hz is imperceptible)
 type Strike = { x: number; y: number; at: number; team: number; kind: 'nuke' | 'thermo' };
 let pendingStrikes: Strike[] = [];   // in-flight missiles → detonate when game.t >= at (unless intercepted)
 export function pendingStrikeList(): readonly Strike[] { return pendingStrikes; }
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; pendingStrikes = []; lastWoodNag = -9; }
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; pendingStrikes = []; lastWoodNag = -9; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -110,7 +112,7 @@ export function setupBases() {
       s = freeSpotNear((bi.tx + 6 * bi.sx) * TILE, (bi.ty + 5 * bi.sy) * TILE); addUnit('strike', s.x, s.y, team);
       s = freeSpotNear((bi.tx + 4 * bi.sx) * TILE, (bi.ty + 6 * bi.sy) * TILE); addUnit('strike', s.x, s.y, team);
     }
-    game.ai[team] = { builtIdx: 0, nextWave: 0, waveN: 0, covertT: 120 + Math.random() * 60, missileT: 480 + Math.random() * 120, techT: 0 };
+    game.ai[team] = { builtIdx: 0, nextWave: 0, waveN: 0, covertT: 120 + Math.random() * 60, missileT: 480 + Math.random() * 120, techT: 0, empT: 300 + Math.random() * 120 };
     game.ai[team].nextWave = FAC[team].persona === 'warlord' ? 130 + Math.random() * 40 : 180 + Math.random() * 60;
   }
 }
@@ -423,6 +425,11 @@ const DIG_AL_RATE = 12;       // alloy/sec spent while excavating ("special equi
 let lastDigNag = -9;
 function vaultTick(dt: number) {
   for (const v of game.vaults) {
+    if (!v.done && v.discBy === undefined) {                 // AI survey discovery — per-team knowledge, no player fog reveal
+      forNearbyUnits(v.x, v.y, SURVEY_R, (u) => {
+        if (!isAllied(PLAYER, u.team) && U[u.type].survey && dist(u, v) < SURVEY_R) v.discBy = u.team;
+      });
+    }
     if (v.discovered) continue;
     let found = false;
     forNearbyUnits(v.x, v.y, SURVEY_R, (u) => {
@@ -1466,7 +1473,6 @@ function aiTech(team: number) {
   const ai = game.ai[team];
   if (game.t < ai.techT) return;
   ai.techT = game.t + 6 + Math.random() * 5;
-  if (!game.buildings.some(b => b.team === team && b.type === 'smelter')) return;   // alloy-gated tech needs a Smelter first
   const count = (t: string) => game.buildings.filter(b => b.team === team && b.type === t).length;
   const place = (t: string, dx: number, dy: number, moneyBuf: number): boolean => {
     const ba = alloyCost(team, B[t].alloy);
@@ -1474,6 +1480,9 @@ function aiTech(team: number) {
     if (!aiPlace(team, t, dx, dy, false)) return false;
     game.money[team] -= B[t].cost; game.alloy[team] -= ba; return true;
   };
+  // Lumber Mill needs no alloy → build it regardless (gifts a Logger; feeds Repair Rigs with wood).
+  if (game.t > 200 && !count('mill') && place('mill', -6, 8, 700)) return;
+  if (!game.buildings.some(b => b.team === team && b.type === 'smelter')) return;   // alloy-gated tech below needs a Smelter
   // Warlords reach for the offensive Silo first; everyone else shields up with an Iron Dome first.
   if (FAC[team].persona === 'warlord') {
     if (game.t > 360 && !count('silo') && place('silo', 7, 4, 900)) return;
@@ -1482,7 +1491,27 @@ function aiTech(team: number) {
     if (game.t > 300 && !count('idome') && place('idome', 5, 6, 600)) return;
     if (game.t > 420 && !count('silo') && place('silo', 7, 4, 1100)) return;
   }
+  if (game.t > 340 && !count('cyber') && place('cyber', -4, 9, 1400)) return;       // EMP / covert legitimacy
+  if (game.t > 480 && !count('drillbay') && place('drillbay', 9, 8, 1800)) return;  // Subterranean Borer + Hero excavation
   if (game.t > 600 && count('idome') < 2 && place('idome', 8, 7, 1400)) return;     // a 2nd dome for a sprawling base
+}
+
+/** Hero hunt + excavation for an AI with a Deep Bore Facility: Survey Hunters seek the nearest vault
+ *  (AI knows the locations — a convenience cheat), then idle Borers drill a surveyed/known vault. */
+function aiHero(team: number) {
+  if (!game.buildings.some(b => b.team === team && b.type === 'drillbay' && b.progress >= 1)) return;
+  const open = game.vaults.filter(v => !v.done);
+  if (!open.length) return;
+  const hunter = game.units.find(u => u.team === team && u.type === 'hunter' && u.order === 'idle');
+  if (hunter) {
+    const tgt = open.filter(v => v.discBy !== team).sort((a, b) => dist(hunter, a) - dist(hunter, b))[0];
+    if (tgt) { hunter.order = 'move'; hunter.dest = { x: tgt.x, y: tgt.y }; setPath(hunter, tgt.x, tgt.y); }
+  }
+  const borer = game.units.find(u => u.team === team && u.type === 'borer' && u.order === 'idle');
+  if (borer) {
+    const known = open.filter(v => v.discBy === team || v.discovered).sort((a, b) => dist(borer, a) - dist(borer, b))[0];
+    if (known) { borer.order = 'dig'; borer.digVault = known.id; borer.target = null; borer.path = null; }
+  }
 }
 
 function aiUpdate(team: number, dt: number) {
@@ -1524,6 +1553,18 @@ function aiUpdate(team: number, dt: number) {
       }
     }
   }
+  // Cyber: with a Cyber Ops Center the AI periodically EMPs a cluster of an enemy's combatants (pays the cost).
+  if (game.t >= ai.empT && game.money[team] >= ABILITIES.emp.cost && game.buildings.some(b => b.team === team && b.type === 'cyber' && b.progress >= 1)) {
+    const foes = game.units.filter(u => isWar(team, u.team) && !isSupport(u.type) && !U[u.type].hero);
+    if (foes.length) {
+      const c = foes[Math.random() * foes.length | 0];
+      game.money[team] -= ABILITIES.emp.cost; ai.empT = game.t + 55 + Math.random() * 45;
+      for (const u of game.units) if (!isAllied(team, u.team) && dist(u, c) < 132) u.disabledUntil = game.t + 8;
+      for (const b of game.buildings) if (!isAllied(team, b.team) && b.type === 'turret' && dist(b, c) < 132) b.disabledUntil = game.t + 8;
+      game.parts.push({ type: 'emp', x: c.x, y: c.y, t: 0, life: 0.85 });
+      if (isAllied(PLAYER, c.team) || tileVisible(c.x, c.y)) { logMsg(FAC[team].name + ' unleashed an EMP pulse — systems offline', 'war'); sfx('emp', c.x); }
+    } else ai.empT = game.t + 15;
+  }
   // conscript from a surplus population when short on crystals (the people as a reserve)
   if ((game.pop[team] || 0) > 34 && game.money[team] < 500 && Math.random() < dt * 0.25) conscript(team);
   const harv = game.units.filter(u => u.team === team && u.type === 'harvester').length;
@@ -1531,21 +1572,32 @@ function aiUpdate(team: number, dt: number) {
   const haulers = game.units.filter(u => u.team === team && u.type === 'hauler').length;
   const hasCoolantDepot = game.buildings.some(b => b.team === team && b.type === 'pump' && b.progress >= 1);
   const hasAlloyDepot = game.buildings.some(b => b.team === team && b.type === 'smelter' && b.progress >= 1);
+  const hasMill = game.buildings.some(b => b.team === team && b.type === 'mill' && b.progress >= 1);
+  const hasDrill = game.buildings.some(b => b.team === team && b.type === 'drillbay' && b.progress >= 1);
   const foundries = game.buildings.filter(b => b.team === team && b.type === 'foundry' && b.progress >= 1);
+  const countType = (t: string) => game.units.reduce((s, u) => s + (u.team === team && u.type === t ? 1 : 0), 0);
   if (foundries.length && foundries[0].queue.length === 0) {
     if (harv < 2 && game.money[team] > 700) { foundries[0].queue.push('harvester'); game.money[team] -= U.harvester.cost; }
     else if (hasCoolantDepot && tankers < 2 && game.money[team] > 800) { foundries[0].queue.push('tanker'); game.money[team] -= U.tanker.cost; }
     else if (hasAlloyDepot && haulers < 2 && game.money[team] > 800) { foundries[0].queue.push('hauler'); game.money[team] -= U.hauler.cost; }
   }
+  // Repair Rigs (sustain) + a Survey Hunter (hero scout) take any free foundry slot — not gated on foundry #0
+  // being idle (army production keeps it busy). An in-flight guard avoids over-queuing past the cap.
+  const anyQueued = (t: string) => foundries.some(f => f.queue.includes(t));
+  const fSup = foundries.find(fo => fo.queue.length < 2);
+  if (fSup) {
+    if (hasMill && countType('repair') < 2 && !anyQueued('repair') && game.money[team] > 800) { fSup.queue.push('repair'); game.money[team] -= U.repair.cost; }
+    else if (hasDrill && countType('hunter') < 1 && !anyQueued('hunter') && game.money[team] > 900) { fSup.queue.push('hunter'); game.money[team] -= U.hunter.cost; }
+  }
   const army = game.units.filter(u => u.team === team && !isSupport(u.type));
-  const countType = (t: string) => game.units.reduce((s, u) => s + (u.team === team && u.type === t ? 1 : 0), 0);
   if (foundries.length && game.money[team] > 900) {
     const f = foundries.find(fo => fo.queue.length < 2);
     if (f) {
       // late-game combined-arms: guarantee a standing core of advanced units…
       let pick: string | null = null;
       if (game.t > 300) {
-        if (countType('aircraft') < 3) pick = 'aircraft';
+        if (hasDrill && countType('borer') < 2 && !anyQueued('borer')) pick = 'borer';   // burrowing assault drill
+        else if (countType('aircraft') < 3) pick = 'aircraft';
         else if (countType('artillery') < 2) pick = 'artillery';
         else if (countType('walker') < 2) pick = 'walker';
         else if (countType('rocket') < 4) pick = 'rocket';
@@ -1565,10 +1617,11 @@ function aiUpdate(team: number, dt: number) {
       }
     }
   }
+  aiHero(team);   // divert idle Survey Hunters / Borers to hero vaults BEFORE the wave grabs idle units
   if (game.t >= ai.nextWave) {
     ai.waveN++;
     const size = Math.min(16, 2 + Math.ceil(ai.waveN * 1.7));
-    const squad = army.filter(u => u.order === 'idle').slice(0, size);
+    const squad = army.filter(u => u.order === 'idle' && !U[u.type].survey).slice(0, size);   // keep hunters out of combat waves
     const relayTargets = game.relays.filter(r => r.owner !== team);
     const contestRelay = relayTargets.length && Math.random() < 0.45;   // half the time, fight for an objective
     if (squad.length >= Math.min(3, size)) {
@@ -1822,7 +1875,11 @@ export function stepWorld(dt: number) {
   separation();                               // rebuilds the grid from post-movement positions
   for (const b of game.buildings) updateBuilding(b, dt);
   updateShots(dt);
-  for (const f of AIS) aiUpdate(f, dt);
+  // Strategic AI (build/train/wave/missile) doesn't need 60Hz — it re-scans every unit per faction, so
+  // running it every frame is a big late-game cost. Throttle to ~3Hz and feed it the accumulated dt so
+  // income, cooldowns and rate-based rolls stay correct. Per-unit combat/targeting stays per-frame above.
+  aiAccum += dt;
+  if (aiAccum >= 0.33) { for (const f of AIS) aiUpdate(f, aiAccum); aiAccum = 0; }
   dipTickT += dt;
   if (dipTickT >= 5) { dipTickT = 0; diplomacyTick(); }
   regenCrystals(dt);
@@ -1834,6 +1891,7 @@ export function stepWorld(dt: number) {
   governmentTick(dt);
   autoScoutTick(dt);
   processStrikes();
-  computeVision();
+  visionAccum += dt;
+  if (visionAccum >= 0.066) { computeVision(); visionAccum = 0; }   // player fog ~15Hz (AI targeting doesn't use it)
   checkEnd();
 }

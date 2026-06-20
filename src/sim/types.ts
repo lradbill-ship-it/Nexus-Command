@@ -43,6 +43,7 @@ export interface Vault {
   tx: number; ty: number;
   archetype: string;      // unit type the vault yields (titan / siegelord / warden)
   discovered: boolean;    // revealed to the player by surveying
+  discBy?: number;        // an AI team that has surveyed this vault (per-team knowledge; no player fog reveal)
   digBy: number;          // team currently / last excavating
   digT: number;           // excavation progress 0..1
   done: boolean;          // hero already extracted
@@ -146,6 +147,7 @@ export interface AIState {
   covertT: number;
   missileT: number;   // next time this AI may launch a missile (needs its own Silo)
   techT: number;      // throttle for the conditional advanced-build pass (domes/silo/etc.)
+  empT: number;       // next time this AI may fire an EMP (needs a Cyber Ops Center)
 }
 
 export interface GameState {

@@ -9,15 +9,16 @@
 > so: put the 3–4 best candidates on cards, and **always also paste the full list (below) in the message**
 > so nothing is hidden — Lane can pick a card or name any other item. Then update this file.
 
-Last updated: **2026‑06‑19** (Session 3 — AI parity Phase 1 shipped).
+Last updated: **2026‑06‑19** (Session 3 — perf + AI parity Phase 1&2 shipped; doing the full list).
 
 ---
 
 ## ▶ Up next — top candidates (curate to 3–5; these go on the cards first)
-- [ ] **AI parity — Phase 2 (economy/tech)** — the AI now builds Iron Domes + Missile Silos and lobs ballistic/thermo missiles (Phase 1 ✅). Still player‑only: **wood/repair** (Lumber Mill → Logger + Repair Rigs), **water** (Water Tower → coolant draw), **Deep Bore Facility → Borer**, **hero hunt/excavation**, and **cyber abilities** (EMP/Hijack from a Cyber Ops Center). Make the AI build + use these too.
 - [ ] **Real CC0 audio** — swap the procedural SFX for real CC0 sound: explosions, weapons, UI, and an **inbound‑nuke klaxon**. Original hard‑requirement #5 ("PS5‑level sound"). Download pipeline is proven. ⚠ can't verify by ear headlessly.
 - [ ] **Defensive structures** — walls / gates / sandbags to shape chokepoints and make base defense deliberate.
 - [ ] **Society layer depth** — make population & settlements actually matter (round‑2 notes #2/#3/#7).
+- [ ] **Deeper perf — Web Worker sim** — if late‑game still bites on device, move the sim off the main thread (big architectural change; playtest‑gate it).
+- [ ] **AI parity — leftovers** — AI Water Tower + AI System Hijack (minor; AI already uses domes/silos/wood/repair/borer/heroes/EMP).
 
 ## Backlog — Features
 - [ ] **Emergent factions** — neutral civilian populations coalesce into a NEW faction that can grow into a real threat (note #3).
@@ -50,6 +51,8 @@ Last updated: **2026‑06‑19** (Session 3 — AI parity Phase 1 shipped).
 ---
 
 ## ✅ Shipped in Session 3 (newest first)
+- **AI parity Phase 2 — AI uses its whole toolbox**: `aiTech` now also builds **Lumber Mill** (→ Loggers + **Repair Rigs** for map‑wide field repair), **Cyber Ops Center**, and **Deep Bore Facility**; the AI trains **Repair Rigs**, **Survey Hunters**, and **Borers**; **hero parity** — AI Hunters survey vaults (per‑team `discBy`, no player fog leak) and idle Borers excavate them, so the AI fields heroes too; and the AI fires **EMP** from a Cyber Ops Center at enemy clusters (pays the cost). Verified headlessly (builds + trains + hero excavation→Titan + EMP all pass). ⚠ feel needs playtest. Leftovers: AI Water Tower + AI Hijack.
+- **Performance pass 2 — smoothness**: throttled the **strategic AI loop** to ~3Hz (it re‑scanned every unit per faction every frame) and **player fog recompute** to ~15Hz, both fed accumulated dt so rates stay correct. Combat/targeting/movement stay per‑frame. (Web Worker sim deferred as the next lever if needed.)
 - **Performance — Safari lag on the 3× maps**: the per‑frame **fog** and **minimap** passes (each touching all 336²=112,896 tiles every frame) were the bottleneck. Now: both throttled to ~14Hz (vision changes a few×/s, not 60×); fog reuses a persistent buffer with alpha‑only writes (no per‑frame `getImageData` allocation); minimap terrain is a cached ImageData blit instead of up to 112k `fillRect` calls/frame; overlay is viewport‑culled with cached faction colours. ⚠ FPS unmeasurable headlessly (Phaser pauses RAF when backgrounded) — Lane to confirm on device.
 - **AI parity Phase 1 — missile/defense counterplay**: the AI now conditionally builds **Iron Domes** + **Missile Silos** (new `aiTech` pass, robust to timing — builds each once as money/alloy allow; warlords reach for the Silo first, others shield up first). AI missile launches are now **gated on owning a Silo**, cost money/alloy, respect a per‑AI cooldown, and escalate to **thermonuclear** when flush — so the player's nuke is no longer an auto‑win and the player's own Iron Dome earns its keep on defense. Verified headlessly (intercept + control + AI‑builds + AI‑launches all pass); ⚠ feel needs Lane's playtest.
 
