@@ -265,6 +265,11 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 1;
     g.beginPath(); g.moveTo(fx + 2, roofY + fh / 2); g.lineTo(fx + fw - 2, roofY + fh / 2); g.stroke();
     g.fillStyle = col; g.globalAlpha = 0.6; g.fillRect(fx + 2, roofY + fh - 5, fw - 4, 2); g.globalAlpha = 1;
+  } else if (type === 'gate') {
+    // two heavy posts flanking a faction-lit threshold (the passable doorway)
+    g.fillStyle = '#39434f'; g.fillRect(fx + 1, roofY - 4, 6, fh + 4); g.fillRect(fx + fw - 7, roofY - 4, 6, fh + 4);
+    g.strokeStyle = col; g.lineWidth = 1.5; g.strokeRect(fx + 1, roofY - 4, 6, fh + 4); g.strokeRect(fx + fw - 7, roofY - 4, 6, fh + 4);
+    g.fillStyle = `rgba(${FAC[team].rgb},.7)`; g.fillRect(fx + 7, roofY + fh / 2 - 1, fw - 14, 3);   // glowing threshold
   }
   return [c, cx, cy];
 }

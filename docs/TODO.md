@@ -15,7 +15,7 @@ Last updated: **2026‑06‑19** (Session 3 — perf + AI parity Phase 1&2 shipp
 
 ## ▶ Up next — top candidates (curate to 3–5; these go on the cards first)
 - [ ] **Real CC0 audio (full sample pack)** — the inbound‑missile **klaxon** shipped (procedural). Remaining: swap the procedural explosions/weapons/UI for real CC0 samples. Original hard‑req #5 ("PS5‑level sound"). Download pipeline proven. ⚠ can't verify by ear headlessly — Lane greenlights the asset approach.
-- [ ] **Defensive structures — gates** — Walls shipped (impassable barrier). Add a **Gate** (togglable open/closed) and optionally **wood‑cost palisades** (a 2nd wood sink). Team‑aware pathing is the hard part → a manual owner‑toggled gate is the simple version.
+- [ ] **Wood‑palisade walls** (optional) — a cheap **wood‑cost** wall/gate variant as a 2nd wood sink (Walls + team‑aware Gates already shipped).
 - [ ] **Society layer depth** — make population & settlements actually matter (round‑2 notes #2/#3/#7).
 - [ ] **Deeper perf — Web Worker sim** — if late‑game still bites on device, move the sim off the main thread (big architectural change; playtest‑gate it).
 - [ ] **AI parity — leftovers** — AI Water Tower + AI System Hijack + AI builds Walls at chokepoints (minor; AI already uses domes/silos/wood/repair/borer/heroes/EMP).
@@ -51,6 +51,7 @@ Last updated: **2026‑06‑19** (Session 3 — perf + AI parity Phase 1&2 shipp
 ---
 
 ## ✅ Shipped in Session 3 (newest first)
+- **Blast Gates (team‑aware)** — a doorway in your wall line: your units + allies path through freely, enemies are blocked and route around (or smash it). Done properly via team‑aware pathfinding: new `passableFor(tx,ty,team)` + per‑tile `game.gate` owner grid; `findPath`, `unitBlocked`, movement & separation all thread the unit's team. An enemy gate reads as a wall to you. Verified headlessly (owner path 0‑tile deviation through the gate; enemy detours 7 tiles around).
 - **Fortified Walls** — new cheap, tough 1×1 barrier building (`B.wall`, 70cr / 1200hp / no power). Impassable (units path around it automatically — buildings already block via `game.occupied`), sellable, crenellated sprite + sidebar icon. Funnel attackers into your turrets. (Gates + wood‑palisades remain — see Up next.)
 - **Pause + game speed** — Space = pause/resume; `[` / `]` (or `-` / `+`) cycle 1×→2×→3×. Implemented as fixed sub‑steps per frame (stable movement/pathing, not one big dt). On‑screen badge + feed messages; resets on new match.
 - **Inbound‑missile klaxon** — distinct air‑raid siren SFX (`sfx('klaxon')`) replaces the generic 'war' beep when a missile is inbound at the player. (Full CC0 sample pack still in Up next.)

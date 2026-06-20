@@ -9,7 +9,7 @@ import {
   game, dip, rk, getRel, setRel, addRel, isAllied, isWar, stateOf, logMsg, hint,
 } from './state';
 import type { Building, Unit, Entity, Vec, Particle, Settlement, Relay, ResourceNode, Vault } from './types';
-import { findPath, passable, nearestPassableTile } from './pathfind';
+import { findPath, passable, passableFor, nearestPassableTile } from './pathfind';
 import { spawnResourceField } from './mapgen';
 import { sfx } from '../audio';
 
@@ -59,12 +59,12 @@ export function addBuilding(type: string, tx: number, ty: number, team: number, 
     hpMax: d.hp, hp: instant ? d.hp : 1, progress: instant ? 1 : 0,
     cooldown: 0, target: null, queue: [], queueT: 0, disabledUntil: 0, anim: Math.random() * 7, unloadFx: -9, aim: 0,
   };
-  for (let y = ty; y < ty + d.h; y++) for (let x = tx; x < tx + d.w; x++) game.occupied[idx(x, y)] = 1;
+  for (let y = ty; y < ty + d.h; y++) for (let x = tx; x < tx + d.w; x++) { game.occupied[idx(x, y)] = 1; if (type === 'gate') game.gate[idx(x, y)] = team; }
   game.buildings.push(b); return b;
 }
 function removeBuildingTiles(b: Building) {
   const d = B[b.type];
-  for (let y = b.ty; y < b.ty + d.h; y++) for (let x = b.tx; x < b.tx + d.w; x++) game.occupied[idx(x, y)] = 0;
+  for (let y = b.ty; y < b.ty + d.h; y++) for (let x = b.tx; x < b.tx + d.w; x++) { game.occupied[idx(x, y)] = 0; game.gate[idx(x, y)] = 0; }
 }
 export function addUnit(type: string, x: number, y: number, team: number): Unit {
   const u: Unit = {
@@ -644,7 +644,7 @@ function nearestHostile(e: Entity, range: number, team: number, playerVisOnly: b
 }
 
 // ── Movement: path following + local steering ────────────────────────────────
-function unitBlocked(x: number, y: number) { return !passable(x / TILE | 0, y / TILE | 0); }
+function unitBlocked(x: number, y: number, team = 0) { return !passableFor(x / TILE | 0, y / TILE | 0, team); }
 // Phasing units ignore terrain entirely: fliers always, dedicated tunnelers (Borer) always,
 // and harvesters while burrowing underground.
 const phasing = (u: Unit) => !!U[u.type].air || !!U[u.type].tunneler || (u.tunnelT ?? 0) > 0;
@@ -654,23 +654,24 @@ function stepToward(u: Unit, dx: number, dy: number, dt: number) {
   u.moving = true;
   const nx = u.x + dx / len * sp, ny = u.y + dy / len * sp;
   u.facing = Math.atan2(dy, dx);
+  const tm = u.team;
   if (phasing(u)) { u.x = nx; u.y = ny; }                 // fliers + burrowing harvesters ignore terrain entirely
-  else if (!unitBlocked(nx, ny)) { u.x = nx; u.y = ny; }
-  else if (!unitBlocked(nx, u.y)) { u.x = nx; }
-  else if (!unitBlocked(u.x, ny)) { u.y = ny; }
-  else { const slx = u.x + (-dy / len) * sp, sly = u.y + (dx / len) * sp, srx = u.x + (dy / len) * sp, sry = u.y + (-dx / len) * sp; if (!unitBlocked(slx, sly)) { u.x = slx; u.y = sly; } else if (!unitBlocked(srx, sry)) { u.x = srx; u.y = sry; } }
+  else if (!unitBlocked(nx, ny, tm)) { u.x = nx; u.y = ny; }
+  else if (!unitBlocked(nx, u.y, tm)) { u.x = nx; }
+  else if (!unitBlocked(u.x, ny, tm)) { u.y = ny; }
+  else { const slx = u.x + (-dy / len) * sp, sly = u.y + (dx / len) * sp, srx = u.x + (dy / len) * sp, sry = u.y + (-dx / len) * sp; if (!unitBlocked(slx, sly, tm)) { u.x = slx; u.y = sly; } else if (!unitBlocked(srx, sry, tm)) { u.x = srx; u.y = sry; } }
   u.x = clamp(u.x, 12, WORLD_W - 12); u.y = clamp(u.y, 12, WORLD_H - 12);
   return len < sp * 1.5;
 }
 export function setPath(u: Unit, wx: number, wy: number) {
   if (!u.finalDest || u.finalDest.x !== wx || u.finalDest.y !== wy) u.unstick = 0;   // reset escalation only on a genuinely new destination
-  u.path = U[u.type].air ? [{ x: wx, y: wy }] : findPath(u.x, u.y, wx, wy);   // fliers fly straight
+  u.path = U[u.type].air ? [{ x: wx, y: wy }] : findPath(u.x, u.y, wx, wy, u.team);   // fliers fly straight
   u.finalDest = { x: wx, y: wy };
   u.stuckT = 0;
 }
 function followPath(u: Unit, dt: number) {
   // escape if we ended up sitting on a blocked tile (e.g. a building was placed on us)
-  if (!phasing(u) && unitBlocked(u.x, u.y)) {
+  if (!phasing(u) && unitBlocked(u.x, u.y, u.team)) {
     const np = nearestPassableTile(u.x / TILE | 0, u.y / TILE | 0);
     if (np) { u.x = np[0] * TILE + 16; u.y = np[1] * TILE + 16; }
   }
@@ -724,8 +725,8 @@ function separation() {
       const min = ar + U[b.type].radius;
       if (d > 0 && d < min) {
         const push = (min - d) / 2, ux = dx / d, uy = dy / d;
-        if (!unitBlocked(a.x - ux * push, a.y - uy * push)) { a.x -= ux * push; a.y -= uy * push; }
-        if (!unitBlocked(b.x + ux * push, b.y + uy * push)) { b.x += ux * push; b.y += uy * push; }
+        if (!unitBlocked(a.x - ux * push, a.y - uy * push, a.team)) { a.x -= ux * push; a.y -= uy * push; }
+        if (!unitBlocked(b.x + ux * push, b.y + uy * push, b.team)) { b.x += ux * push; b.y += uy * push; }
       }
     });
   }
@@ -741,7 +742,7 @@ function nearestNodePathable(u: Unit) {
   const kind = resOf(u);
   const sorted = game.nodes.filter(n => n.amount > 0 && n.kind === kind).sort((a, b) => dist(u, a) - dist(u, b));
   for (let i = 0; i < Math.min(4, sorted.length); i++) {
-    const p = findPath(u.x, u.y, sorted[i].x, sorted[i].y);
+    const p = findPath(u.x, u.y, sorted[i].x, sorted[i].y, u.team);
     if (p) return { node: sorted[i], path: p };
   }
   return null;
@@ -764,7 +765,7 @@ function nearestWaterTile(u: Unit): { tx: number; ty: number; approach: Vec; pat
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
       if (!passable(tx + dx, ty + dy)) continue;
       const ax = (tx + dx) * TILE + 16, ay = (ty + dy) * TILE + 16;
-      const p = findPath(u.x, u.y, ax, ay);
+      const p = findPath(u.x, u.y, ax, ay, u.team);
       if (p) return { tx, ty, approach: { x: ax, y: ay }, path: p, d: Math.hypot((tx + 0.5) * TILE - u.x, (ty + 0.5) * TILE - u.y) };
     }
   }
@@ -890,7 +891,7 @@ function nearestForest(u: Unit): { tx: number; ty: number; approach: Vec; path: 
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
       if (!passable(tx + dx, ty + dy)) continue;
       const ax = (tx + dx) * TILE + 16, ay = (ty + dy) * TILE + 16;
-      const p = findPath(u.x, u.y, ax, ay);
+      const p = findPath(u.x, u.y, ax, ay, u.team);
       if (p) return { tx, ty, approach: { x: ax, y: ay }, path: p };
     }
   }

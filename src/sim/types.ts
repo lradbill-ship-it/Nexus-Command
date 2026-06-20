@@ -184,6 +184,7 @@ export interface GameState {
   waterAmt: Float32Array;                  // per-tile coolant remaining in water features (drained by tankers → dries up)
   terr: Uint8Array;
   occupied: Uint8Array;
+  gate: Uint8Array;
   explored: Uint8Array;
   visible: Uint8Array;
   selection: Entity[];

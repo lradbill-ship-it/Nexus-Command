@@ -1,18 +1,18 @@
 import { TILE, MAPW, MAPH, idx, inMap, clamp, PASSABLE } from './constants';
-import { game } from './state';
+import { game, isAllied } from './state';
 import type { Vec } from './types';
 
 export const tPassable = (tx: number, ty: number) => inMap(tx, ty) && PASSABLE[game.terr[idx(tx, ty)]] === 1;
 export const passable = (tx: number, ty: number) => tPassable(tx, ty) && game.occupied[idx(tx, ty)] === 0;
-
-function losClear(ax: number, ay: number, bx: number, by: number) {
-  const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 10);
-  for (let i = 1; i <= steps; i++) {
-    const x = ax + (bx - ax) * i / steps, y = ay + (by - ay) * i / steps;
-    if (!passable(x / TILE | 0, y / TILE | 0)) return false;
-  }
-  return true;
-}
+/** Team-aware passability: an allied gate tile is walkable for that team; enemies see it (and all other
+ *  occupied tiles) as blocked. team 0 = no allegiance ⇒ gates block (treated like walls). */
+export const passableFor = (tx: number, ty: number, team: number) => {
+  if (!tPassable(tx, ty)) return false;
+  const i = idx(tx, ty);
+  if (game.occupied[i] === 0) return true;
+  const g = game.gate[i];
+  return g !== 0 && isAllied(team, g);
+};
 
 export function nearestPassableTile(tx: number, ty: number): [number, number] | null {
   if (passable(tx, ty)) return [tx, ty];
@@ -30,14 +30,24 @@ const DIRS: [number, number, number][] = [
   [1, 1, 1.4], [1, -1, 1.4], [-1, 1, 1.4], [-1, -1, 1.4],
 ];
 
-/** A* on the tile grid, returns a smoothed world-space waypoint list (or null). */
-export function findPath(wx0: number, wy0: number, wx1: number, wy1: number): Vec[] | null {
+/** A* on the tile grid, returns a smoothed world-space waypoint list (or null).
+ *  `team` makes allied gates walkable for that team (enemies route around them). */
+export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, team = 0): Vec[] | null {
+  const pass = (x: number, y: number) => passableFor(x, y, team);
+  const losClear = (ax: number, ay: number, bx: number, by: number) => {
+    const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 10);
+    for (let i = 1; i <= steps; i++) {
+      const x = ax + (bx - ax) * i / steps, y = ay + (by - ay) * i / steps;
+      if (!pass(x / TILE | 0, y / TILE | 0)) return false;
+    }
+    return true;
+  };
   let sx = clamp(wx0 / TILE | 0, 0, MAPW - 1), sy = clamp(wy0 / TILE | 0, 0, MAPH - 1);
   const tgt = nearestPassableTile(clamp(wx1 / TILE | 0, 0, MAPW - 1), clamp(wy1 / TILE | 0, 0, MAPH - 1));
   if (!tgt) return null;
   const [tx, ty] = tgt;
   if (sx === tx && sy === ty) return [{ x: wx1, y: wy1 }];
-  if (!passable(sx, sy)) { const np = nearestPassableTile(sx, sy); if (np) { sx = np[0]; sy = np[1]; } }
+  if (!pass(sx, sy)) { const np = nearestPassableTile(sx, sy); if (np) { sx = np[0]; sy = np[1]; } }
   _g.fill(Infinity); _came.fill(-1);
   const start = idx(sx, sy), goal = idx(tx, ty);
   _g[start] = 0;
@@ -73,8 +83,8 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number): Ve
     const cx = cur % MAPW, cy = cur / MAPW | 0, cg = _g[cur];
     for (const [dx, dy, c] of DIRS) {
       const nx = cx + dx, ny = cy + dy;
-      if (!passable(nx, ny)) continue;
-      if (dx && dy && (!passable(cx + dx, cy) || !passable(cx, cy + dy))) continue;
+      if (!pass(nx, ny)) continue;
+      if (dx && dy && (!pass(cx + dx, cy) || !pass(cx, cy + dy))) continue;
       const ni = idx(nx, ny), ng = cg + c;
       if (ng < _g[ni]) { _g[ni] = ng; _came[ni] = cur; push(ng + H(ni), ni); }
     }

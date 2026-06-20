@@ -23,6 +23,7 @@ function createGame(): GameState {
     terr: new Uint8Array(MAPW * MAPH),
     waterAmt: new Float32Array(MAPW * MAPH),
     occupied: new Uint8Array(MAPW * MAPH),
+    gate: new Uint8Array(MAPW * MAPH),          // gate tiles → owner team (0 = none); allies pass, enemies blocked
     explored: new Uint8Array(MAPW * MAPH),
     visible: new Uint8Array(MAPW * MAPH),
     selection: [], groups: {}, placing: null, armed: null,
