@@ -6,7 +6,7 @@ import {
 import { game, resetState, isAllied, logMsg } from '../sim/state';
 import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, spawnParts, pendingStrikeList } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
-import { renderTerrain, getTerrainCanvas, scorch, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
+import { renderTerrain, getTerrainCanvas, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import grassTex from '../assets/terrain/grass.jpg?inline';
 import rockTex from '../assets/terrain/rock.jpg?inline';
 import dirtTex from '../assets/terrain/dirt.jpg?inline';
@@ -58,6 +58,10 @@ export class BattleScene extends Phaser.Scene {
   private fogData!: ImageData;                  // persistent fog buffer — reused each update (no per-frame getImageData alloc)
   private hudAccum = 999;                       // throttle accumulator for the heavy full-map fog + minimap passes
   private speedBadge?: HTMLDivElement;          // on-screen pause / game-speed indicator
+  private scorchPool: Phaser.GameObjects.Image[] = [];   // pooled scorch decals (avoid re-uploading the terrain texture on every death)
+  private scorchIdx = 0;
+  private terrainAccum = 999;                    // throttle for terrain-texture re-uploads (forest-clear / dried water)
+  private static readonly SCORCH_MAX = 160;
 
   constructor() { super('battle'); }
 
@@ -80,7 +84,8 @@ export class BattleScene extends Phaser.Scene {
       this.textures.get('tex_pine').getSourceImage() as HTMLImageElement,
       this.textures.get('tex_tree').getSourceImage() as HTMLImageElement,
     );
-    setScorchHook(scorch);
+    this.makeScorchTexture();
+    setScorchHook((x, y, r) => this.addScorch(x, y, r));   // scorch = cheap pooled decals, NOT a terrain re-bake (was freezing on every death)
     setClearForestHook(clearForestAt);
     setDryWaterHook(dryWaterAt);
     setEndHook((win) => this.onEnd(win));
@@ -149,6 +154,30 @@ export class BattleScene extends Phaser.Scene {
     this.vignette.setDisplaySize(this.scale.width, this.scale.height);
   }
 
+  /** A soft irregular dark blotch used for blast scorch marks (baked once). */
+  private makeScorchTexture() {
+    const key = 'scorch';
+    if (this.textures.exists(key)) return;
+    const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+    const g = c.getContext('2d')!;
+    for (let i = 0; i < 7; i++) {
+      const cx = 64 + (Math.random() * 36 - 18), cy = 64 + (Math.random() * 36 - 18), r = 22 + Math.random() * 30;
+      const grd = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grd.addColorStop(0, 'rgba(10,8,6,0.6)'); grd.addColorStop(0.6, 'rgba(14,10,7,0.3)'); grd.addColorStop(1, 'rgba(14,10,7,0)');
+      g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+    }
+    this.textures.addCanvas(key, c);
+  }
+
+  /** Stamp a scorch decal (pooled, capped) instead of baking into the terrain texture — no GPU re-upload. */
+  private addScorch(x: number, y: number, r: number) {
+    let img = this.scorchPool[this.scorchIdx];
+    if (!img) { img = this.add.image(x, y, 'scorch').setDepth(-90); this.scorchPool[this.scorchIdx] = img; }
+    const size = Math.max(20, r * 2.6);
+    img.setPosition(x, y).setDisplaySize(size, size).setRotation(Math.random() * 6.28).setAlpha(0.55).setVisible(true);
+    this.scorchIdx = (this.scorchIdx + 1) % BattleScene.SCORCH_MAX;   // ring buffer → oldest marks recycle
+  }
+
   /** Regenerate a fresh battlefield. start=true skips the intro (used by restart). */
   newMatch(start: boolean) {
     // wipe sprites
@@ -156,6 +185,8 @@ export class BattleScene extends Phaser.Scene {
     this.recs.clear();
     for (const c of this.crystals.values()) { c.spr.destroy(); c.glow.destroy(); }
     this.crystals.clear();
+    for (const s of this.scorchPool) s.setVisible(false);   // clear last match's scorch marks
+    this.scorchIdx = 0;
 
     resetState();
     resetSimLocals();
@@ -350,7 +381,9 @@ export class BattleScene extends Phaser.Scene {
     // times a second, so refresh them on a ~14Hz throttle instead of every frame.
     this.hudAccum += delta;
     if (this.hudAccum >= 70) { this.hudAccum = 0; this.updateFog(); this.drawMinimap(); }
-    if (terrainDirty()) { this.terrainTex.refresh(); clearTerrainDirty(); }
+    // terrain re-upload (forest-clear / dried water) is a full GPU upload — coalesce bursts to avoid hitches
+    if (terrainDirty()) { this.terrainAccum += delta; if (this.terrainAccum >= 180) { this.terrainTex.refresh(); clearTerrainDirty(); this.terrainAccum = 0; } }
+    else this.terrainAccum = 999;
 
     // screen shake
     if (game.shake > 0.1) this.cameras.main.setScroll(
