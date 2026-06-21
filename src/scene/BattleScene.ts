@@ -167,8 +167,9 @@ export class BattleScene extends Phaser.Scene {
     renderTerrain();
     if (this.textures.exists('terrain')) this.textures.remove('terrain');
     this.terrainTex = this.textures.addCanvas('terrain', getTerrainCanvas())!;
+    this.terrainTex.setFilter(Phaser.Textures.FilterMode.LINEAR);     // smooth the upscale from the reduced bake
     clearTerrainDirty();
-    this.terrainImg.setTexture('terrain');
+    this.terrainImg.setTexture('terrain').setDisplaySize(WORLD_W, WORLD_H);   // bake is downscaled → scale back to world size
 
     // camera to player's base (SW)
     const bi = BASE_INFO[PLAYER];

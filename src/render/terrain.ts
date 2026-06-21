@@ -5,9 +5,18 @@ import {
 import { game } from '../sim/state';
 import { makeNoise } from '../sim/mapgen';
 
+// Bake terrain at a reduced resolution so the backing canvas stays within mobile (iOS Safari) canvas
+// limits — a full 1:1 world canvas (10752² on the ×3 map ≈ 115MP) exceeds them and comes back BLANK/BLACK.
+// All drawing stays in world coordinates via a persistent scale transform; the texture is upscaled on
+// display. Bonus: ~10× less GPU texture memory + faster uploads on every device.
+const MAX_AREA = 12_000_000;   // safely under iOS Safari's ~16.7M canvas-area cap
+const MAX_DIM = 4096;          // and under the per-dimension cap
+export const TERRAIN_RES = Math.min(1, MAX_DIM / Math.max(WORLD_W, WORLD_H), Math.sqrt(MAX_AREA / (WORLD_W * WORLD_H)));
 const terrainCv = document.createElement('canvas');
-terrainCv.width = WORLD_W; terrainCv.height = WORLD_H;
+terrainCv.width = Math.max(1, Math.round(WORLD_W * TERRAIN_RES));
+terrainCv.height = Math.max(1, Math.round(WORLD_H * TERRAIN_RES));
 const tg = terrainCv.getContext('2d')!;
+tg.setTransform(TERRAIN_RES, 0, 0, TERRAIN_RES, 0, 0);   // draw in world coords → fit into the reduced canvas
 let dirty = false;
 
 export function getTerrainCanvas() { return terrainCv; }
