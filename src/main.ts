@@ -24,7 +24,7 @@ w.__nexusGame = new Phaser.Game({
   scene,
 });
 
-scene.setEndHandler((win) => { showEnd(win); sfx(win ? 'chime' : 'war'); });
+scene.setEndHandler((win) => { showEnd(win); sfx(win ? 'victory' : 'defeat'); });
 
 setStartHook(() => {
   initAudio();

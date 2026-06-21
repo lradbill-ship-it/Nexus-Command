@@ -9,3 +9,7 @@ declare module '*.png?inline' {
   const url: string;
   export default url;
 }
+declare module '*.m4a?inline' {
+  const url: string;
+  export default url;
+}
