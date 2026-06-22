@@ -491,19 +491,21 @@ function buildSpinners(scene: Phaser.Scene) {
 }
 
 /** Build every entity texture for all four factions. Call once after the scene boots. */
+/** Bake every building/unit/barrel sprite for one faction — used at boot and when a faction emerges mid-match. */
+export function buildTeamTextures(scene: Phaser.Scene, team: number) {
+  for (const type of Object.keys(B)) {
+    const [c, cx, cy] = buildingCanvas(type, team); addCanvas(scene, `b_${type}_${team}`, c, cx, cy);
+  }
+  for (const type of Object.keys(U)) {
+    const [c, cx, cy] = unitCanvas(type, team); addCanvas(scene, `u_${type}_${team}`, c, cx, cy);
+  }
+  for (const type of ['turret', 'strike', 'walker', 'artillery', 'aaturret']) {
+    const [c, cx, cy] = barrelCanvas(type, team); addCanvas(scene, `t_${type}_${team}`, c, cx, cy);
+  }
+}
 export function buildAllTextures(scene: Phaser.Scene) {
   buildGlow(scene); buildCrystal(scene); buildCoolant(scene); buildAlloy(scene); buildSpinners(scene);
-  for (const team of ALL_TEAMS) {
-    for (const type of Object.keys(B)) {
-      const [c, cx, cy] = buildingCanvas(type, team); addCanvas(scene, `b_${type}_${team}`, c, cx, cy);
-    }
-    for (const type of Object.keys(U)) {
-      const [c, cx, cy] = unitCanvas(type, team); addCanvas(scene, `u_${type}_${team}`, c, cx, cy);
-    }
-    for (const type of ['turret', 'strike', 'walker', 'artillery', 'aaturret']) {
-      const [c, cx, cy] = barrelCanvas(type, team); addCanvas(scene, `t_${type}_${team}`, c, cx, cy);
-    }
-  }
+  for (const team of ALL_TEAMS) buildTeamTextures(scene, team);
   // Free Militia is the only team-0 (unaligned) unit — bake its sprite separately.
   { const [c, cx, cy] = unitCanvas('militia', 0); addCanvas(scene, 'u_militia_0', c, cx, cy); }
 }

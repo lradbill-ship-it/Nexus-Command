@@ -9,8 +9,13 @@ export const WORLD_W = MAPW * TILE;
 export const WORLD_H = MAPH * TILE;
 
 export const PLAYER = 1;
-export const AIS = [2, 3, 4, 5, 6] as const;
-export const ALL_TEAMS = [1, 2, 3, 4, 5, 6] as const;
+// Mutable team rosters: the base 6 factions, plus a possible emergent 7th (Free Legion) added at runtime.
+// Mutated IN PLACE (never reassigned) so every importer shares the live array.
+export const AIS: number[] = [2, 3, 4, 5, 6];
+export const ALL_TEAMS: number[] = [1, 2, 3, 4, 5, 6];
+export const EMERGENT_TEAM = 7;            // the emergent faction's team id
+export function resetTeams() { AIS.length = 0; AIS.push(2, 3, 4, 5, 6); ALL_TEAMS.length = 0; ALL_TEAMS.push(1, 2, 3, 4, 5, 6); }
+export function addAITeam(t: number) { if (!AIS.includes(t)) AIS.push(t); if (!ALL_TEAMS.includes(t)) ALL_TEAMS.push(t); }
 
 export type Persona = 'player' | 'warlord' | 'merchant' | 'covert' | 'industrial';
 
@@ -57,6 +62,7 @@ export const FAC: Record<number, Faction> = {
   4: { name: 'GULF COALITION', col: '#e0a83d', rgb: '224,168,61', persona: 'merchant' },
   5: { name: 'EASTERN BLOC', col: '#e8483a', rgb: '232,72,58', persona: 'warlord' },
   6: { name: 'OCEANIC LEAGUE', col: '#2fc6c0', rgb: '47,198,192', persona: 'covert' },
+  7: { name: 'FREE LEGION', col: '#d24ddd', rgb: '210,77,221', persona: 'warlord' },   // EMERGENT — coalesces from civilian uprisings (team 7)
 };
 
 // ── Terrain ──────────────────────────────────────────────────────────────────

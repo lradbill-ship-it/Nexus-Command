@@ -1,6 +1,7 @@
 import {
   TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, AIS, ALL_TEAMS, FAC, B, U, ABILITIES, COVERT,
-  BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD, T_FOREST, T_WATER, STYLES,
+  BASE_INFO, AI_SCRIPT, T_GRASS, T_DIRT, T_ROAD, T_FOREST, T_WATER, STYLES, PERSONA_STYLE,
+  EMERGENT_TEAM, resetTeams, addAITeam,
   RELAY_INCOME, RELAY_HP,
   idx, inMap, clamp, dist,
 } from './constants';
@@ -22,6 +23,8 @@ let clearForestHook: (tx: number, ty: number) => void = () => {};
 export function setClearForestHook(fn: (tx: number, ty: number) => void) { clearForestHook = fn; }
 let dryWaterHook: (tx: number, ty: number) => void = () => {};
 export function setDryWaterHook(fn: (tx: number, ty: number) => void) { dryWaterHook = fn; }
+let emergeHook: (team: number) => void = () => {};   // renderer bakes textures for a faction that emerges mid-match
+export function setEmergeHook(fn: (team: number) => void) { emergeHook = fn; }
 
 // Transient module locals — reset on each new match.
 let nextId = 1;
@@ -36,7 +39,7 @@ let visionAccum = 0;     // throttle accumulator for player fog-of-war recompute
 type Strike = { x: number; y: number; at: number; team: number; kind: 'nuke' | 'thermo' };
 let pendingStrikes: Strike[] = [];   // in-flight missiles → detonate when game.t >= at (unless intercepted)
 export function pendingStrikeList(): readonly Strike[] { return pendingStrikes; }
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; pendingStrikes = []; lastWoodNag = -9; }
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; uprisings = 0; legionFounded = false; pendingStrikes = []; lastWoodNag = -9; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -93,6 +96,7 @@ function aiPlace(team: number, type: string, dx: number, dy: number, instant: bo
   return false;
 }
 export function setupBases() {
+  resetTeams();                                    // drop any emergent faction from a previous match (back to the base 6)
   for (const team of ALL_TEAMS) {
     const bi = BASE_INFO[team];
     addBuilding('hq', bi.tx, bi.ty, team, true);
@@ -361,13 +365,15 @@ function settlementTick(dt: number) {
       s.unrest = (s.unrest || 0) + dt;
       const militiaN = game.units.reduce((n, u) => n + (u.team === 0 ? 1 : 0), 0);
       if (s.unrest >= UPRISING_TIME && militiaN < MILITIA_CAP) {
-        s.unrest = 0;
+        s.unrest = 0; uprisings++;
+        const team = legionFounded ? EMERGENT_TEAM : 0;            // once organized, recruits join the Legion
         const n = 2 + (Math.random() * 3 | 0);
-        for (let i = 0; i < n; i++) { const sp = freeSpotNear(s.x, s.y); const m = addUnit('militia', sp.x, sp.y, 0); orderMilitia(m); }
+        for (let i = 0; i < n; i++) { const sp = freeSpotNear(s.x, s.y); const m = addUnit('militia', sp.x, sp.y, team); if (team === 0) orderMilitia(m); }
         s.pop = Math.max(8, s.pop - n * 3);                        // fighters leave the town
         const nearPlayer = game.buildings.some(b => isAllied(PLAYER, b.team) && dist(b, s) < 22 * TILE);
         if (nearPlayer) { logMsg('⚠ A FREE MILITIA has risen up from an ungoverned settlement nearby!', 'war'); sfx('war'); }
         else logMsg('A Free Militia has risen up from an ungoverned settlement.');
+        if (!legionFounded && uprisings >= EMERGE_UPRISINGS) emergeFaction(s);   // sustained unrest coalesces into a real faction
       }
     } else if (s.unrest) s.unrest = Math.max(0, s.unrest - dt * 0.5);
   }
@@ -376,7 +382,10 @@ function settlementTick(dt: number) {
 const UPRISING_POP = 26;     // a neutral town this large with nobody governing it grows restless
 const UPRISING_TIME = 75;    // seconds of neglect before it boils over into an armed mob
 const MILITIA_CAP = 32;      // global cap on live militia so an uprising can't run away
+const EMERGE_UPRISINGS = 3;  // after this many uprisings, the movement coalesces into the Free Legion (team 7)
 let militiaT = 0;
+let uprisings = 0;
+let legionFounded = false;
 function orderMilitia(u: Unit) {                                  // send a militiaman at the nearest faction structure
   let best: Building | null = null, bd = Infinity;
   for (const b of game.buildings) { const d = dist(u, b); if (d < bd) { bd = d; best = b; } }
@@ -385,6 +394,43 @@ function orderMilitia(u: Unit) {                                  // send a mili
 function militiaTick(dt: number) {
   militiaT += dt; if (militiaT < 1.5) return; militiaT = 0;       // idle militia periodically pick a new target to march on
   for (const u of game.units) if (u.team === 0 && u.order === 'idle') orderMilitia(u);
+}
+
+// ── Emergent faction: the uprisings coalesce into the FREE LEGION (team 7), a full faction ──────
+/** Initialise every per-team state slice for a faction created mid-match (mirrors createGame's defaults). */
+function initFactionState(T: number) {
+  game.money[T] = 3500; game.water[T] = 60; game.alloy[T] = 250; game.wood[T] = 0;
+  game.overheat[T] = false; game.pop[T] = 30; game.happy[T] = 58; game.conscriptPenalty[T] = 0;
+  game.leader[T] = PERSONA_STYLE[FAC[T].persona]; game.platform[T] = game.leader[T];
+  game.electionT[T] = game.t + 270; game.campaign[T] = 0; game.coupT[T] = 0; game.aggroT[T] = 0;
+  game.eliminated[T] = false;
+  game.ai[T] = { builtIdx: 0, nextWave: game.t + 45, waveN: 0, covertT: game.t + 140, missileT: game.t + 320, techT: 0, empT: game.t + 220, hijackT: game.t + 260 };
+}
+/** Found the Free Legion at an uprising's settlement: a stronghold, a starter economy, a warband, diplomacy. */
+function emergeFaction(s: Settlement) {
+  const T = EMERGENT_TEAM;
+  legionFounded = true;
+  addAITeam(T);
+  initFactionState(T);
+  const tx = clamp(s.x / TILE | 0, 2, MAPW - 4), ty = clamp(s.y / TILE | 0, 2, MAPH - 4);
+  BASE_INFO[T] = { tx, ty, sx: 1, sy: 1 };                        // anchor so the AI's base-relative logic works
+  s.owner = T; s.capT = 0; s.capBy = 0; s.unrest = 0;            // their birthplace becomes their seat
+  // stronghold + starter economy near the settlement
+  if (!aiPlace(T, 'hq', 0, 0, true)) addBuilding('hq', tx, ty, T, true);
+  aiPlace(T, 'power', -2, 3, true);
+  aiPlace(T, 'refinery', 3, 1, true);
+  let sp = freeSpotNear((tx + 3) * TILE, (ty + 4) * TILE); addUnit('harvester', sp.x, sp.y, T);
+  // every risen militiaman rallies to the Legion
+  for (const u of game.units) if (u.team === 0) { u.team = T; u.order = 'idle'; u.target = null; u.path = null; }
+  // a founding warband so the new faction is an immediate threat, not a pushover
+  for (let i = 0; i < 5; i++) { sp = freeSpotNear((tx + (Math.random() * 6 - 3)) * TILE, (ty + 4 + Math.random() * 2) * TILE); addUnit(i < 3 ? 'strike' : 'rocket', sp.x, sp.y, T); }
+  // diplomacy: at war with the player + the faction in whose territory it rose; tense (not war) with the rest
+  let near = PLAYER, nd = Infinity;
+  for (const f of [2, 3, 4, 5, 6]) { const b = game.buildings.find(bb => bb.team === f); if (b) { const d = dist(b, s); if (d < nd) { nd = d; near = f; } } }
+  for (const f of ALL_TEAMS) { if (f === T) continue; setRel(T, f, (f === PLAYER || f === near) ? -80 : -15); }
+  emergeHook(T);                                                  // renderer bakes team-7 textures before they render
+  logMsg('⚠ THE FREE LEGION HAS RISEN — a faction forged from the uprisings now contests the map!', 'war'); sfx('war');
+  game.shake = Math.min(13, game.shake + 7);
 }
 
 // ── Command Relays — income + vision objective points (§5) ───────────────────

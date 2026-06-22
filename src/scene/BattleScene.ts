@@ -4,7 +4,7 @@ import {
   idx, clamp, dist,
 } from '../sim/constants';
 import { game, resetState, isAllied, logMsg } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, spawnParts, pendingStrikeList } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, spawnParts, pendingStrikeList } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import grassTex from '../assets/terrain/grass.jpg?inline';
@@ -12,7 +12,7 @@ import rockTex from '../assets/terrain/rock.jpg?inline';
 import dirtTex from '../assets/terrain/dirt.jpg?inline';
 import pineTex from '../assets/trees/pine.png?inline';
 import treeTex from '../assets/trees/tree.png?inline';
-import { buildAllTextures, originOf } from '../render/textures';
+import { buildAllTextures, buildTeamTextures, originOf } from '../render/textures';
 import { initAudio, sfx, setViewWidth, toggleMute } from '../audio';
 import type { Building, Unit, Entity } from '../sim/types';
 
@@ -89,6 +89,7 @@ export class BattleScene extends Phaser.Scene {
     setClearForestHook(clearForestAt);
     setDryWaterHook(dryWaterAt);
     setEndHook((win) => this.onEnd(win));
+    setEmergeHook((team) => buildTeamTextures(this, team));   // a faction emerged mid-match → bake its sprites before they render
 
     this.cameras.main.setBackgroundColor('#0a0e08');
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
