@@ -170,6 +170,8 @@ export function makeUI() {
   ($('restartBtn') as HTMLButtonElement).onclick = () => restartHook();
   ($('startBtn') as HTMLButtonElement).onclick = () => { $('introOverlay').style.display = 'none'; startHook(); };
   ($('endBtn') as HTMLButtonElement).onclick = () => { $('endOverlay').style.display = 'none'; restartHook(); };
+  ($('helpBtn') as HTMLButtonElement).onclick = () => { $('helpOverlay').style.display = 'flex'; };
+  ($('helpCloseBtn') as HTMLButtonElement).onclick = () => { $('helpOverlay').style.display = 'none'; };
 }
 
 export function logMsg(msg: string, cls?: string) {

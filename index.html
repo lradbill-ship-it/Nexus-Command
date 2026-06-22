@@ -35,10 +35,10 @@
   #uiWoodWrap b{color:#9ec24f;text-shadow:0 0 6px rgba(158,194,79,.4);}
   #topbar .spacer{flex:1;}
   #uiHint{color:var(--gold);}
-  #restartBtn{pointer-events:auto;background:linear-gradient(180deg,var(--steel),var(--steel-lo));
+  #restartBtn,#helpBtn{pointer-events:auto;background:linear-gradient(180deg,var(--steel),var(--steel-lo));
     border:1px solid var(--steel-dk);border-top-color:var(--steel-hi);color:#16191f;
     font:inherit;font-weight:700;font-size:10px;letter-spacing:.14em;padding:6px 12px;cursor:pointer;border-radius:2px;}
-  #restartBtn:hover{filter:brightness(1.12);}
+  #restartBtn:hover,#helpBtn:hover{filter:brightness(1.12);}
   /* ====== C&C-style metal sidebar ====== */
   #sidebar{width:288px;display:flex;flex-direction:column;
     background:linear-gradient(180deg,#878f9b 0%,#6d7480 6%,#5a606b 50%,#4a505a 100%);
@@ -200,6 +200,7 @@
       <div class="stat">UPTIME <b id="uiTime">00:00</b></div>
       <div class="spacer"></div>
       <div class="stat" id="uiHint"></div>
+      <button id="helpBtn" title="Controls &amp; legend">⌨ KEYS</button>
       <button id="restartBtn" title="Restart with a brand new random map">⟳ NEW MAP / RESTART</button>
     </div>
 
@@ -217,8 +218,10 @@
           <div class="facCard" style="border-left-color:#2fc6c0"><b style="color:#2fc6c0">OCEANIC LEAGUE</b>Covert. Steals and sabotages, even in peace.</div>
         </div>
         <ul>
-          <li><kbd>Drag</kbd> select · <kbd>Right-click</kbd> move / attack / harvest · <kbd>T</kbd> attack-move · <kbd>1-9</kbd> control groups</li>
+          <li><kbd>Drag</kbd> select · <kbd>Right-click</kbd> move / attack / harvest · <kbd>T</kbd> attack-move · <kbd>Ctrl</kbd>+<kbd>1-9</kbd> set group, <kbd>1-9</kbd> recall</li>
           <li>Scroll with <kbd>W A S D</kbd> / arrows, <kbd>middle-mouse drag</kbd>, or the radar map — the screen never drifts on its own</li>
+          <li><kbd>Space</kbd> pause · <kbd>[</kbd> <kbd>]</kbd> game speed 1×/2×/3× · <kbd>Del</kbd> sell selected structure · <b>Walls</b> &amp; <b>Gates</b> funnel attackers into your turrets</li>
+          <li><b style="color:#d24ddd">WATCH THE MAP</b>: neglected neutral towns revolt — sustained uprisings forge a hostile <b style="color:#d24ddd">FREE LEGION</b> faction. Govern or be overrun.</li>
           <li><b>ECONOMY</b>: harvest <b style="color:#9bd4ff">crystals</b> (currency), <b style="color:#7fd6ea">coolant</b> (cools heavy units) &amp; <b style="color:#e0a155">alloy</b> (builds advanced war machines). Each base is rich in some, poor in others — expand to thrive.</li>
           <li><b>SOCIETY</b>: build Habitats &amp; Markets to grow a happy population — they work faster (labor) and can be <kbd>C</kbd> conscripted into troops. Neglect them and they revolt. Recruit or intimidate <b style="color:#b8bcc4">neutral settlements</b> for more people.</li>
           <li><b>DIPLOMACY</b>: gifts, trade pacts (resources flow both ways), alliances (shared vision, allies join your wars), war</li>
@@ -237,6 +240,25 @@
         <h2 id="endSub"></h2>
         <p id="endText"></p>
         <button class="go" id="endBtn">NEW BATTLEFIELD</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="helpOverlay" style="display:none">
+      <div class="panelBox">
+        <h1>CONTROLS <span>&amp; LEGEND</span></h1>
+        <h2>EVERY LEVER YOU HAVE, COMMANDER</h2>
+        <ul>
+          <li><b>SELECT &amp; ORDER</b> — <kbd>Drag</kbd> marquee · <kbd>Left-click</kbd> select · <kbd>Right-click</kbd> move / attack / harvest / guard · <kbd>T</kbd> attack-move</li>
+          <li><b>CONTROL GROUPS</b> — <kbd>Ctrl</kbd>+<kbd>1-9</kbd> assign · <kbd>1-9</kbd> recall</li>
+          <li><b>CAMERA</b> — <kbd>W A S D</kbd> / arrows · <kbd>middle-mouse drag</kbd> · radar-map click/drag (the view never drifts on its own)</li>
+          <li><b>TEMPO</b> — <kbd>Space</kbd> pause/resume · <kbd>[</kbd> <kbd>]</kbd> game speed 1×/2×/3× · <kbd>M</kbd> mute</li>
+          <li><b>BUILD</b> — CONSTRUCT then place · <kbd>Del</kbd>/<kbd>Backspace</kbd> sell selected structure · <b>Walls</b> &amp; <b>Gates</b> shape chokepoints (your units pass your gate; enemies route around)</li>
+          <li><b>SOCIETY</b> — grow population (Habitat / Market); <kbd>C</kbd> conscript; recruit or intimidate <b style="color:#b8bcc4">neutral settlements</b> (loot + recruits on capture)</li>
+          <li><b>CYBER</b> (Cyber Ops Center) — <kbd>E</kbd> EMP · <kbd>H</kbd> Hijack · <kbd>N</kbd> Ballistic &amp; <kbd>B</kbd> Thermonuclear missile (need a Missile Silo; an Iron Dome intercepts)</li>
+          <li><b style="color:#d24ddd">THE FREE LEGION</b> — neglect ungoverned towns and they revolt; sustained uprisings coalesce into a hostile new faction. Govern the map or face it.</li>
+          <li><b>VICTORY</b> — destroy every rival faction, including any that emerge. Hold <b style="color:#cfe6ee">★ Command Relays</b> for income + vision.</li>
+        </ul>
+        <button class="go" id="helpCloseBtn">CLOSE</button>
       </div>
     </div>
   </div>
