@@ -12,7 +12,7 @@ import {
 let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
 
-const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'wall', 'gate', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'idome', 'cyber', 'silo', 'drillbay'];
+const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'wall', 'gate', 'palisade', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'idome', 'cyber', 'silo', 'drillbay'];
 const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'aegis', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'hunter', 'borer'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
@@ -39,6 +39,7 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'idome') { g.fillStyle = 'rgba(150,210,255,.6)'; g.beginPath(); g.arc(cx, cy + 3, 8, Math.PI, 0); g.fill(); g.strokeStyle = '#9fdcff'; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy + 3, 8, Math.PI, 0); g.stroke(); g.strokeStyle = '#c9d6e0'; g.beginPath(); g.moveTo(cx - 3, cy + 2); g.lineTo(cx - 6, cy - 4); g.moveTo(cx + 3, cy + 2); g.lineTo(cx + 6, cy - 4); g.stroke(); }
     else if (type === 'wall') { g.fillStyle = '#3a4552'; g.fillRect(11, 10, 18, 10); g.strokeStyle = '#9fd9cc'; g.strokeRect(11, 10, 18, 10); g.fillStyle = '#2c3744'; for (let i = 0; i < 4; i++) g.fillRect(12 + i * 5, 6, 3, 4); }
     else if (type === 'gate') { g.fillStyle = '#3a4552'; g.fillRect(10, 8, 6, 12); g.fillRect(24, 8, 6, 12); g.strokeStyle = '#9fd9cc'; g.strokeRect(10, 8, 6, 12); g.strokeRect(24, 8, 6, 12); g.strokeStyle = '#69d84f'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(20, 8); g.lineTo(20, 20); g.stroke(); }
+    else if (type === 'palisade') { g.strokeStyle = '#9c7338'; g.lineWidth = 2.4; for (let i = 0; i < 4; i++) { const x = 13 + i * 5; g.beginPath(); g.moveTo(x, 19); g.lineTo(x, 8); g.stroke(); g.fillStyle = '#7a5a2c'; g.beginPath(); g.moveTo(x - 2, 8); g.lineTo(x + 2, 8); g.lineTo(x, 5); g.closePath(); g.fill(); } }
   } else {
     if (type === 'harvester') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#9bd4ff'; g.fillRect(16, 9, 8, 6); }
     else if (type === 'tanker') { g.fillRect(13, 5, 14, 16); g.strokeRect(13, 5, 14, 16); g.fillStyle = '#7fd6ea'; g.beginPath(); g.arc(20, 13, 5, 0, 7); g.fill(); g.strokeStyle = '#cfeef5'; g.beginPath(); g.moveTo(15, 13); g.lineTo(25, 13); g.stroke(); }
@@ -81,7 +82,7 @@ export function makeUI() {
   const bg = $('buildBtns');
   for (const t of buildOrder) {
     const d = B[t];
-    const btn = cmdButton('b_' + t, iconCanvas('b', t), d.name, '▣' + d.cost + (d.alloy ? ' ⬡' + d.alloy : ''));
+    const btn = cmdButton('b_' + t, iconCanvas('b', t), d.name, '▣' + d.cost + (d.alloy ? ' ⬡' + d.alloy : '') + (d.wood ? ' 🪵' + d.wood : ''));
     btn.title = d.desc; btn.onclick = () => startPlacing(t); bg.appendChild(btn);
   }
   const ug = $('unitBtns');

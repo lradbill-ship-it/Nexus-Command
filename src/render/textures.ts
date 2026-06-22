@@ -265,6 +265,14 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 1;
     g.beginPath(); g.moveTo(fx + 2, roofY + fh / 2); g.lineTo(fx + fw - 2, roofY + fh / 2); g.stroke();
     g.fillStyle = col; g.globalAlpha = 0.6; g.fillRect(fx + 2, roofY + fh - 5, fw - 4, 2); g.globalAlpha = 1;
+  } else if (type === 'palisade') {
+    // a row of sharpened timber stakes
+    for (let i = 0; i < 4; i++) {
+      const sx = fx + 3 + i * (fw - 6) / 3;
+      g.fillStyle = i % 2 ? '#7a5a2c' : '#8a6633'; g.fillRect(sx - 1.5, roofY - 2, 3.2, fh + 2);
+      g.fillStyle = '#9c7a44'; g.beginPath(); g.moveTo(sx - 1.6, roofY - 2); g.lineTo(sx + 1.6, roofY - 2); g.lineTo(sx, roofY - 6); g.closePath(); g.fill();
+    }
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(fx + 2, roofY + fh * 0.6); g.lineTo(fx + fw - 2, roofY + fh * 0.6); g.stroke();
   } else if (type === 'gate') {
     // two heavy posts flanking a faction-lit threshold (the passable doorway)
     g.fillStyle = '#39434f'; g.fillRect(fx + 1, roofY - 4, 6, fh + 4); g.fillRect(fx + fw - 7, roofY - 4, 6, fh + 4);

@@ -1856,11 +1856,13 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
   }
   sfx('click');
 }
+const LINEAR_DEFENSE = (type: string) => type === 'wall' || type === 'gate' || type === 'palisade';
 export function startPlacing(type: string) {
   if (game.money[PLAYER] < B[type].cost) { hint('Insufficient crystals'); return; }
   if (alloyCost(PLAYER, B[type].alloy) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy'); return; }
+  if ((B[type].wood || 0) > (game.wood[PLAYER] || 0)) { hint('Insufficient wood — log some forest first'); return; }
   game.placing = type; game.armed = null;
-  hint('Place ' + B[type].name + ' — right-click to cancel');
+  hint(LINEAR_DEFENSE(type) ? 'Place ' + B[type].name + ' — keep clicking to lay a line; right-click to stop' : 'Place ' + B[type].name + ' — right-click to cancel');
 }
 export function canPlaceHere(type: string, tx: number, ty: number) {
   if (!footprintFree(type, tx, ty)) return false;
@@ -1875,9 +1877,14 @@ export function tryPlace(wx: number, wy: number) {
   if (!canPlaceHere(type, tx, ty)) { hint('Cannot deploy here — needs clear, scouted ground near your base'); return; }
   if (game.money[PLAYER] < d.cost) { hint('Insufficient crystals'); game.placing = null; return; }
   if (alloyCost(PLAYER, d.alloy) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy'); game.placing = null; return; }
-  game.money[PLAYER] -= d.cost; game.alloy[PLAYER] -= alloyCost(PLAYER, d.alloy);
+  if ((d.wood || 0) > (game.wood[PLAYER] || 0)) { hint('Insufficient wood — log some forest first'); game.placing = null; return; }
+  game.money[PLAYER] -= d.cost; game.alloy[PLAYER] -= alloyCost(PLAYER, d.alloy); game.wood[PLAYER] = (game.wood[PLAYER] || 0) - (d.wood || 0);
   addBuilding(type, tx, ty, PLAYER, false);
-  sfx('place', wx); game.placing = null; hint('');
+  sfx('place', wx);
+  // Linear defenses stay armed so you can lay a long run with repeated clicks (right-click / Esc stops).
+  if (LINEAR_DEFENSE(type) && game.money[PLAYER] >= d.cost && alloyCost(PLAYER, d.alloy) <= (game.alloy[PLAYER] || 0) && (d.wood || 0) <= (game.wood[PLAYER] || 0)) {
+    hint('Placing ' + d.name + ' — keep clicking to extend; right-click to stop');
+  } else { game.placing = null; hint(''); }
 }
 export function cancelUnit(t: string) {
   const fs = game.buildings.filter(b => b.team === PLAYER && b.type === 'foundry' && b.queue.includes(t));
