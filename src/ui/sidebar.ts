@@ -76,6 +76,33 @@ export function setRestartHook(fn: () => void) { restartHook = fn; }
 let startHook: () => void = () => {};
 export function setStartHook(fn: () => void) { startHook = fn; }
 
+/** Create the covert chip + diplomacy row for one faction if they don't exist yet.
+ *  Idempotent, so it auto-extends the diplomacy UI to a faction that emerges mid-match (the Free Legion). */
+function ensureDipUI(f: number) {
+  if (!document.getElementById('chip_' + f)) {
+    const btn = document.createElement('button'); btn.id = 'chip_' + f;
+    btn.textContent = FAC[f].name.split(' ')[0]; btn.style.borderColor = FAC[f].col;
+    btn.onclick = () => { game.covTarget = f; refresh(); };
+    $('covChips').appendChild(btn);
+  }
+  if (!document.getElementById('dip_' + f)) {
+    const row = document.createElement('div'); row.className = 'dipRow'; row.id = 'dip_' + f;
+    row.innerHTML = `
+      <div class="hd"><span class="sw" style="background:${FAC[f].col};color:${FAC[f].col}"></span>
+        <span>${FAC[f].name}</span><span class="st" id="dst_${f}">NEUTRAL</span></div>
+      <div class="relBar"><div class="mid"></div><div class="fill" id="drel_${f}"></div></div>
+      <div class="dipBtns">
+        <button id="dg_${f}">GIFT 300</button><button id="dt_${f}">TRADE</button>
+        <button id="da_${f}">ALLY</button><button id="dw_${f}">WAR</button>
+      </div>`;
+    $('dipRows').appendChild(row);
+    ($('dg_' + f) as HTMLButtonElement).onclick = () => dipGift(f);
+    ($('dt_' + f) as HTMLButtonElement).onclick = () => dipTrade(f);
+    ($('da_' + f) as HTMLButtonElement).onclick = () => dipAlly(f);
+    ($('dw_' + f) as HTMLButtonElement).onclick = () => dipWar(f);
+  }
+}
+
 export function makeUI() {
   setLogHook(logMsg); setHintHook((m) => { $('uiHint').textContent = m; });
 
@@ -101,12 +128,6 @@ export function makeUI() {
     const btn = cmdButton('a_' + k, ic, a.name, '▣' + a.cost + (a.alloy ? ' ⬡' + a.alloy : '') + ' · ' + a.cd + 's', a.key);
     btn.title = a.desc; btn.onclick = () => tryAbility(k); ag.appendChild(btn);
   }
-  const ch = $('covChips');
-  for (const f of AIS) {
-    const btn = document.createElement('button'); btn.id = 'chip_' + f;
-    btn.textContent = FAC[f].name.split(' ')[0]; btn.style.borderColor = FAC[f].col;
-    btn.onclick = () => { game.covTarget = f; refresh(); }; ch.appendChild(btn);
-  }
   const cg = $('covBtns');
   for (const k of covertOrder) {
     const m = COVERT[k];
@@ -115,23 +136,7 @@ export function makeUI() {
     const btn = cmdButton('c_' + k, ic, m.name, '▣' + m.cost + ' · ' + Math.round(m.chance * 100) + '%');
     btn.title = m.desc; btn.onclick = () => runCovert(k); cg.appendChild(btn);
   }
-  const dr = $('dipRows');
-  for (const f of AIS) {
-    const row = document.createElement('div'); row.className = 'dipRow'; row.id = 'dip_' + f;
-    row.innerHTML = `
-      <div class="hd"><span class="sw" style="background:${FAC[f].col};color:${FAC[f].col}"></span>
-        <span>${FAC[f].name}</span><span class="st" id="dst_${f}">NEUTRAL</span></div>
-      <div class="relBar"><div class="mid"></div><div class="fill" id="drel_${f}"></div></div>
-      <div class="dipBtns">
-        <button id="dg_${f}">GIFT 300</button><button id="dt_${f}">TRADE</button>
-        <button id="da_${f}">ALLY</button><button id="dw_${f}">WAR</button>
-      </div>`;
-    dr.appendChild(row);
-    ($('dg_' + f) as HTMLButtonElement).onclick = () => dipGift(f);
-    ($('dt_' + f) as HTMLButtonElement).onclick = () => dipTrade(f);
-    ($('da_' + f) as HTMLButtonElement).onclick = () => dipAlly(f);
-    ($('dw_' + f) as HTMLButtonElement).onclick = () => dipWar(f);
-  }
+  for (const f of AIS) ensureDipUI(f);   // covert chip + diplomacy row per AI faction (auto-extends to an emergent faction)
   // tabs
   const tabs: [string, string][] = [['tabBase', 'paneBase'], ['tabOps', 'paneOps'], ['tabDip', 'paneDip']];
   for (const [tb, pn] of tabs) {
@@ -192,7 +197,13 @@ export function showEnd(win: boolean) {
     : 'Your last structure has gone dark. The battlefield belongs to someone else now.';
   $('endOverlay').style.display = 'flex';
 }
-export function resetOverlays() { $('endOverlay').style.display = 'none'; $('log').innerHTML = ''; }
+export function resetOverlays() {
+  $('endOverlay').style.display = 'none'; $('log').innerHTML = '';
+  // drop any emergent-faction (team >6) diplomacy UI left over from the previous match
+  for (const el of Array.from(document.querySelectorAll('[id^="dip_"],[id^="chip_"]'))) {
+    const n = +el.id.split('_')[1]; if (n > 6) el.remove();
+  }
+}
 
 /** Periodic UI sync (credits, power, cooldowns, diplomacy, selection). */
 export function refresh() {
@@ -260,6 +271,7 @@ export function refresh() {
     btn.disabled = !hc || game.money[PLAYER] < COVERT[k].cost || game.covCd[k] > 0 || !!game.eliminated[game.covTarget] || isAllied(PLAYER, game.covTarget);
     (btn.querySelector('.cd') as HTMLElement).style.width = (game.covCd[k] > 0 ? game.covCd[k] / COVERT[k].cd * 100 : 0) + '%';
   }
+  for (const f of AIS) ensureDipUI(f);   // a faction may have emerged mid-match → make sure its chip + row exist
   for (const f of AIS) {
     const c = $('chip_' + f);
     c.classList.toggle('on', game.covTarget === f);
