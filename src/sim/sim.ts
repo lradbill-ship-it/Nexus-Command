@@ -36,7 +36,7 @@ let visionAccum = 0;     // throttle accumulator for player fog-of-war recompute
 type Strike = { x: number; y: number; at: number; team: number; kind: 'nuke' | 'thermo' };
 let pendingStrikes: Strike[] = [];   // in-flight missiles → detonate when game.t >= at (unless intercepted)
 export function pendingStrikeList(): readonly Strike[] { return pendingStrikes; }
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; pendingStrikes = []; lastWoodNag = -9; }
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; pendingStrikes = []; lastWoodNag = -9; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -115,6 +115,7 @@ export function setupBases() {
     game.ai[team] = { builtIdx: 0, nextWave: 0, waveN: 0, covertT: 120 + Math.random() * 60, missileT: 480 + Math.random() * 120, techT: 0, empT: 300 + Math.random() * 120, hijackT: 380 + Math.random() * 140 };
     game.ai[team].nextWave = FAC[team].persona === 'warlord' ? 130 + Math.random() * 40 : 180 + Math.random() * 60;
   }
+  for (const f of ALL_TEAMS) setRel(0, f, -100);   // the Free Militia (team 0) is at war with every faction
 }
 
 // ── Fog of war ───────────────────────────────────────────────────────────────
@@ -323,11 +324,16 @@ const SETTLE_R = 4 * TILE;   // capture influence radius
 const SETTLE_INCOME = 0.05;  // crystals/sec per population point an owned settlement yields (civilian economy)
 function captureSettlement(s: Settlement, team: number, militaryOnly: boolean) {
   const prev = s.owner;
-  s.owner = team; s.capT = 0; s.capBy = 0;
+  s.owner = team; s.capT = 0; s.capBy = 0; s.unrest = 0;
   game.pop[team] = (game.pop[team] || 0) + s.pop;                 // its citizens join your population
   // intimidated (troops only) subjects resent it; persuaded/recruited ones welcome it
   game.happy[team] = clamp((game.happy[team] ?? 60) + (militaryOnly ? -6 : 6), 0, 100);
-  if (team === PLAYER) { logMsg((militaryOnly ? 'Intimidated' : 'Won over') + ' a settlement — +' + s.pop + ' population', 'good'); sfx('chime'); }
+  // conquest windfall — looted stores + a few citizens take up arms for the new owner (scales with population)
+  const loot = Math.round(s.pop * 8);
+  game.money[team] = (game.money[team] || 0) + loot;
+  const recruits = Math.min(3, 1 + (s.pop / 14 | 0));
+  for (let i = 0; i < recruits; i++) { const sp = freeSpotNear(s.x, s.y); addUnit('infantry', sp.x, sp.y, team); }
+  if (team === PLAYER) { logMsg((militaryOnly ? 'Intimidated' : 'Won over') + ' a settlement — +' + s.pop + ' pop, +' + loot + ' crystals, ' + recruits + ' recruits', 'good'); sfx('chime'); }
   else if (prev === PLAYER) { logMsg(FAC[team].name + ' has seized one of our settlements', 'war'); sfx('war'); }
 }
 function settlementTick(dt: number) {
@@ -338,19 +344,47 @@ function settlementTick(dt: number) {
       if (isSupport(u.type)) civ[u.team] = (civ[u.team] || 0) + 1; else army[u.team] = (army[u.team] || 0) + 1;
     });
     const present = new Set<number>([...Object.keys(army), ...Object.keys(civ)].map(Number));
-    const challengers = [...present].filter(t => t !== s.owner);
+    const challengers = [...present].filter(t => t !== s.owner && t !== 0);      // militia (team 0) raid, they don't capture
     if (challengers.length === 1) {                                // uncontested takeover
       const team = challengers[0];
       s.capBy = team; s.capT += dt / 6;                            // ~6s of presence to flip
       if (s.capT >= 1) captureSettlement(s, team, !civ[team] && !!army[team]);   // troops-only ⇒ intimidation
-    } else if (present.size === 0) {
+    } else if (challengers.length === 0) {
       s.capT = Math.max(0, s.capT - dt / 10); if (s.capT === 0) s.capBy = 0;     // unattended → cools off
     } else {
       s.capT = Math.max(0, s.capT - dt / 18);                      // contested → stalls
     }
     // an owned settlement is a working town — its citizens yield a crystal trickle to the owner
     if (s.owner) game.money[s.owner] += s.pop * SETTLE_INCOME * dt;
+    // Civilian uprising: a large, ungoverned (neutral, uncontested) town foments unrest → an armed mob takes up arms
+    if (!s.owner && s.pop >= UPRISING_POP && challengers.length === 0) {
+      s.unrest = (s.unrest || 0) + dt;
+      const militiaN = game.units.reduce((n, u) => n + (u.team === 0 ? 1 : 0), 0);
+      if (s.unrest >= UPRISING_TIME && militiaN < MILITIA_CAP) {
+        s.unrest = 0;
+        const n = 2 + (Math.random() * 3 | 0);
+        for (let i = 0; i < n; i++) { const sp = freeSpotNear(s.x, s.y); const m = addUnit('militia', sp.x, sp.y, 0); orderMilitia(m); }
+        s.pop = Math.max(8, s.pop - n * 3);                        // fighters leave the town
+        const nearPlayer = game.buildings.some(b => isAllied(PLAYER, b.team) && dist(b, s) < 22 * TILE);
+        if (nearPlayer) { logMsg('⚠ A FREE MILITIA has risen up from an ungoverned settlement nearby!', 'war'); sfx('war'); }
+        else logMsg('A Free Militia has risen up from an ungoverned settlement.');
+      }
+    } else if (s.unrest) s.unrest = Math.max(0, s.unrest - dt * 0.5);
   }
+}
+// ── Free Militia (team 0): unaligned hostiles spawned by ungoverned settlements ──────────────
+const UPRISING_POP = 26;     // a neutral town this large with nobody governing it grows restless
+const UPRISING_TIME = 75;    // seconds of neglect before it boils over into an armed mob
+const MILITIA_CAP = 32;      // global cap on live militia so an uprising can't run away
+let militiaT = 0;
+function orderMilitia(u: Unit) {                                  // send a militiaman at the nearest faction structure
+  let best: Building | null = null, bd = Infinity;
+  for (const b of game.buildings) { const d = dist(u, b); if (d < bd) { bd = d; best = b; } }
+  if (best) { u.order = 'amove'; u.dest = { x: best.x, y: best.y }; setPath(u, best.x, best.y); }
+}
+function militiaTick(dt: number) {
+  militiaT += dt; if (militiaT < 1.5) return; militiaT = 0;       // idle militia periodically pick a new target to march on
+  for (const u of game.units) if (u.team === 0 && u.order === 'idle') orderMilitia(u);
 }
 
 // ── Command Relays — income + vision objective points (§5) ───────────────────
@@ -1902,6 +1936,7 @@ export function stepWorld(dt: number) {
   waterStep(dt);
   societyTick(dt);
   settlementTick(dt);
+  militiaTick(dt);
   relayTick(dt);
   vaultTick(dt);
   governmentTick(dt);

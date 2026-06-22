@@ -33,6 +33,7 @@ export interface Settlement {
   capBy: number;               // faction currently gaining capture progress (0 = none)
   capT: number;                // capture progress 0..1
   seed: number;                // render variation
+  unrest?: number;             // ungoverned-town unrest accrual → a Free Militia uprising (team 0)
 }
 
 // Hero Vaults — buried in mountain rock, found by surveying (Hero Hunter), excavated

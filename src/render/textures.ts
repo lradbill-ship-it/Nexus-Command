@@ -391,6 +391,12 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill();   // helmet
     g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx + 1, cy); g.lineTo(cx + 6, cy - 6); g.stroke(); // rifle
     g.fillStyle = `rgba(${rgb},.9)`; g.fillRect(cx - 4, cy + 4, 8, 1.5);
+  } else if (type === 'militia') {
+    // ragtag fighter: hood/cap + body + makeshift weapon (grey, unaligned)
+    g.fillStyle = '#41464d'; g.beginPath(); g.ellipse(cx, cy + 1, 4.3, 5.3, 0, 0, 7); g.fill();
+    g.strokeStyle = col; g.lineWidth = 1.1; g.stroke();
+    g.fillStyle = '#b7bcc4'; g.beginPath(); g.arc(cx, cy - 4, 2.8, 0, 7); g.fill();   // head/cap
+    g.strokeStyle = '#8a8f97'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 6, cy - 5); g.stroke();   // makeshift weapon
   } else if (type === 'rocket') {
     // rocket trooper: trooper + shoulder launcher tube
     g.fillStyle = '#3a4654'; g.beginPath(); g.ellipse(cx, cy + 1, 4.5, 5.5, 0, 0, 7); g.fill();
@@ -498,4 +504,6 @@ export function buildAllTextures(scene: Phaser.Scene) {
       const [c, cx, cy] = barrelCanvas(type, team); addCanvas(scene, `t_${type}_${team}`, c, cx, cy);
     }
   }
+  // Free Militia is the only team-0 (unaligned) unit — bake its sprite separately.
+  { const [c, cx, cy] = unitCanvas('militia', 0); addCanvas(scene, 'u_militia_0', c, cx, cy); }
 }

@@ -50,6 +50,7 @@ export interface Faction {
 // 6 regional coalitions (DESIGN_SPEC_v4 §6). Names are geopolitical coalitions;
 // AI persona is a GAMEPLAY archetype, deliberately not a cultural stereotype.
 export const FAC: Record<number, Faction> = {
+  0: { name: 'FREE MILITIA', col: '#9aa0a8', rgb: '154,160,168', persona: 'player' },   // unaligned (team 0) — emergent civilian uprising, no economy/diplomacy
   1: { name: 'AMERICAN FEDERATION', col: '#3e7cd8', rgb: '62,124,216', persona: 'player' },
   2: { name: 'EUROPEAN CONCORD', col: '#cdd6e4', rgb: '205,214,228', persona: 'merchant' },
   3: { name: 'PAN-AFRICAN UNION', col: '#4faf5a', rgb: '79,175,90', persona: 'industrial' },
@@ -155,6 +156,7 @@ export const U: Record<string, UnitDef> = {
   repair: { name: 'Repair Rig', cost: 350, hp: 270, speed: 80, radius: 10, sight: 5, buildTime: 10, repair: true, desc: 'Mobile mender — heals friendly units & buildings, burning wood. Escort one (right-click) or it auto-seeks the wounded.' },
   recon: { name: 'Recon Drone', cost: 150, hp: 78, speed: 140, radius: 8, sight: 9, buildTime: 6, dmg: 4, range: 96, rof: 0.4, air: true, desc: 'Fast scout quadcopter — flies over terrain; only AA can hit it.' },
   infantry: { name: 'Rifle Trooper', cost: 90, hp: 70, speed: 70, radius: 7, sight: 6, buildTime: 4, dmg: 5, range: 98, rof: 0.5, infantry: true, desc: 'Cheap massable foot soldier.' },
+  militia: { name: 'Free Militia', cost: 0, hp: 85, speed: 66, radius: 7, sight: 6, buildTime: 0, dmg: 6, range: 100, rof: 0.6, infantry: true, desc: 'Armed civilians risen from an ungoverned settlement — hostile to every faction.' },
   rocket: { name: 'Rocket Trooper', cost: 180, hp: 90, speed: 62, radius: 7, sight: 7, buildTime: 7, dmg: 17, range: 152, rof: 1.5, antiAir: true, infantry: true, desc: 'Anti-armor & anti-air infantry.' },
   strike: { name: 'Hover Tank', cost: 300, hp: 155, speed: 96, radius: 10, sight: 7, buildTime: 9, dmg: 11, range: 124, rof: 0.8, desc: 'Backbone main battle tank.' },
   artillery: { name: 'Siege Artillery', cost: 850, hp: 200, speed: 50, radius: 12, sight: 6, buildTime: 18, dmg: 58, range: 256, rof: 3.0, splash: 58, coolant: 3, alloy: 350, desc: 'Long-range splash siege. Fragile; needs coolant + alloy.' },
