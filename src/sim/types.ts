@@ -113,6 +113,7 @@ export interface Unit {
   vet?: number;          // rank: 0 rookie · 1 veteran · 2 elite
   stack?: number;        // merged collectors: how many units this one represents (cargo/rate/hp scale ×stack)
   revealT?: number;      // stealth units: game.t until which the cloak is dropped (fired recently / enemy nearby)
+  buffUntil?: number;    // Overcharge: game.t until which this unit has the combat-stim (+dmg/+speed) buff
   dead?: boolean;
 }
 
@@ -152,6 +153,7 @@ export interface AIState {
   techT: number;      // throttle for the conditional advanced-build pass (domes/silo/etc.)
   empT: number;       // next time this AI may fire an EMP (needs a Cyber Ops Center)
   hijackT: number;    // next time this AI may hijack an enemy unit (needs a Cyber Ops Center)
+  buffT?: number;     // next time this AI may Overcharge its army (needs a Cyber Ops Center)
 }
 
 export interface GameState {

@@ -120,7 +120,7 @@ export function setupBases() {
       s = freeSpotNear((bi.tx + 6 * bi.sx) * TILE, (bi.ty + 5 * bi.sy) * TILE); addUnit('strike', s.x, s.y, team);
       s = freeSpotNear((bi.tx + 4 * bi.sx) * TILE, (bi.ty + 6 * bi.sy) * TILE); addUnit('strike', s.x, s.y, team);
     }
-    game.ai[team] = { builtIdx: 0, nextWave: 0, waveN: 0, covertT: 120 + Math.random() * 60, missileT: 480 + Math.random() * 120, techT: 0, empT: 300 + Math.random() * 120, hijackT: 380 + Math.random() * 140 };
+    game.ai[team] = { builtIdx: 0, nextWave: 0, waveN: 0, covertT: 120 + Math.random() * 60, missileT: 480 + Math.random() * 120, techT: 0, empT: 300 + Math.random() * 120, hijackT: 380 + Math.random() * 140, buffT: 280 + Math.random() * 120 };
     game.ai[team].nextWave = FAC[team].persona === 'warlord' ? 130 + Math.random() * 40 : 180 + Math.random() * 60;
   }
   for (const f of ALL_TEAMS) setRel(0, f, -100);   // the Free Militia (team 0) is at war with every faction
@@ -415,7 +415,7 @@ function initFactionState(T: number) {
   game.leader[T] = PERSONA_STYLE[FAC[T].persona]; game.platform[T] = game.leader[T];
   game.electionT[T] = game.t + 270; game.campaign[T] = 0; game.coupT[T] = 0; game.aggroT[T] = 0;
   game.eliminated[T] = false;
-  game.ai[T] = { builtIdx: 0, nextWave: game.t + 45, waveN: 0, covertT: game.t + 140, missileT: game.t + 320, techT: 0, empT: game.t + 220, hijackT: game.t + 260 };
+  game.ai[T] = { builtIdx: 0, nextWave: game.t + 45, waveN: 0, covertT: game.t + 140, missileT: game.t + 320, techT: 0, empT: game.t + 220, hijackT: game.t + 260, buffT: game.t + 200 };
 }
 /** Found the Free Legion at an uprising's settlement: a stronghold, a starter economy, a warband, diplomacy. */
 function emergeFaction(s: Settlement) {
@@ -617,6 +617,7 @@ function fireAt(src: Entity, target: Entity, dmg: number, rail: boolean, splash 
   dmg = dmg * (styleMod(src.team).combat ?? 1);          // Militarist hits harder, Mercantile/Populist softer
   const byUnit = src.kind === 'u' ? (src as Unit) : undefined;
   if (byUnit) dmg *= vetDmg(byUnit.vet || 0);            // veterans/elites hit harder
+  if (byUnit && buffed(byUnit)) dmg *= OVERCHARGE_DMG;   // Overcharge combat stim
   const subsurface = src.kind === 'u' && !!U[(src as Unit).type].tunneler;
   game.shots.push({ x: src.x, y: src.y, target, dmg, team: src.team, speed: rail ? 940 : 560, col: FAC[src.team].col, rail, splash, subsurface, by: byUnit });
   src.lastShot = game.t;
@@ -771,7 +772,7 @@ function unitBlocked(x: number, y: number, team = 0) { return !passableFor(x / T
 // and harvesters while burrowing underground.
 const phasing = (u: Unit) => !!U[u.type].air || !!U[u.type].tunneler || (u.tunnelT ?? 0) > 0;
 function stepToward(u: Unit, dx: number, dy: number, dt: number) {
-  const sp = U[u.type].speed * dt, len = Math.hypot(dx, dy);
+  const sp = U[u.type].speed * (buffed(u) ? OVERCHARGE_SPD : 1) * dt, len = Math.hypot(dx, dy);
   if (len < 1) { u.moving = false; return true; }
   u.moving = true;
   const nx = u.x + dx / len * sp, ny = u.y + dy / len * sp;
@@ -866,6 +867,14 @@ let stealthT = 0;
 export const cloaked = (u: Unit) => !!U[u.type].stealth && (u.revealT ?? 0) <= game.t;
 /** Hidden from the human player's view? (an enemy stealth unit currently cloaked). */
 export const cloakedToPlayer = (u: Unit) => cloaked(u) && !isAllied(PLAYER, u.team);
+
+// ── Overcharge (combat stim): a timed +dmg / +speed buff on your units ────────
+const OVERCHARGE_R = 150;       // buff radius around the cast point
+const OVERCHARGE_DUR = 9;       // seconds the stim lasts
+const OVERCHARGE_DMG = 1.4;     // damage multiplier while buffed
+const OVERCHARGE_SPD = 1.35;    // movement-speed multiplier while buffed
+export const buffed = (u: Unit) => (u.buffUntil ?? 0) > game.t;
+
 function stealthTick(dt: number) {
   stealthT += dt; if (stealthT < 0.25) return; stealthT = 0;
   for (const u of game.units) {
@@ -1426,6 +1435,13 @@ export function castAbility(key: string, wx: number, wy: number) {
     game.parts.push({ type: 'emp', x: best.x, y: best.y, t: 0, life: 0.8 });
     sfx('emp', best.x);
     logMsg(U[best.type].name + ' hijacked — it\'s ours now', 'hot');
+  } else if (key === 'overcharge') {
+    game.money[PLAYER] -= a.cost; game.cooldowns.overcharge = a.cd * (styleMod(PLAYER).cdMul ?? 1);
+    game.parts.push({ type: 'ring', x: wx, y: wy, t: 0, life: 0.8, big: true });
+    let n = 0;
+    for (const u of game.units) if (isAllied(PLAYER, u.team) && !isSupport(u.type) && dist(u, { x: wx, y: wy }) < OVERCHARGE_R) { u.buffUntil = game.t + OVERCHARGE_DUR; n++; spawnParts('spark', u.x, u.y, 4, '255,205,90'); }
+    sfx('chime', wx);
+    logMsg(n ? '⚡ Overcharge — ' + n + ' units stimmed (+dmg & +speed, 9s)' : 'Overcharge — no combat units in range', 'hot');
   } else if (key === 'nuke') {
     game.money[PLAYER] -= a.cost; game.cooldowns.nuke = a.cd * (styleMod(PLAYER).cdMul ?? 1);
     pendingStrikes.push({ x: wx, y: wy, at: game.t + NUKE_TRAVEL, team: PLAYER, kind: 'nuke' });
@@ -1850,6 +1866,21 @@ function aiUpdate(team: number, dt: number) {
       game.parts.push({ type: 'emp', x: v.x, y: v.y, t: 0, life: 0.8 });
       if (was === PLAYER || isAllied(PLAYER, was)) { logMsg(FAC[team].name + ' HIJACKED our ' + U[v.type].name + '!', 'war'); sfx('covert', v.x); }
     } else ai.hijackT = game.t + 20;
+  }
+  // Cyber: Overcharge — the AI stims a dense cluster of its own army when it's engaging (times it with a push).
+  if (game.t >= (ai.buffT ?? 0) && game.money[team] >= ABILITIES.overcharge.cost && game.buildings.some(b => b.team === team && b.type === 'cyber' && b.progress >= 1)) {
+    const mine = game.units.filter(u => u.team === team && !isSupport(u.type) && (U[u.type].dmg || 0) > 0 && !buffed(u));
+    let best: Unit | null = null, bn = 0;
+    for (const u of mine) {
+      const near = mine.reduce((s, o) => s + (dist(o, u) < OVERCHARGE_R ? 1 : 0), 0);
+      if (near > bn && game.units.some(e => isWar(team, e.team) && dist(e, u) < OVERCHARGE_R * 2)) { bn = near; best = u; }
+    }
+    if (best && bn >= 4) {
+      game.money[team] -= ABILITIES.overcharge.cost; ai.buffT = game.t + 70 + Math.random() * 40;
+      for (const u of game.units) if (u.team === team && !isSupport(u.type) && dist(u, best) < OVERCHARGE_R) u.buffUntil = game.t + OVERCHARGE_DUR;
+      game.parts.push({ type: 'ring', x: best.x, y: best.y, t: 0, life: 0.8, big: true });
+      if (tileVisible(best.x, best.y)) logMsg(FAC[team].name + ' overcharges its assault force', 'war');
+    } else ai.buffT = game.t + 12;
   }
   // conscript from a surplus population when short on crystals (the people as a reserve)
   if ((game.pop[team] || 0) > 34 && game.money[team] < 500 && Math.random() < dt * 0.25) conscript(team);
