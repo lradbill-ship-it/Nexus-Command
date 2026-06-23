@@ -354,6 +354,7 @@ function refreshSel() {
     let extra = '';
     if (sObj.kind === 'b' && (sObj as any).progress < 1) extra = `<br>Constructing ${Math.round((sObj as any).progress * 100)}%`;
     if (sObj.kind === 'b' && (sObj as any).type === 'foundry' && (sObj as any).queue.length) extra = `<br>Queue: ${(sObj as any).queue.length} (${U[(sObj as any).queue[0]].name})`;
+    if (sObj.kind === 'b' && (sObj as any).garrison?.length) extra += `<br><b style="color:#8fd0ff">⛨ Garrison ${(sObj as any).garrison.length}/5</b> · press U to unload`;
     if (sObj.kind === 'u' && U[(sObj as any).type].harvests) extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${d.cargo * stk} ${d.harvests}`;
     if (sObj.kind === 'u' && U[(sObj as any).type].logs) extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${d.cargo * stk} wood`;
     const vet = sObj.kind === 'u' ? ((sObj as any).vet || 0) : 0;

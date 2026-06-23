@@ -80,6 +80,7 @@ export interface Building {
   aim: number;
   lastShot?: number;
   rally?: Vec;
+  garrison?: { type: string; hp: number; vet?: number }[];   // infantry sheltering inside → defensive fire; eject if it falls
   dead?: boolean;
 }
 
@@ -90,7 +91,7 @@ export interface Unit {
   team: number;
   x: number; y: number;
   hpMax: number; hp: number;
-  order: 'idle' | 'move' | 'amove' | 'attack' | 'guard' | 'dig' | 'patrol';
+  order: 'idle' | 'move' | 'amove' | 'attack' | 'guard' | 'dig' | 'patrol' | 'enter';
   dest: Vec | null;
   digVault?: number;     // vault id a Borer is excavating (order === 'dig')
   target: Entity | null;

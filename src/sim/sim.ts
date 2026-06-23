@@ -640,6 +640,7 @@ function destroy(e: Entity, fromTeam: number) {
   game.shake = Math.min(11, game.shake + (big ? 7 : 2));
   sfx(big ? 'bigboom' : 'boom', e.x);
   if (big) {
+    if ((e as Building).garrison?.length) ejectFrom(e as Building, true);   // occupants spill out wounded as it falls
     removeBuildingTiles(e as Building);
     game.buildings = game.buildings.filter(b => b !== e);
     logMsg((e.team === PLAYER ? 'Our ' : FAC[e.team].name + ' ') + B[(e as Building).type].name + ' destroyed', e.team === PLAYER ? 'war' : undefined);
@@ -858,6 +859,37 @@ function separation() {
 // Non-combat economy/support units (harvesters, loggers, repair rigs) — never
 // desert in a revolt, count as civilians at settlements, and don't take attack orders.
 export const isSupport = (type: string) => !!(U[type].harvests || U[type].logs || U[type].repair || U[type].shield);
+
+// ── Garrison: infantry shelter inside a building → defensive fire; eject if it falls ──
+const GARRISON_CAP = 5;          // occupants per building
+const GARRISON_RANGE = 160;      // garrisoned building's defensive fire range
+const GARRISON_ROF = 0.7;        // seconds between garrison volleys
+const canGarrison = (type: string) => !!U[type].infantry;          // foot soldiers only
+const garrisonable = (b: Building) => b.progress >= 1 && b.type !== 'wall' && b.type !== 'gate' && b.type !== 'palisade' && b.type !== 'turret' && b.type !== 'aaturret';
+function enterGarrison(u: Unit, b: Building): boolean {
+  if (!b.garrison) b.garrison = [];
+  if (b.garrison.length >= GARRISON_CAP) return false;
+  b.garrison.push({ type: u.type, hp: u.hp, vet: u.vet });
+  game.units = game.units.filter(x => x !== u);
+  game.selection = game.selection.filter(s => s !== u);
+  return true;
+}
+/** Eject every occupant of a building as a (wounded) unit nearby — on manual unload or when the building falls. */
+function ejectFrom(b: Building, hurt: boolean) {
+  if (!b.garrison || !b.garrison.length) return;
+  for (const g of b.garrison) {
+    const s = freeSpotNear(b.x, b.y + b.h * 0.5);
+    const u = addUnit(g.type, s.x, s.y, b.team);
+    u.hp = hurt ? Math.max(1, Math.min(g.hp, u.hpMax) * 0.5) : Math.min(g.hp, u.hpMax);
+    u.vet = g.vet || 0;
+  }
+  b.garrison = [];
+}
+export function ejectGarrison() {
+  let n = 0;
+  for (const s of game.selection) if (s.kind === 'b' && (s as Building).team === PLAYER && (s as Building).garrison?.length) { n += (s as Building).garrison!.length; ejectFrom(s as Building, false); }
+  if (n) { hint(n + ' troops disembarked'); sfx('click'); } else hint('No garrisoned building selected');
+}
 
 // ── Stealth (Spectre): cloaked & untargetable until it fires or an enemy gets close ──
 const DETECT_R = 3 * TILE;       // an enemy within this range spots a cloaked unit
@@ -1206,6 +1238,13 @@ function updateUnit(u: Unit, dt: number) {
     else { u.moving = false; u.path = null; u.facing += dt * 2.5; excavate(v, u.team, dt); if (v.done) { u.order = 'idle'; u.digVault = undefined; } }
     return;
   }
+  if (u.order === 'enter') {                                            // infantry moving to garrison a building
+    const b = u.guard as Building | null;
+    if (!b || b.dead || !garrisonable(b) || (b.garrison?.length || 0) >= GARRISON_CAP) { u.order = 'idle'; u.guard = null; u.path = null; }
+    else if (dist(u, b) - Math.max(b.w, b.h) / 2 <= 22) { enterGarrison(u, b); return; }   // arrived → board (unit removed)
+    else { const d2 = u.dest || b; u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.5; setPath(u, d2.x, d2.y); } followPath(u, dt); return; }   // approach a passable spot beside it (the centre is solid)
+    return;
+  }
   if (u.order === 'guard') {
     const g = u.guard;
     if (!g || g.dead) { u.order = 'idle'; u.guard = null; u.path = null; }
@@ -1319,6 +1358,16 @@ function updateBuilding(b: Building, dt: number) {
       b.aim += clamp(da, -5 * dt, 5 * dt);
       if (b.cooldown <= 0 && Math.abs(da) < 0.4) { fireAt(b, b.target, d.dmg!, false); b.cooldown = d.rof! / pw.factor * rofMult(b); }
     } else b.aim += dt * 0.4;
+  }
+  // garrisoned infantry lay down defensive fire from inside the structure
+  if (b.garrison && b.garrison.length) {
+    b.cooldown = Math.max(0, b.cooldown - dt);
+    if (b.target && (b.target.dead || dist(b, b.target) > GARRISON_RANGE + 30 || !isWar(b.team, b.target.team) || (b.target.kind === 'u' && ((b.target as Unit).tunnelT ?? 0) > 0))) b.target = null;
+    if (!b.target) b.target = nearestHostile(b, GARRISON_RANGE, b.team, b.team === PLAYER);
+    if (b.target && b.cooldown <= 0) {
+      const dmg = b.garrison.reduce((s, o) => s + (U[o.type].dmg || 0), 0);   // every occupant adds a barrel
+      fireAt(b, b.target, dmg, false); b.cooldown = GARRISON_ROF;
+    }
   }
   if (b.type === 'power' && Math.random() < dt * 1.6)
     spawnParts('steam', b.x - b.w * 0.18, b.y - b.h / 2 - d.hgt, 1, '200,205,210');
@@ -1931,6 +1980,14 @@ function aiUpdate(team: number, dt: number) {
       layMinefield(hq.x + dx / len * 130, hq.y + dy / len * 130, team);
     } else ai.mineT = game.t + 20;
   }
+  // Garrison: occasionally tuck a spare IDLE infantryman into a nearby building for defense (never the whole army).
+  if (Math.random() < dt * 0.15) {
+    const inf = game.units.find(u => u.team === team && U[u.type].infantry && u.order === 'idle' && !U[u.type].hero);
+    if (inf) {
+      const b = game.buildings.find(bb => bb.team === team && garrisonable(bb) && (bb.garrison?.length || 0) < GARRISON_CAP && dist(bb, inf) < 12 * TILE);
+      if (b) { inf.order = 'enter'; inf.guard = b; inf.target = null; setPath(inf, b.x, b.y); }
+    }
+  }
   // conscript from a surplus population when short on crystals (the people as a reserve)
   if ((game.pop[team] || 0) > 34 && game.money[team] < 500 && Math.random() < dt * 0.25) conscript(team);
   const harv = game.units.filter(u => u.team === team && u.type === 'harvester').length;
@@ -2139,6 +2196,12 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
     if (!isAllied(PLAYER, b.team) || b.progress < 1) continue;
     if (Math.abs(wx - b.x) <= b.w / 2 + 6 && Math.abs(wy - b.y) <= b.h / 2 + 6) { repairB = b; break; }
   }
+  // infantry right-clicking a friendly building with room → garrison it (shelter + defensive fire)
+  let garrisonB: Building | null = null;
+  if (!tgt && !guardT && sel.some(s => canGarrison(s.type))) for (const b of game.buildings) {
+    if (!isAllied(PLAYER, b.team) || !garrisonable(b) || (b.garrison?.length || 0) >= GARRISON_CAP) continue;
+    if (Math.abs(wx - b.x) <= b.w / 2 + 6 && Math.abs(wy - b.y) <= b.h / 2 + 6) { garrisonB = b; break; }
+  }
   if (tgt && !isWar(PLAYER, tgt.team)) {
     const key = 'ag' + tgt.team;
     if (!game.aggroT[key] || game.t - game.aggroT[key] > 10) {
@@ -2154,11 +2217,13 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
     if (tgt && !support && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; u.guard = null; setPath(u, tgt.x, tgt.y); }
     else if (guardT && (!support || U[u.type].repair)) { u.order = 'guard'; u.guard = guardT; u.target = null; u.path = null; }
     else if (repairB && U[u.type].repair) { u.order = 'guard'; u.guard = repairB; u.target = null; u.path = null; setPath(u, repairB.x, repairB.y); }
+    else if (garrisonB && canGarrison(u.type)) { u.order = 'enter'; u.guard = garrisonB; u.target = null; const sp = freeSpotNear(garrisonB.x, garrisonB.y + garrisonB.h * 0.6); u.dest = sp; setPath(u, sp.x, sp.y); }
     else if (node && harvester && node.kind === U[u.type].harvests) { u.hNode = node; u.hState = 'go'; u.order = 'idle'; setPath(u, node.x, node.y); }
-    else if (!(guardT && support) && !(repairB && U[u.type].repair)) { u.guard = null; movers.push(u); }
+    else if (!(guardT && support) && !(repairB && U[u.type].repair) && !(garrisonB && canGarrison(u.type))) { u.guard = null; movers.push(u); }
   }
   if (guardT && sel.some(s => !isSupport(s.type) || U[s.type].repair)) hint((sel.some(s => U[s.type].repair) ? 'Repairing & escorting ' : 'Escorting ') + U[guardT.type].name);
   else if (repairB && sel.some(s => U[s.type].repair)) hint('Repair Rig dispatched to mend the ' + B[repairB.type].name);
+  else if (garrisonB && sel.some(s => canGarrison(s.type))) hint('Garrisoning the ' + B[garrisonB.type].name + ' — press U to unload');
   const slots = formationSlots(movers, wx, wy);
   for (let k = 0; k < movers.length; k++) {
     const u = movers[k], support = isSupport(u.type);
