@@ -14,6 +14,7 @@ Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all 
 ---
 
 ## ✅ Shipped in Session 4 (newest first)
+- **Animated water shimmer** (`713db02`, live) — a slow diagonal light sweep + finer cross‑ripple that glints on wave crests across visible water (new additive `waterGfx` layer, depth −90, under fog). Viewport‑culled + crest‑thresholded so only a few on‑screen tiles draw; skips dried tiles; ~30Hz. tsc + bundle clean, no console errors. ⚠ the *motion/look* can't be seen headlessly (Phaser RAF pauses when backgrounded) → Lane's eye on device. **Knobs:** thresholds 0.5 / `*0.22` alpha / sweep speed `t*1.1`+`t*1.7` in `drawWater()`.
 - **Explicit Command Relay targeting** (`a4120bd`, live) — right‑click an enemy/neutral **Command Relay** with troops selected → the selected military `amove` onto it in formation to **seize & hold** it (neutral falls to presence; an enemy's gets shot offline en route). Support units excluded. Previously relays were only auto‑assaulted by whatever military happened to be present. Headless‑verified 4/4; intro/help updated.
 - **Sue for peace / ceasefires** (`eb2ffc0`, live) — wars can now END diplomatically, not only by annihilation, so the emergent **Free Legion is negotiable**. Player **SUE FOR PEACE** button in the Diplomacy panel (enabled at war) pays 400cr reparations; the target weighs the bid by how the war's going for it + persona (warlords resist unless beaten, merchants keen). **Proactive AI peace:** a badly‑losing faction de‑escalates — AI↔AI auto‑signs a ceasefire; an AI losing to the player stands up a **free standing offer** (button → ACCEPT PEACE) but never auto‑ends the *player's* war (annihilation stays the player's call). New `dip.truce` (pair→expiry) pins relations at the truce floor (−10) for 90s so peace doesn't instantly drift back to war; declaring war clears it. Headless‑verified 11/11; intro/help document it. **Tuning knobs:** `TRUCE_TIME` 90, `PEACE_COST` 400, `PEACE_PROPOSE_CD` 25, `TRUCE_FLOOR` −10, `PEACE_THRESH` per persona (warlord 0.35 … merchant 0.62).
 
@@ -35,7 +36,7 @@ Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all 
 ## Backlog — Art / Audio / Polish
 - [ ] **Real CC0 explosion/smoke sprite sheets** on deaths (deferred; harder to verify headlessly than terrain).
 - [ ] **Richer unit/building sprites** — procedural upgrade, or CC0 where it maps cleanly (units are small at game zoom → lower verifiability).
-- [ ] **Water shimmer / texture pass** — apply the CC0 treatment to water + a moving sheen.
+- [x] **Water shimmer / texture pass** — ✅ Session 4 (`713db02`): animated additive sheen (sweep + ripple) on visible water. Could still add a CC0 water *texture* on the static base.
 - [ ] UI polish / animations; a tech‑tree or help panel; on‑screen hotkey hints.
 
 ## Backlog — Balance & AI
