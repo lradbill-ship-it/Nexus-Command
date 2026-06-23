@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import {
   TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, FAC, B, U, BASE_INFO,
-  idx, clamp, dist,
+  idx, clamp, dist, T_WATER,
 } from '../sim/constants';
 import { game, resetState, isAllied, logMsg } from '../sim/state';
 import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, armPatrol, spawnParts, pendingStrikeList } from '../sim/sim';
@@ -38,6 +38,8 @@ export class BattleScene extends Phaser.Scene {
   private fxAdd!: Phaser.GameObjects.Graphics;
   private fxNorm!: Phaser.GameObjects.Graphics;
   private settleGfx!: Phaser.GameObjects.Graphics;
+  private waterGfx!: Phaser.GameObjects.Graphics;   // animated water sheen — additive glints over visible water tiles
+  private waterAccum = 0;                            // throttle for the water shimmer (~30Hz; slow motion, cheap)
   private overlay!: Phaser.GameObjects.Graphics;
   private vignette!: Phaser.GameObjects.Image;
   private recs = new Map<number, SpriteRec>();
@@ -97,6 +99,7 @@ export class BattleScene extends Phaser.Scene {
 
     // layers
     this.terrainImg = this.add.image(0, 0, '__DEFAULT').setOrigin(0, 0).setDepth(-100);
+    this.waterGfx = this.add.graphics().setDepth(-90).setBlendMode(Phaser.BlendModes.ADD);   // above terrain (-100), under everything else
     this.settleGfx = this.add.graphics().setDepth(-40);   // settlements sit on the ground, under units
     this.fxNorm = this.add.graphics().setDepth(9000);
     this.fxAdd = this.add.graphics().setDepth(9001).setBlendMode(Phaser.BlendModes.ADD);
@@ -376,6 +379,8 @@ export class BattleScene extends Phaser.Scene {
     }
 
     this.syncCrystals();
+    this.waterAccum += delta;
+    if (this.waterAccum >= 33) { this.waterAccum = 0; this.drawWater(); }   // ~30Hz water shimmer (slow + cheap)
     this.drawSettlements();
     this.syncEntities();
     this.drawFx();
@@ -482,6 +487,23 @@ export class BattleScene extends Phaser.Scene {
     if (r.barrel) r.barrel.setVisible(vis).setDepth(depth + 0.5).setPosition(u.x, dy).setRotation(u.aim + Math.PI / 2);
     if (r.rotor) r.rotor.setVisible(vis).setDepth(depth + 0.6).setPosition(u.x, dy).setRotation(game.t * 22)
       .setScale(u.type === 'aircraft' ? 1 : 0.6).setAlpha(0.5);
+  }
+
+  /** Animated water sheen: a slow diagonal light sweep + cross-ripple glinting on visible water tiles.
+   *  Viewport-culled and crest-thresholded so only a handful of tiles draw — cheap, additive, under fog. */
+  private drawWater() {
+    const g = this.waterGfx; g.clear();
+    if (!game.started) return;
+    const wv = this.cameras.main.worldView, pad = TILE, t = game.t;
+    for (const w of game.waterTiles) {
+      const wx = w.x * TILE, wy = w.y * TILE;
+      if (wx < wv.x - pad || wx > wv.right + pad || wy < wv.y - pad || wy > wv.bottom + pad) continue;   // off-screen
+      if (game.terr[idx(w.x, w.y)] !== T_WATER) continue;                                                // dried → no shimmer
+      const s = Math.sin((w.x + w.y) * 0.5 - t * 1.1) * 0.6 + Math.sin((w.x * 0.9 - w.y * 0.7) + t * 1.7) * 0.4;
+      if (s <= 0.5) continue;                                                                            // only wave crests glint
+      g.fillStyle(0x9fe0ff, (s - 0.5) * 0.22);
+      g.fillRect(wx + 3, wy + 3, TILE - 6, TILE - 6);
+    }
   }
 
   private drawSettlements() {
