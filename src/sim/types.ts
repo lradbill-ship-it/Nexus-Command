@@ -36,6 +36,15 @@ export interface Settlement {
   unrest?: number;             // ungoverned-town unrest accrual → a Free Militia uprising (team 0)
 }
 
+// Proximity mines — scattered by the Minefield ability; hidden from the enemy, they
+// detonate when a hostile unit wanders within trigger range.
+export interface Mine {
+  id: number;
+  x: number; y: number;
+  team: number;       // owner faction (allies are safe; only enemies trigger it)
+  armAt: number;      // game.t when the mine becomes live (brief arming delay after being laid)
+}
+
 // Hero Vaults — buried in mountain rock, found by surveying (Hero Hunter), excavated
 // by a Subterranean Borer (pay-as-you-drill) to unearth a unique hero super-unit.
 export interface Vault {
@@ -154,6 +163,7 @@ export interface AIState {
   empT: number;       // next time this AI may fire an EMP (needs a Cyber Ops Center)
   hijackT: number;    // next time this AI may hijack an enemy unit (needs a Cyber Ops Center)
   buffT?: number;     // next time this AI may Overcharge its army (needs a Cyber Ops Center)
+  mineT?: number;     // next time this AI may lay a defensive Minefield (needs a Cyber Ops Center)
 }
 
 export interface GameState {
@@ -185,6 +195,7 @@ export interface GameState {
   settlements: Settlement[];
   relays: Relay[];
   vaults: Vault[];
+  mines: Mine[];
   trees: Tree[];
   waterTiles: { x: number; y: number }[];
   waterAmt: Float32Array;                  // per-tile coolant remaining in water features (drained by tankers → dries up)

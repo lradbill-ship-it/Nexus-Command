@@ -324,6 +324,7 @@ export class BattleScene extends Phaser.Scene {
       else if (k === 'b') tryAbility('thermo');
       else if (k === 'o') tryAbility('orbital');
       else if (k === 'v') tryAbility('overcharge');
+      else if (k === 'l') tryAbility('minefield');
       else if (k === 'm') toggleMute();
       else if (k === 't') { if (game.selection.some(s => s.kind === 'u')) game.armed = 'amove'; }
       else if (k === 'c') conscript(PLAYER);
@@ -515,6 +516,17 @@ export class BattleScene extends Phaser.Scene {
 
   private drawSettlements() {
     const g = this.settleGfx; g.clear();
+    // own/allied proximity mines — small markers so you can see your own field (enemy mines stay hidden)
+    {
+      const wv = this.cameras.main.worldView, pulse = 0.4 + 0.6 * Math.abs(Math.sin(game.t * 4));
+      for (const m of game.mines) {
+        if (!isAllied(PLAYER, m.team)) continue;
+        if (m.x < wv.x - 16 || m.x > wv.right + 16 || m.y < wv.y - 16 || m.y > wv.bottom + 16) continue;
+        g.fillStyle(0x1a1d22, 0.85); g.fillCircle(m.x, m.y, 4);
+        g.lineStyle(1, 0xe8b04c, 0.5); g.strokeCircle(m.x, m.y, 4);
+        g.fillStyle(0xffc24c, pulse * (game.t >= m.armAt ? 1 : 0.3)); g.fillCircle(m.x, m.y, 1.4);   // armed → brighter blink
+      }
+    }
     for (const s of game.settlements) {
       const tx = s.x / TILE | 0, ty = s.y / TILE | 0;
       if (!game.explored[idx(tx, ty)]) continue;                  // hidden in unexplored fog

@@ -132,7 +132,7 @@ export function makeUI() {
   for (const k of Object.keys(ABILITIES)) {
     const a = ABILITIES[k];
     const ic = document.createElement('canvas'); ic.width = 40; ic.height = 26;
-    const g = ic.getContext('2d')!; g.strokeStyle = k === 'emp' ? '#96c3ff' : k === 'nuke' ? '#e9a93d' : k === 'thermo' ? '#e8483a' : k === 'orbital' ? '#5fe0ff' : k === 'overcharge' ? '#ffce6a' : '#b07dff'; g.lineWidth = 1.6;
+    const g = ic.getContext('2d')!; g.strokeStyle = k === 'emp' ? '#96c3ff' : k === 'nuke' ? '#e9a93d' : k === 'thermo' ? '#e8483a' : k === 'orbital' ? '#5fe0ff' : k === 'overcharge' ? '#ffce6a' : k === 'minefield' ? '#d68a3a' : '#b07dff'; g.lineWidth = 1.6;
     g.beginPath(); g.arc(20, 13, 8, 0, 7); g.stroke(); g.beginPath(); g.arc(20, 13, 4, 0, 7); g.stroke();
     if (k === 'thermo') { g.fillStyle = '#e8483a'; g.beginPath(); g.arc(20, 13, 2, 0, 7); g.fill(); }
     if (k === 'orbital') { g.strokeStyle = '#5fe0ff'; g.beginPath(); g.moveTo(20, 1); g.lineTo(20, 25); g.stroke(); }   // ion beam column

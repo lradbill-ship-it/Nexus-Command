@@ -43,7 +43,7 @@ let peaceCd: Record<string, number> = {};      // pair key → game.t until whic
 let aiPeaceOffer: Record<number, number> = {}; // AI team → game.t until which it is standing-offering the player a free ceasefire
 let lastPeaceLog: Record<number, number> = {}; // AI team → game.t of its last "sues for peace" feed line (throttle)
 export function pendingStrikeList(): readonly Strike[] { return pendingStrikes; }
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; uprisings = 0; legionFounded = false; pendingStrikes = []; lastWoodNag = -9; peaceCd = {}; aiPeaceOffer = {}; lastPeaceLog = {}; stealthT = 0; }
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; uprisings = 0; legionFounded = false; pendingStrikes = []; lastWoodNag = -9; peaceCd = {}; aiPeaceOffer = {}; lastPeaceLog = {}; stealthT = 0; mineTrip = 0; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -120,7 +120,7 @@ export function setupBases() {
       s = freeSpotNear((bi.tx + 6 * bi.sx) * TILE, (bi.ty + 5 * bi.sy) * TILE); addUnit('strike', s.x, s.y, team);
       s = freeSpotNear((bi.tx + 4 * bi.sx) * TILE, (bi.ty + 6 * bi.sy) * TILE); addUnit('strike', s.x, s.y, team);
     }
-    game.ai[team] = { builtIdx: 0, nextWave: 0, waveN: 0, covertT: 120 + Math.random() * 60, missileT: 480 + Math.random() * 120, techT: 0, empT: 300 + Math.random() * 120, hijackT: 380 + Math.random() * 140, buffT: 280 + Math.random() * 120 };
+    game.ai[team] = { builtIdx: 0, nextWave: 0, waveN: 0, covertT: 120 + Math.random() * 60, missileT: 480 + Math.random() * 120, techT: 0, empT: 300 + Math.random() * 120, hijackT: 380 + Math.random() * 140, buffT: 280 + Math.random() * 120, mineT: 320 + Math.random() * 120 };
     game.ai[team].nextWave = FAC[team].persona === 'warlord' ? 130 + Math.random() * 40 : 180 + Math.random() * 60;
   }
   for (const f of ALL_TEAMS) setRel(0, f, -100);   // the Free Militia (team 0) is at war with every faction
@@ -415,7 +415,7 @@ function initFactionState(T: number) {
   game.leader[T] = PERSONA_STYLE[FAC[T].persona]; game.platform[T] = game.leader[T];
   game.electionT[T] = game.t + 270; game.campaign[T] = 0; game.coupT[T] = 0; game.aggroT[T] = 0;
   game.eliminated[T] = false;
-  game.ai[T] = { builtIdx: 0, nextWave: game.t + 45, waveN: 0, covertT: game.t + 140, missileT: game.t + 320, techT: 0, empT: game.t + 220, hijackT: game.t + 260, buffT: game.t + 200 };
+  game.ai[T] = { builtIdx: 0, nextWave: game.t + 45, waveN: 0, covertT: game.t + 140, missileT: game.t + 320, techT: 0, empT: game.t + 220, hijackT: game.t + 260, buffT: game.t + 200, mineT: game.t + 240 };
 }
 /** Found the Free Legion at an uprising's settlement: a stronghold, a starter economy, a warband, diplomacy. */
 function emergeFaction(s: Settlement) {
@@ -1442,6 +1442,12 @@ export function castAbility(key: string, wx: number, wy: number) {
     for (const u of game.units) if (isAllied(PLAYER, u.team) && !isSupport(u.type) && dist(u, { x: wx, y: wy }) < OVERCHARGE_R) { u.buffUntil = game.t + OVERCHARGE_DUR; n++; spawnParts('spark', u.x, u.y, 4, '255,205,90'); }
     sfx('chime', wx);
     logMsg(n ? '⚡ Overcharge — ' + n + ' units stimmed (+dmg & +speed, 9s)' : 'Overcharge — no combat units in range', 'hot');
+  } else if (key === 'minefield') {
+    game.money[PLAYER] -= a.cost; game.cooldowns.minefield = a.cd * (styleMod(PLAYER).cdMul ?? 1);
+    layMinefield(wx, wy, PLAYER);
+    spawnParts('debris', wx, wy, 8, '90,86,70');
+    sfx('place', wx);
+    logMsg('Minefield deployed — ' + MINE_COUNT + ' mines armed', 'good');
   } else if (key === 'nuke') {
     game.money[PLAYER] -= a.cost; game.cooldowns.nuke = a.cd * (styleMod(PLAYER).cdMul ?? 1);
     pendingStrikes.push({ x: wx, y: wy, at: game.t + NUKE_TRAVEL, team: PLAYER, kind: 'nuke' });
@@ -1536,6 +1542,40 @@ function detonateOrbital(x: number, y: number, byTeam: number) {
   game.parts.push({ type: 'flash', x, y, t: 0, life: 0.3, big: true });
   scorchHook(x, y, ORBITAL_R * 0.7); game.shake = Math.min(16, game.shake + 11); sfx('bigboom', x);
   logMsg(byTeam === PLAYER ? '⚡ Orbital ion strike — target vaporized' : '⚡ ' + FAC[byTeam].name + ' calls down an orbital ion strike', 'war');
+}
+// ── Proximity mines (Deploy Minefield ability) ───────────────────────────────
+const MINE_COUNT = 8;        // mines scattered per cast
+const MINE_SPREAD = 115;     // radius they scatter within
+const MINE_ARM = 1.5;        // arming delay before a mine is live
+const MINE_TRIGGER = 30;     // an enemy this close trips it
+const MINE_R = 92;           // blast radius
+let mineTrip = 0;
+function layMinefield(x: number, y: number, team: number) {
+  for (let i = 0; i < MINE_COUNT; i++) {
+    const a = Math.random() * Math.PI * 2, r = Math.random() * MINE_SPREAD;
+    const mx = clamp(x + Math.cos(a) * r, TILE, WORLD_W - TILE), my = clamp(y + Math.sin(a) * r, TILE, WORLD_H - TILE);
+    game.mines.push({ id: nextId++, x: mx, y: my, team, armAt: game.t + MINE_ARM });
+  }
+}
+function mineTick(dt: number) {
+  mineTrip += dt; if (mineTrip < 0.15) return; mineTrip = 0;     // ~7Hz proximity scan
+  if (!game.mines.length) return;
+  for (let i = game.mines.length - 1; i >= 0; i--) {
+    const m = game.mines[i];
+    if (game.t < m.armAt) continue;
+    let trip = false;
+    forNearbyUnits(m.x, m.y, MINE_TRIGGER, (u) => { if (!trip && isWar(m.team, u.team) && (u.tunnelT ?? 0) <= 0 && dist(u, m) < MINE_TRIGGER) trip = true; });
+    if (trip) {
+      game.mines.splice(i, 1);
+      detonate(m.x, m.y, m.team, MINE_R, 240, 120);             // anti-personnel: brutal on units, light on structures
+      spawnParts('fire', m.x, m.y, 16, '255,170,70'); spawnParts('debris', m.x, m.y, 10, '110,110,118'); spawnParts('smoke', m.x, m.y, 8, '70,70,76');
+      game.parts.push({ type: 'ring', x: m.x, y: m.y, t: 0, life: 0.5, big: false });
+      game.parts.push({ type: 'flash', x: m.x, y: m.y, t: 0, life: 0.14, big: false });
+      scorchHook(m.x, m.y, 22); game.shake = Math.min(8, game.shake + 3); sfx('boom', m.x);
+      if (isAllied(PLAYER, m.team)) logMsg('Mine detonated — chokepoint holds', 'good');
+      else if (tileVisible(m.x, m.y)) logMsg('⚠ We hit a ' + FAC[m.team].name + ' minefield!', 'war', { x: m.x, y: m.y });
+    }
+  }
 }
 function processStrikes() {
   if (!pendingStrikes.length) return;
@@ -1881,6 +1921,15 @@ function aiUpdate(team: number, dt: number) {
       game.parts.push({ type: 'ring', x: best.x, y: best.y, t: 0, life: 0.8, big: true });
       if (tileVisible(best.x, best.y)) logMsg(FAC[team].name + ' overcharges its assault force', 'war');
     } else ai.buffT = game.t + 12;
+  }
+  // Cyber: lay a defensive Minefield on the approach to the AI's HQ (toward the map centre, where attacks come from).
+  if (game.t >= (ai.mineT ?? 0) && game.money[team] >= ABILITIES.minefield.cost && game.buildings.some(b => b.team === team && b.type === 'cyber' && b.progress >= 1)) {
+    const hq = game.buildings.find(b => b.team === team && b.type === 'hq');
+    if (hq) {
+      const dx = MAPW * TILE / 2 - hq.x, dy = MAPH * TILE / 2 - hq.y, len = Math.hypot(dx, dy) || 1;
+      game.money[team] -= ABILITIES.minefield.cost; ai.mineT = game.t + 80 + Math.random() * 60;
+      layMinefield(hq.x + dx / len * 130, hq.y + dy / len * 130, team);
+    } else ai.mineT = game.t + 20;
   }
   // conscript from a surplus population when short on crystals (the people as a reserve)
   if ((game.pop[team] || 0) > 34 && game.money[team] < 500 && Math.random() < dt * 0.25) conscript(team);
@@ -2257,6 +2306,7 @@ export function stepWorld(dt: number) {
   governmentTick(dt);
   autoScoutTick(dt);
   stealthTick(dt);
+  mineTick(dt);
   processStrikes();
   visionAccum += dt;
   if (visionAccum >= 0.066) { computeVision(); visionAccum = 0; }   // player fog ~15Hz (AI targeting doesn't use it)
