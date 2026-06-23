@@ -1970,6 +1970,19 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
   // fall through so the units simply move there and take it by presence.
   const clickedSettle = game.settlements.find(s => s.owner !== PLAYER && dist(s, { x: wx, y: wy }) < 30);
   if (clickedSettle && tryRecruit(clickedSettle)) return;
+  // right-clicking a Command Relay you don't hold → send selected military to assault & secure it
+  // (a neutral relay falls to presence; an enemy's must be shot offline first — amove fights its defenders).
+  const clickedRelay = game.relays.find(r => r.owner !== PLAYER && !isAllied(PLAYER, r.owner) && dist(r, { x: wx, y: wy }) < 30);
+  if (clickedRelay) {
+    const force = sel.filter(u => !isSupport(u.type));
+    if (force.length) {
+      const slots = formationSlots(force, clickedRelay.x, clickedRelay.y);
+      for (let k = 0; k < force.length; k++) { const u = force[k]; u.order = 'amove'; u.target = null; u.guard = null; u.dest = slots[k]; setPath(u, slots[k].x, slots[k].y); }
+      hint(clickedRelay.owner ? 'Assaulting the Command Relay — shoot it offline, then hold' : 'Securing the Command Relay');
+      sfx('click');
+      return;
+    }
+  }
   let tgt: Entity | null = null;
   for (const u of game.units) {
     if (isAllied(PLAYER, u.team)) continue;
