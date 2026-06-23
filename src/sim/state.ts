@@ -27,7 +27,7 @@ function createGame(): GameState {
     explored: new Uint8Array(MAPW * MAPH),
     visible: new Uint8Array(MAPW * MAPH),
     selection: [], groups: {}, placing: null, armed: null,
-    cooldowns: { emp: 0, hijack: 0, nuke: 0, thermo: 0 },
+    cooldowns: { emp: 0, hijack: 0, nuke: 0, thermo: 0, orbital: 0 },
     covCd: { steal: 0, sabotage: 0, recon: 0, incite: 0 },
     covTarget: 2, tempVision: [], shake: 0, aggroT: {}, ai: {}, eliminated: {},
   };

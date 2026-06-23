@@ -36,7 +36,7 @@ let autoScout = false;   // when on, idle Recon Drones auto-reveal the map (scou
 let autoScoutT = 0;      // throttle accumulator for auto-scout order assignment
 let aiAccum = 0;         // throttle accumulator for the strategic AI pass (build/train/wave) — not needed at 60Hz
 let visionAccum = 0;     // throttle accumulator for player fog-of-war recompute (~15Hz is imperceptible)
-type Strike = { x: number; y: number; at: number; team: number; kind: 'nuke' | 'thermo' };
+type Strike = { x: number; y: number; at: number; team: number; kind: 'nuke' | 'thermo' | 'orbital' };
 let pendingStrikes: Strike[] = [];   // in-flight missiles → detonate when game.t >= at (unless intercepted)
 // ── Ceasefire / sue-for-peace state ──────────────────────────────────────────
 let peaceCd: Record<string, number> = {};      // pair key → game.t until which the player can't re-propose peace (anti-spam)
@@ -1416,6 +1416,13 @@ export function castAbility(key: string, wx: number, wy: number) {
     pendingStrikes.push({ x: wx, y: wy, at: game.t + THERMO_TRAVEL, team: PLAYER, kind: 'thermo' });
     sfx('rail', wx); game.shake = Math.min(9, game.shake + 5);
     logMsg('☢☢ THERMONUCLEAR LAUNCH — impact in ' + THERMO_TRAVEL + 's. May the targets be clustered.', 'war');
+  } else if (key === 'orbital') {
+    game.money[PLAYER] -= a.cost; game.alloy[PLAYER] = (game.alloy[PLAYER] || 0) - (a.alloy || 0);
+    game.cooldowns.orbital = a.cd * (styleMod(PLAYER).cdMul ?? 1);
+    pendingStrikes.push({ x: wx, y: wy, at: game.t + ORBITAL_TRAVEL, team: PLAYER, kind: 'orbital' });
+    spawnParts('spark', wx, wy, 10, '150,225,255');                                 // targeting laser paints the spot
+    sfx('rail', wx);
+    logMsg('⚡ ORBITAL ION STRIKE designated — beam fires in ' + ORBITAL_TRAVEL + 's (no intercepting this one)', 'war');
   }
   game.armed = null;
 }
@@ -1423,6 +1430,8 @@ const NUKE_TRAVEL = 4;       // seconds from launch to impact
 const NUKE_R = 150;          // ballistic blast radius (px)
 const THERMO_TRAVEL = 7;     // thermonuclear flight time (longer — react / intercept window)
 const THERMO_R = 440;        // thermonuclear blast radius (px) — covers a clustered base → faction-killer
+const ORBITAL_TRAVEL = 1.6;  // orbital ion beam — short telegraph, then fires (no missile to intercept)
+const ORBITAL_R = 95;        // ion strike blast radius (px) — small & surgical vs the missiles' wide AoE
 // ── Iron Dome interception ────────────────────────────────────────────────────
 const IDOME_R = 7 * TILE;    // Iron Dome building intercept radius
 const IDOME_CD = 9;          // seconds to recharge an interceptor
@@ -1480,14 +1489,27 @@ function detonateThermo(x: number, y: number, byTeam: number) {
   scorchHook(x, y, THERMO_R * 0.6); game.shake = Math.min(40, game.shake + 36); sfx('bigboom', x);
   logMsg('☢☢ THERMONUCLEAR DETONATION — ' + (byTeam === PLAYER ? 'target erased' : FAC[byTeam].name + ' unleashes a thermonuke'), 'war');
 }
+function detonateOrbital(x: number, y: number, byTeam: number) {
+  detonate(x, y, byTeam, ORBITAL_R, 1500, 2400);                                // small radius, brutal on whatever's under it
+  // a searing vertical ion column + a tight ground burst
+  for (let i = 0; i < 7; i++) game.parts.push({ type: 'flash', x, y: y - i * 26, t: 0, life: 0.3 + i * 0.02, big: false });
+  spawnParts('spark', x, y, 40, '170,235,255'); spawnParts('ember', x, y, 22, '150,220,255'); spawnParts('smoke', x, y, 28, '70,74,82');
+  game.parts.push({ type: 'ring', x, y, t: 0, life: 0.9, big: true });
+  game.parts.push({ type: 'shock', x, y, t: 0, life: 0.7, big: false });
+  game.parts.push({ type: 'flash', x, y, t: 0, life: 0.3, big: true });
+  scorchHook(x, y, ORBITAL_R * 0.7); game.shake = Math.min(16, game.shake + 11); sfx('bigboom', x);
+  logMsg(byTeam === PLAYER ? '⚡ Orbital ion strike — target vaporized' : '⚡ ' + FAC[byTeam].name + ' calls down an orbital ion strike', 'war');
+}
 function processStrikes() {
   if (!pendingStrikes.length) return;
   const due = pendingStrikes.filter(s => s.at <= game.t);
   if (!due.length) return;
   pendingStrikes = pendingStrikes.filter(s => s.at > game.t);
   for (const s of due) {
-    if (tryIntercept(s)) continue;
-    if (s.kind === 'thermo') detonateThermo(s.x, s.y, s.team); else detonateNuke(s.x, s.y, s.team);
+    if (s.kind !== 'orbital' && tryIntercept(s)) continue;        // orbital is a beam from orbit — nothing to shoot down
+    if (s.kind === 'thermo') detonateThermo(s.x, s.y, s.team);
+    else if (s.kind === 'orbital') detonateOrbital(s.x, s.y, s.team);
+    else detonateNuke(s.x, s.y, s.team);
   }
 }
 export function runCovert(key: string) {
@@ -1763,14 +1785,22 @@ function aiUpdate(team: number, dt: number) {
       const hq = game.buildings.find(b => b.team === tgt && b.type === 'hq') || game.buildings.find(b => b.team === tgt);
       if (hq) {
         const canThermo = game.money[team] >= ABILITIES.thermo.cost && (game.alloy[team] || 0) >= (ABILITIES.thermo.alloy || 0);
-        const kind: 'nuke' | 'thermo' = (canThermo && Math.random() < (persona === 'warlord' ? 0.55 : 0.4)) ? 'thermo' : 'nuke';
+        const canOrbital = game.money[team] >= ABILITIES.orbital.cost && (game.alloy[team] || 0) >= (ABILITIES.orbital.alloy || 0);
+        let kind: 'nuke' | 'thermo' | 'orbital';
+        if (canThermo && Math.random() < (persona === 'warlord' ? 0.45 : 0.3)) kind = 'thermo';
+        else if (canOrbital && Math.random() < 0.5) kind = 'orbital';   // surgical, uninterceptable — punishes a dome-turtle
+        else kind = 'nuke';
         const a = ABILITIES[kind];
         if (game.money[team] >= a.cost && (game.alloy[team] || 0) >= (a.alloy || 0)) {
           game.money[team] -= a.cost; game.alloy[team] -= (a.alloy || 0);
-          const travel = kind === 'thermo' ? THERMO_TRAVEL : NUKE_TRAVEL;
-          pendingStrikes.push({ x: hq.x + (Math.random() * 90 - 45), y: hq.y + (Math.random() * 90 - 45), at: game.t + travel + 2, team, kind });
+          const travel = kind === 'thermo' ? THERMO_TRAVEL : kind === 'orbital' ? ORBITAL_TRAVEL : NUKE_TRAVEL;
+          const scatter = kind === 'orbital' ? 14 : 45;                // orbital is precise — aim right at the structure
+          pendingStrikes.push({ x: hq.x + (Math.random() * 2 - 1) * scatter, y: hq.y + (Math.random() * 2 - 1) * scatter, at: game.t + travel + 2, team, kind });
           ai.missileT = game.t + a.cd * 0.8 + Math.random() * 45;
-          if (tgt === PLAYER || isAllied(PLAYER, tgt)) { logMsg('⚠ INBOUND ' + (kind === 'thermo' ? 'THERMONUCLEAR' : 'BALLISTIC') + ' MISSILE from ' + FAC[team].name + ' — intercept or scatter!', 'war', { x: hq.x, y: hq.y }); sfx('klaxon'); }
+          if (tgt === PLAYER || isAllied(PLAYER, tgt)) {
+            const label = kind === 'thermo' ? 'THERMONUCLEAR MISSILE' : kind === 'orbital' ? 'ORBITAL ION STRIKE' : 'BALLISTIC MISSILE';
+            logMsg('⚠ INBOUND ' + label + ' from ' + FAC[team].name + (kind === 'orbital' ? ' — no intercept, scatter!' : ' — intercept or scatter!'), 'war', { x: hq.x, y: hq.y }); sfx('klaxon');
+          }
         } else {
           ai.missileT = game.t + 20;   // can't afford yet — re-check soon
         }

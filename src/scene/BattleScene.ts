@@ -322,6 +322,7 @@ export class BattleScene extends Phaser.Scene {
       else if (k === 'h') tryAbility('hijack');
       else if (k === 'n') tryAbility('nuke');
       else if (k === 'b') tryAbility('thermo');
+      else if (k === 'o') tryAbility('orbital');
       else if (k === 'm') toggleMute();
       else if (k === 't') { if (game.selection.some(s => s.kind === 'u')) game.armed = 'amove'; }
       else if (k === 'c') conscript(PLAYER);
@@ -725,10 +726,10 @@ export class BattleScene extends Phaser.Scene {
     }
     // inbound-missile warning reticles (pulsing target rings at each in-flight strike)
     for (const s of pendingStrikeList()) {
-      const big = s.kind === 'thermo';
-      const col = big ? 0xff3030 : 0xffa040;
-      const pulse = 0.45 + 0.55 * Math.abs(Math.sin(game.t * 6));
-      const r = big ? 64 : 34;
+      const big = s.kind === 'thermo', ion = s.kind === 'orbital';
+      const col = big ? 0xff3030 : ion ? 0x5fe0ff : 0xffa040;
+      const pulse = 0.45 + 0.55 * Math.abs(Math.sin(game.t * (ion ? 10 : 6)));   // ion designator flickers faster
+      const r = big ? 64 : ion ? 26 : 34;
       g.lineStyle(big ? 3 : 2, col, pulse);
       g.strokeCircle(s.x, s.y, r); g.strokeCircle(s.x, s.y, r * 0.55);
       g.lineBetween(s.x - r * 1.2, s.y, s.x + r * 1.2, s.y); g.lineBetween(s.x, s.y - r * 1.2, s.x, s.y + r * 1.2);

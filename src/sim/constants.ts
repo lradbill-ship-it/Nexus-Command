@@ -186,6 +186,7 @@ export const ABILITIES: Record<string, AbilityDef> = {
   hijack: { name: 'System Hijack', cost: 600, cd: 90, key: 'H', requires: 'cyber', desc: 'Seize one enemy unit permanently. A hostile act against neutrals.' },
   nuke: { name: 'Ballistic Missile', cost: 2000, cd: 150, key: 'N', requires: 'silo', desc: 'Long-range strike — a devastating area blast after a short flight. Needs a Missile Silo. Interceptable by Iron Dome.' },
   thermo: { name: 'Thermonuclear Missile', cost: 9000, alloy: 2500, cd: 360, key: 'B', requires: 'silo', desc: 'CONTINENT-CRACKER — a colossal blast that can erase an entire faction in one strike. Staggering cost; needs a Missile Silo. Interceptable by Iron Dome.' },
+  orbital: { name: 'Orbital Ion Strike', cost: 3500, alloy: 400, cd: 200, key: 'O', requires: 'silo', desc: 'A pinpoint ion beam from orbit — near-instant and UNINTERCEPTABLE (no missile to shoot down). Small blast; surgically erases a key structure or tight cluster. Needs a Missile Silo.' },
 };
 
 export interface CovertDef { name: string; cost: number; cd: number; chance: number; desc: string; }
