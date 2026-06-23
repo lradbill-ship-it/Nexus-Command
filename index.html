@@ -260,6 +260,7 @@
         <h2>EVERY LEVER YOU HAVE, COMMANDER</h2>
         <ul>
           <li><b>SELECT &amp; ORDER</b> — <kbd>Drag</kbd> marquee · <kbd>Left-click</kbd> select · <kbd>Right-click</kbd> move / attack / harvest / guard · <kbd>T</kbd> attack-move</li>
+          <li><b>PATROL</b> — select combat units, press <kbd>P</kbd> (or tap ⚑ PATROL) and click a spot → they guard that whole area and hunt any enemy that enters it (far beyond weapon range)</li>
           <li><b>CONTROL GROUPS</b> — <kbd>Ctrl</kbd>+<kbd>1-9</kbd> assign · <kbd>1-9</kbd> recall</li>
           <li><b>CAMERA</b> — <kbd>W A S D</kbd> / arrows · <kbd>middle-mouse drag</kbd> · radar-map click/drag (the view never drifts on its own)</li>
           <li><b>TEMPO</b> — <kbd>Space</kbd> pause/resume · <kbd>[</kbd> <kbd>]</kbd> game speed 1×/2×/3× · <kbd>M</kbd> mute</li>
@@ -285,6 +286,7 @@
     <div class="frame"><div class="screenIn" id="selInfo">Nothing selected.</div></div>
     <button id="sellBtn" title="Sell the selected structure for a partial crystal refund (Del / Backspace)" style="display:none;margin:2px 8px 0;font:inherit;font-size:10px;letter-spacing:.12em;font-weight:700;padding:7px;cursor:pointer;color:#fff;background:linear-gradient(180deg,#b3463a,#7d2c24);border:1px solid #2a2e36;border-top-color:#c66;border-radius:2px;">✖ SELL STRUCTURE</button>
     <button id="combineBtn" title="Merge the selected collectors into one mega-collector that gathers ×N (key: G)" style="display:none;margin:2px 8px 0;font:inherit;font-size:10px;letter-spacing:.1em;font-weight:700;padding:7px;cursor:pointer;color:#06210f;background:linear-gradient(180deg,#5fe08a,#2faf5a);border:1px solid #1c3a26;border-top-color:#9fe9b8;border-radius:2px;">⊕ COMBINE COLLECTORS</button>
+    <button id="patrolBtn" title="Patrol: guard an area — the selected units hunt any enemy that enters it (key: P)" style="display:none;margin:2px 8px 0;font:inherit;font-size:10px;letter-spacing:.1em;font-weight:700;padding:7px;cursor:pointer;color:#06210f;background:linear-gradient(180deg,#7fd0ea,#3a90c8);border:1px solid #1c2e3a;border-top-color:#bfe6f5;border-radius:2px;">⚑ PATROL AREA</button>
     <button id="autoScoutBtn" title="Idle Recon Drones automatically scout the unexplored map (toggle)" style="margin:2px 8px 0;font:inherit;font-size:9.5px;letter-spacing:.1em;font-weight:700;padding:6px;cursor:pointer;color:#c8d4dc;background:linear-gradient(180deg,#2d3540,#1b212a);border:1px solid #424a56;border-radius:2px;">🔭 AUTO-SCOUT: OFF</button>
     <div class="tabRow">
       <button id="tabBase" class="on">BASE</button>

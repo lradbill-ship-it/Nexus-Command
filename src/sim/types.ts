@@ -81,7 +81,7 @@ export interface Unit {
   team: number;
   x: number; y: number;
   hpMax: number; hp: number;
-  order: 'idle' | 'move' | 'amove' | 'attack' | 'guard' | 'dig';
+  order: 'idle' | 'move' | 'amove' | 'attack' | 'guard' | 'dig' | 'patrol';
   dest: Vec | null;
   digVault?: number;     // vault id a Borer is excavating (order === 'dig')
   target: Entity | null;

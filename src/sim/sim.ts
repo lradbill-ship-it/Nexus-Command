@@ -162,13 +162,20 @@ export function tradeIncome(team: number) {
 // it. When a team's reserve runs dry in deficit it OVERHEATS — those weapons fire
 // at half rate until coolant is restored (build more Coolant Plants).
 export const WATER_CAP = 600;
+const COOLANT_IDLE = 0.25;   // idle units only sip coolant — engines cool when not moving or firing
 export function waterOf(team: number) {
   let prod = 0, cons = 0;
   for (const b of game.buildings) {
     if (b.team !== team || b.progress < 1) continue;
     prod += B[b.type].water || 0; cons += B[b.type].coolant || 0;
   }
-  for (const u of game.units) if (u.team === team) cons += U[u.type].coolant || 0;
+  // Units consume FULL coolant only while active (moving or recently fired); stationed/idle units sip a
+  // fraction. So a standing defensive force is cheap to keep — coolant is a cost of active combat & maneuver.
+  for (const u of game.units) if (u.team === team) {
+    const c = U[u.type].coolant || 0; if (!c) continue;
+    const active = u.moving || (game.t - (u.lastShot ?? -9) < 3);
+    cons += c * (active ? 1 : COOLANT_IDLE);
+  }
   return { prod, cons, net: prod - cons, stored: game.water[team] || 0 };
 }
 function waterStep(dt: number) {
@@ -1123,6 +1130,7 @@ function updateRepair(u: Unit, dt: number) {
 // ── Unit update ──────────────────────────────────────────────────────────────
 const GUARD_FOLLOW = 70;    // how close an escort stays to the unit it guards
 const GUARD_LEASH = 230;    // how far an escort chases a threat from the guarded unit before disengaging
+const PATROL_R = 12 * TILE; // patrol/area-guard radius — engage any enemy entering this zone (far past weapon range)
 function updateUnit(u: Unit, dt: number) {
   if (u.disabledUntil > game.t) { u.moving = false; return; }
   const d = U[u.type];
@@ -1185,6 +1193,23 @@ function updateUnit(u: Unit, dt: number) {
       } else { u.moving = false; u.path = null; }
       return;
     }
+  }
+  if (u.order === 'patrol' && u.dest) {
+    const c = u.dest;                                          // the post being guarded
+    if (!u.target || u.target.dead) {                         // scan the whole patrolled area (far past weapon range)
+      u.target = null; u.acqT = (u.acqT || 0) - dt;
+      if (u.acqT <= 0) { u.acqT = 0.3; const t = nearestHostile(u, PATROL_R, u.team, false); if (t && dist(t, c) < PATROL_R) u.target = t; }   // a sentry senses intruders in its whole zone (ignores fog)
+    }
+    if (u.target && dist(u.target, c) > PATROL_R) u.target = null;   // threat left the zone → disengage, return to post
+    if (u.target) {
+      const tgt = u.target;
+      const r = (d.range || 0) + (tgt.kind === 'b' ? Math.max((tgt as Building).w, (tgt as Building).h) / 2 : U[(tgt as Unit).type].radius);
+      if (dist(u, tgt) <= r) { u.moving = false; u.path = null; u.facing = Math.atan2(tgt.y - u.y, tgt.x - u.x); if (u.cooldown <= 0 && Math.abs(da) < 0.5) { fireAt(u, tgt, d.dmg!, u.type === 'walker' || u.type === 'borer', d.splash || 0); u.cooldown = d.rof! * rofMult(u); } }
+      else { u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.6; setPath(u, tgt.x, tgt.y); } followPath(u, dt); }
+    } else if (dist(u, c) > GUARD_FOLLOW) {                    // no threat → march back to the post
+      u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.5; setPath(u, c.x, c.y); } followPath(u, dt);
+    } else { u.moving = false; u.path = null; }
+    return;
   }
   if (u.order === 'attack' && u.target) {
     const tgt = u.target;
@@ -1352,6 +1377,7 @@ export function tryAbility(key: string) {
 }
 export function castAbility(key: string, wx: number, wy: number) {
   if (key === 'amove') { issueOrder(wx, wy, true); game.armed = null; hint(''); return; }
+  if (key === 'patrol') { patrolOrder(wx, wy); game.armed = null; return; }
   const a = ABILITIES[key];
   if (key === 'emp') {
     game.money[PLAYER] -= a.cost; game.cooldowns.emp = a.cd * (styleMod(PLAYER).cdMul ?? 1);
@@ -1824,6 +1850,24 @@ function formationSlots(units: Unit[], wx: number, wy: number): Vec[] {
     if (best >= 0) { used[best] = true; out[best] = slot; }
   }
   return out;
+}
+/** True if the selection has at least one player combat unit (can be put on patrol). */
+export function canPatrol() { return game.selection.some(s => s.kind === 'u' && (s as Unit).team === PLAYER && !isSupport((s as Unit).type) && ((U[(s as Unit).type].dmg || 0) > 0)); }
+/** Arm patrol mode — next map click sets the patrol post for the selected combat units. */
+export function armPatrol() {
+  if (!canPatrol()) { hint('Select combat units to patrol'); return; }
+  game.armed = 'patrol'; game.placing = null;
+  hint('Patrol: click a spot to guard — they will hunt any enemy that enters the area');
+}
+/** Post the selected combat units to guard an area around (wx,wy). */
+function patrolOrder(wx: number, wy: number) {
+  let n = 0;
+  for (const s of game.selection) {
+    if (s.kind !== 'u') continue; const u = s as Unit;
+    if (u.team !== PLAYER || isSupport(u.type) || (U[u.type].dmg || 0) <= 0) continue;   // combat units only
+    u.order = 'patrol'; u.dest = { x: wx, y: wy }; u.target = null; u.guard = null; u.path = null; setPath(u, wx, wy); n++;
+  }
+  if (n) { hint(n + (n > 1 ? ' units' : ' unit') + ' on patrol — they will engage enemies entering the area'); sfx('click'); }
 }
 export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
   const sel = game.selection.filter(s => s.kind === 'u') as Unit[];

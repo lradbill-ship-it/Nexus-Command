@@ -6,7 +6,7 @@ import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, 
 import {
   startPlacing, trainUnit, cancelUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
   hasCyber, hasBuilding, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
-  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, sellSelected, combineSelected, setAutoScout, getAutoScout,
+  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, sellSelected, combineSelected, armPatrol, canPatrol, setAutoScout, getAutoScout,
 } from '../sim/sim';
 
 let chosenLeader: LeaderStyle = 'industrialist';
@@ -179,6 +179,7 @@ export function makeUI() {
   ($('conscriptBtn') as HTMLButtonElement).onclick = () => conscript(PLAYER);
   ($('sellBtn') as HTMLButtonElement).onclick = () => sellSelected();
   ($('combineBtn') as HTMLButtonElement).onclick = () => combineSelected();
+  ($('patrolBtn') as HTMLButtonElement).onclick = () => { armPatrol(); closeDrawer(); };
   ($('autoScoutBtn') as HTMLButtonElement).onclick = () => setAutoScout(!getAutoScout());
   ($('restartBtn') as HTMLButtonElement).onclick = () => restartHook();
   ($('startBtn') as HTMLButtonElement).onclick = () => { $('introOverlay').style.display = 'none'; startHook(); };
@@ -316,6 +317,7 @@ function refreshSel() {
   const coll = game.selection.filter(s => s.kind === 'u' && (s as any).team === PLAYER && (U[(s as any).type].harvests || U[(s as any).type].logs)) as any[];
   const counts: Record<string, number> = {}; for (const c of coll) counts[c.type] = (counts[c.type] || 0) + 1;
   cb.style.display = Object.values(counts).some(n => n >= 2) ? '' : 'none';
+  ($('patrolBtn') as HTMLButtonElement).style.display = canPatrol() ? '' : 'none';
   if (!game.selection.length) { el.innerHTML = 'Nothing selected.'; return; }
   if (game.selection.length === 1) {
     const sObj = game.selection[0];

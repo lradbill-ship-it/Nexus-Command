@@ -4,7 +4,7 @@ import {
   idx, clamp, dist,
 } from '../sim/constants';
 import { game, resetState, isAllied, logMsg } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, spawnParts, pendingStrikeList } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, armPatrol, spawnParts, pendingStrikeList } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import grassTex from '../assets/terrain/grass.jpg?inline';
@@ -319,6 +319,7 @@ export class BattleScene extends Phaser.Scene {
       else if (k === 't') { if (game.selection.some(s => s.kind === 'u')) game.armed = 'amove'; }
       else if (k === 'c') conscript(PLAYER);
       else if (k === 'g') combineSelected();   // merge selected collectors into one mega-collector
+      else if (k === 'p') armPatrol();          // patrol: click a spot to guard an area
       else if (k === 'delete' || k === 'backspace') { e.preventDefault(); sellSelected(); }
       else if (k === ' ') { e.preventDefault(); game.paused = !game.paused; logMsg(game.paused ? '⏸ Paused' : '▶ Resumed'); }
       else if (k === ']' || k === '+' || k === '=') { game.speed = Math.min(3, (game.speed || 1) + 1); game.paused = false; logMsg('▶▶ Game speed ' + game.speed + '×'); }
@@ -682,6 +683,11 @@ export class BattleScene extends Phaser.Scene {
     if (game.armed === 'emp') {
       const p = this.input.activePointer;
       g.lineStyle(2, 0x96c3ff, 0.7); g.strokeCircle(p.worldX, p.worldY, 132);
+    }
+    if (game.armed === 'patrol') {                       // show the area that will be guarded
+      const p = this.input.activePointer;
+      g.lineStyle(2, 0x6fe08a, 0.7); g.strokeCircle(p.worldX, p.worldY, 12 * TILE);
+      g.fillStyle(0x6fe08a, 0.06); g.fillCircle(p.worldX, p.worldY, 12 * TILE);
     }
     // marquee
     if (this.dragging && this.dragStart) {
