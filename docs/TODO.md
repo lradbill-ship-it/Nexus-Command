@@ -9,14 +9,19 @@
 > so: put the 3–4 best candidates on cards, and **always also paste the full list (below) in the message**
 > so nothing is hidden — Lane can pick a card or name any other item. Then update this file.
 
-Last updated: **2026‑06‑23** (end of Session 3 — full backlog shipped; canonical handoff: `docs/SESSION_4_HANDOFF.md`). Session 4 = balance tuning from playtests.
+Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all of it"; shipping backlog in increments). Canonical handoff: `docs/SESSION_4_HANDOFF.md`.
+
+---
+
+## ✅ Shipped in Session 4 (newest first)
+- **Sue for peace / ceasefires** (`eb2ffc0`, live) — wars can now END diplomatically, not only by annihilation, so the emergent **Free Legion is negotiable**. Player **SUE FOR PEACE** button in the Diplomacy panel (enabled at war) pays 400cr reparations; the target weighs the bid by how the war's going for it + persona (warlords resist unless beaten, merchants keen). **Proactive AI peace:** a badly‑losing faction de‑escalates — AI↔AI auto‑signs a ceasefire; an AI losing to the player stands up a **free standing offer** (button → ACCEPT PEACE) but never auto‑ends the *player's* war (annihilation stays the player's call). New `dip.truce` (pair→expiry) pins relations at the truce floor (−10) for 90s so peace doesn't instantly drift back to war; declaring war clears it. Headless‑verified 11/11; intro/help document it. **Tuning knobs:** `TRUCE_TIME` 90, `PEACE_COST` 400, `PEACE_PROPOSE_CD` 25, `TRUCE_FLOOR` −10, `PEACE_THRESH` per persona (warlord 0.35 … merchant 0.62).
 
 ---
 
 ## ▶ Up next — top candidates (curate to 3–5; these go on the cards first)
 - [ ] **More CC0 audio (optional)** — real CC0 **explosions + nuke blast + victory jingle** now ship (see below). Could add real samples for **weapons/UI** too (kept procedural — they fire very fast) + more explosion variety. ⚠ I can't judge sound by ear — Lane curates; swapping a sample = drop a new file in `src/assets/audio/`. **Key enabler learned: `afconvert` on this Mac DOES decode OGG → so OGG CC0 sources can be transcoded to Safari‑safe AAC/M4A.**
-- [ ] **Society layer — deeper civilian diplomacy** (optional) — recruit/absorb civilian populations via diplomacy (not just conquest); the emergent faction (below) could be *negotiated* with, not only fought.
-- [ ] **Deeper perf — Web Worker sim** — if late‑game still bites on device, move the sim off the main thread (big architectural change; playtest‑gate it).
+- [ ] **Society layer — deeper civilian diplomacy** (optional) — recruit/absorb civilian populations via diplomacy (not just conquest). ✅ The emergent faction can now be **negotiated with / sued for peace** (Session 4); remaining: *peaceful* recruitment/absorption of neutral civilian populations.
+- [ ] **Deeper perf — Web Worker sim** — if late‑game still bites on device, move the sim off the main thread (big architectural change; playtest‑gate it). **HELD pending Lane confirming FPS actually bites.**
 
 ## Backlog — Features
 - [ ] **Emergent factions** — neutral civilian populations coalesce into a NEW faction that can grow into a real threat (note #3).
