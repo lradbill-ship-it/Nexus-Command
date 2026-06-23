@@ -208,4 +208,5 @@ export interface DipState {
   rel: Record<string, number>;
   alliance: Record<string, boolean>;
   trade: Record<string, boolean>;
+  truce: Record<string, number>;   // pair key → game.t at which the ceasefire lapses (holds relations out of war until then)
 }

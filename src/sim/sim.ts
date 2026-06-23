@@ -38,8 +38,12 @@ let aiAccum = 0;         // throttle accumulator for the strategic AI pass (buil
 let visionAccum = 0;     // throttle accumulator for player fog-of-war recompute (~15Hz is imperceptible)
 type Strike = { x: number; y: number; at: number; team: number; kind: 'nuke' | 'thermo' };
 let pendingStrikes: Strike[] = [];   // in-flight missiles → detonate when game.t >= at (unless intercepted)
+// ── Ceasefire / sue-for-peace state ──────────────────────────────────────────
+let peaceCd: Record<string, number> = {};      // pair key → game.t until which the player can't re-propose peace (anti-spam)
+let aiPeaceOffer: Record<number, number> = {}; // AI team → game.t until which it is standing-offering the player a free ceasefire
+let lastPeaceLog: Record<number, number> = {}; // AI team → game.t of its last "sues for peace" feed line (throttle)
 export function pendingStrikeList(): readonly Strike[] { return pendingStrikes; }
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; uprisings = 0; legionFounded = false; pendingStrikes = []; lastWoodNag = -9; }
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; uprisings = 0; legionFounded = false; pendingStrikes = []; lastWoodNag = -9; peaceCd = {}; aiPeaceOffer = {}; lastPeaceLog = {}; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -1557,8 +1561,81 @@ export function dipAlly(f: number) {
 }
 export function dipWar(f: number) {
   setRel(PLAYER, f, Math.min(getRel(PLAYER, f), -60));
-  delete dip.alliance[rk(PLAYER, f)]; delete dip.trade[rk(PLAYER, f)];
+  delete dip.alliance[rk(PLAYER, f)]; delete dip.trade[rk(PLAYER, f)]; delete dip.truce[rk(PLAYER, f)];
   logMsg('WAR declared on ' + FAC[f].name, 'war'); sfx('war');
+}
+
+// ── Sue for peace / ceasefires ───────────────────────────────────────────────
+const TRUCE_TIME = 90;       // a signed ceasefire holds relations out of war for this long (then drift can reignite it)
+const PEACE_COST = 400;      // crystals offered as reparations when the player initiates a ceasefire
+const PEACE_PROPOSE_CD = 25; // seconds before the player can re-propose after a rebuff (anti-spam)
+const TRUCE_FLOOR = -10;     // relations a ceasefire settles at (above the −30 war line)
+// How desperate a faction must be (its strength as a fraction of its strongest enemy's) before it
+// will SUE for peace on its own — warlords are stubborn, merchants/builders pragmatic.
+const PEACE_THRESH: Record<string, number> = { warlord: 0.35, covert: 0.5, industrial: 0.6, merchant: 0.62, player: 0.5 };
+/** Rough military weight of a faction: buildings count double, combat units once (support/heroes aside). */
+function factionStrength(team: number) {
+  let s = 0;
+  for (const b of game.buildings) if (b.team === team && !game.eliminated[team]) s += 2;
+  for (const u of game.units) if (u.team === team && !isSupport(u.type)) s += 1;
+  return s;
+}
+function signCeasefire(a: number, b: number, viaOffer: boolean) {
+  setRel(a, b, TRUCE_FLOOR);
+  dip.truce[rk(a, b)] = game.t + TRUCE_TIME;
+  delete aiPeaceOffer[a === PLAYER ? b : a];
+  const other = a === PLAYER ? b : (b === PLAYER ? a : b);
+  if (a === PLAYER || b === PLAYER) {
+    logMsg('☮ CEASEFIRE with ' + FAC[other].name + (viaOffer ? ' — their peace offer accepted' : ' — the guns fall silent'), 'good');
+    sfx('chime');
+  } else logMsg(FAC[a].name + ' and ' + FAC[b].name + ' agree to a ceasefire');
+}
+/** Player sues the faction f for peace. Free + automatic if they're already offering; else a paid bid the
+ *  target weighs by how the war is going for it and its persona (warlords resist unless badly beaten). */
+export function dipPeace(f: number) {
+  if (!isWar(PLAYER, f)) { hint('Not at war with ' + FAC[f].name); return; }
+  if (aiPeaceOffer[f] > game.t) { signCeasefire(PLAYER, f, true); return; }   // they offered → accept for free
+  const k = rk(PLAYER, f);
+  if ((peaceCd[k] || 0) > game.t) { hint(FAC[f].name + ' won’t hear another overture yet'); return; }
+  if (game.money[PLAYER] < PEACE_COST) { hint('Need ' + PEACE_COST + ' crystals for reparations'); return; }
+  const ps = factionStrength(PLAYER), fs = factionStrength(f);
+  let chance = ({ warlord: 0.30, merchant: 0.80, covert: 0.55, industrial: 0.65, player: 0.5 } as Record<string, number>)[FAC[f].persona] ?? 0.5;
+  if (fs < ps * 0.7) chance += 0.45;        // they're losing → keen to stop the bleeding
+  else if (fs > ps * 1.4) chance -= 0.35;   // they're winning → why would they?
+  chance = clamp(chance, 0.05, 0.95);
+  if (Math.random() < chance) {
+    game.money[PLAYER] -= PEACE_COST;       // reparations paid only on a deal
+    signCeasefire(PLAYER, f, false);
+  } else {
+    addRel(PLAYER, f, 3);                    // the gesture earns a little goodwill even when rebuffed
+    peaceCd[k] = game.t + PEACE_PROPOSE_CD;
+    logMsg(FAC[f].name + ' rebuffs your overture — the war goes on', 'war');
+  }
+}
+export const hasPeaceOffer = (f: number) => (aiPeaceOffer[f] || 0) > game.t;
+/** Proactive AI peace: a faction losing its war badly de-escalates. AI↔AI auto-resolves to a ceasefire;
+ *  AI→player surfaces a standing offer the player can accept (it never auto-ends the player's war). */
+function proactivePeace() {
+  for (const a of ALL_TEAMS) for (const b of ALL_TEAMS) {
+    if (a >= b || game.eliminated[a] || game.eliminated[b]) continue;
+    if (!isWar(a, b)) continue;
+    const k = rk(a, b);
+    if ((dip.truce[k] || 0) > game.t) continue;             // already under a ceasefire
+    const sa = factionStrength(a), sb = factionStrength(b);
+    const weak = sa <= sb ? a : b, strong = weak === a ? b : a;
+    const ws = Math.min(sa, sb), ss = Math.max(sa, sb);
+    if (ss < 6 || ws >= ss * (PEACE_THRESH[FAC[weak].persona] ?? 0.5)) continue;   // not desperate enough yet
+    if (weak === PLAYER) continue;                          // the player decides their own wars
+    if (strong === PLAYER) {
+      // the AI sues the human — stand up a free offer + a throttled feed line, but don't force the war to end
+      aiPeaceOffer[weak] = game.t + 30;
+      if ((lastPeaceLog[weak] || -99) + 40 < game.t) { lastPeaceLog[weak] = game.t; logMsg('☮ ' + FAC[weak].name + ' sues for peace — accept in the Diplomacy panel', 'good'); }
+    } else {
+      // two AIs — the loser de-escalates; when it climbs out of war they sign a ceasefire
+      addRel(a, b, 5);
+      if (!isWar(a, b)) signCeasefire(a, b, false);
+    }
+  }
 }
 
 // ── World diplomacy & AI ─────────────────────────────────────────────────────
@@ -1571,6 +1648,7 @@ function diplomacyTick() {
     if (game.eliminated[a]) continue;
     for (const b of ALL_TEAMS) {
       if (b === a || game.eliminated[b]) continue;
+      if ((dip.truce[rk(a, b)] || 0) > game.t) { if (getRel(a, b) < TRUCE_FLOOR) setRel(a, b, TRUCE_FLOOR); continue; }   // a ceasefire freezes the drift
       const tg2 = targets[FAC[a].persona];
       const want = (b === 1 ? tg2[1] : tg2.def), cur = getRel(a, b);
       if (Math.abs(cur - want) > 1) addRel(a, b, cur < want ? 0.9 : -0.9);
@@ -1596,6 +1674,11 @@ function diplomacyTick() {
       logMsg(FAC[a].name + ' and ' + FAC[b].name + ' have formed an alliance', 'hot');
     }
   }
+  for (const k in dip.truce) {                                  // a live ceasefire holds relations off the war line
+    if (dip.truce[k] <= game.t) { delete dip.truce[k]; continue; }
+    if ((dip.rel[k] ?? 0) < TRUCE_FLOOR) dip.rel[k] = TRUCE_FLOOR;
+  }
+  proactivePeace();                                             // losing factions de-escalate / sue for peace
   for (const a of ALL_TEAMS) for (const b of ALL_TEAMS) {
     if (a >= b) continue;
     const k = rk(a, b), st = stateOf(a, b);

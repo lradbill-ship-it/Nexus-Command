@@ -4,7 +4,7 @@ import {
 import type { LeaderStyle } from '../sim/constants';
 import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, setHintHook } from '../sim/state';
 import {
-  startPlacing, trainUnit, cancelUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
+  startPlacing, trainUnit, cancelUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar, dipPeace, hasPeaceOffer,
   hasCyber, hasBuilding, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
   setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, sellSelected, combineSelected, armPatrol, canPatrol, setAutoScout, getAutoScout,
 } from '../sim/sim';
@@ -100,12 +100,14 @@ function ensureDipUI(f: number) {
       <div class="dipBtns">
         <button id="dg_${f}">GIFT 300</button><button id="dt_${f}">TRADE</button>
         <button id="da_${f}">ALLY</button><button id="dw_${f}">WAR</button>
+        <button id="dp_${f}">PEACE</button>
       </div>`;
     $('dipRows').appendChild(row);
     ($('dg_' + f) as HTMLButtonElement).onclick = () => dipGift(f);
     ($('dt_' + f) as HTMLButtonElement).onclick = () => dipTrade(f);
     ($('da_' + f) as HTMLButtonElement).onclick = () => dipAlly(f);
     ($('dw_' + f) as HTMLButtonElement).onclick = () => dipWar(f);
+    ($('dp_' + f) as HTMLButtonElement).onclick = () => dipPeace(f);
   }
 }
 
@@ -300,6 +302,11 @@ export function refresh() {
     aBtn.disabled = gone || isWar(PLAYER, f); aBtn.classList.toggle('active', isAllied(PLAYER, f));
     aBtn.textContent = isAllied(PLAYER, f) ? 'BREAK' : 'ALLY';
     ($('dw_' + f) as HTMLButtonElement).disabled = gone || isWar(PLAYER, f);
+    const pBtn = $('dp_' + f) as HTMLButtonElement;
+    const atWar = isWar(PLAYER, f), offered = hasPeaceOffer(f);
+    pBtn.disabled = gone || !atWar;
+    pBtn.textContent = offered ? 'ACCEPT PEACE' : 'SUE FOR PEACE';
+    pBtn.classList.toggle('active', offered);
   }
   refreshSel();
 }

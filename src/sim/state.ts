@@ -34,7 +34,7 @@ function createGame(): GameState {
 }
 
 function createDip(): DipState {
-  return { rel: {}, alliance: {}, trade: {} };
+  return { rel: {}, alliance: {}, trade: {}, truce: {} };
 }
 
 // Live module bindings — reassigned wholesale on restart. ES module consumers
