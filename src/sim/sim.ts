@@ -43,7 +43,7 @@ let peaceCd: Record<string, number> = {};      // pair key → game.t until whic
 let aiPeaceOffer: Record<number, number> = {}; // AI team → game.t until which it is standing-offering the player a free ceasefire
 let lastPeaceLog: Record<number, number> = {}; // AI team → game.t of its last "sues for peace" feed line (throttle)
 export function pendingStrikeList(): readonly Strike[] { return pendingStrikes; }
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; uprisings = 0; legionFounded = false; pendingStrikes = []; lastWoodNag = -9; peaceCd = {}; aiPeaceOffer = {}; lastPeaceLog = {}; }
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; uprisings = 0; legionFounded = false; pendingStrikes = []; lastWoodNag = -9; peaceCd = {}; aiPeaceOffer = {}; lastPeaceLog = {}; stealthT = 0; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -620,6 +620,7 @@ function fireAt(src: Entity, target: Entity, dmg: number, rail: boolean, splash 
   const subsurface = src.kind === 'u' && !!U[(src as Unit).type].tunneler;
   game.shots.push({ x: src.x, y: src.y, target, dmg, team: src.team, speed: rail ? 940 : 560, col: FAC[src.team].col, rail, splash, subsurface, by: byUnit });
   src.lastShot = game.t;
+  if (byUnit && U[byUnit.type].stealth) byUnit.revealT = game.t + REVEAL_LINGER;   // firing drops the cloak briefly
   spawnParts('muzzle', src.x, src.y, 2, '255,235,180');
   sfx(rail ? 'rail' : 'shot', src.x);
 }
@@ -750,6 +751,7 @@ function nearestHostile(e: Entity, range: number, team: number, playerVisOnly: b
   const canHitUnderground = e.kind === 'u' && !!U[(e as Unit).type].tunneler;   // only a Borer reaches below ground
   forNearbyUnits(e.x, e.y, range, (u) => {
     if (!isWar(team, u.team)) return;
+    if (cloaked(u)) return;                                   // a cloaked Spectre can't be acquired until it reveals
     if ((u.tunnelT ?? 0) > 0 && !canHitUnderground) return;   // burrowing units are underground — only a tunneler can target them
     if (!eligibleTarget(e, u)) return;
     if (playerVisOnly && !tileVisible(u.x, u.y)) return;
@@ -855,6 +857,25 @@ function separation() {
 // Non-combat economy/support units (harvesters, loggers, repair rigs) — never
 // desert in a revolt, count as civilians at settlements, and don't take attack orders.
 export const isSupport = (type: string) => !!(U[type].harvests || U[type].logs || U[type].repair || U[type].shield);
+
+// ── Stealth (Spectre): cloaked & untargetable until it fires or an enemy gets close ──
+const DETECT_R = 3 * TILE;       // an enemy within this range spots a cloaked unit
+const REVEAL_LINGER = 1.6;       // seconds a stealth unit stays revealed after firing / being spotted
+let stealthT = 0;
+/** True while a stealth unit's cloak is up (not recently revealed) → enemies can't see or target it. */
+export const cloaked = (u: Unit) => !!U[u.type].stealth && (u.revealT ?? 0) <= game.t;
+/** Hidden from the human player's view? (an enemy stealth unit currently cloaked). */
+export const cloakedToPlayer = (u: Unit) => cloaked(u) && !isAllied(PLAYER, u.team);
+function stealthTick(dt: number) {
+  stealthT += dt; if (stealthT < 0.25) return; stealthT = 0;
+  for (const u of game.units) {
+    if (!U[u.type].stealth || u.dead) continue;
+    let seen = false;
+    forNearbyUnits(u.x, u.y, DETECT_R, (o) => { if (!seen && isWar(u.team, o.team) && dist(u, o) < DETECT_R) seen = true; });
+    if (!seen) for (const b of game.buildings) { if (b.progress >= 1 && isWar(u.team, b.team) && dist(u, b) < DETECT_R) { seen = true; break; } }
+    if (seen) u.revealT = game.t + REVEAL_LINGER;
+  }
+}
 
 // ── Harvesting (resource-typed: harvester=crystal, tanker=coolant) ────────────
 const resOf = (u: Unit) => U[u.type].harvests!;
@@ -1839,6 +1860,7 @@ function aiUpdate(team: number, dt: number) {
   const hasAlloyDepot = game.buildings.some(b => b.team === team && b.type === 'smelter' && b.progress >= 1);
   const hasMill = game.buildings.some(b => b.team === team && b.type === 'mill' && b.progress >= 1);
   const hasDrill = game.buildings.some(b => b.team === team && b.type === 'drillbay' && b.progress >= 1);
+  const hasCyberB = game.buildings.some(b => b.team === team && b.type === 'cyber' && b.progress >= 1);
   const foundries = game.buildings.filter(b => b.team === team && b.type === 'foundry' && b.progress >= 1);
   const countType = (t: string) => game.units.reduce((s, u) => s + (u.team === team && u.type === t ? 1 : 0), 0);
   if (foundries.length && foundries[0].queue.length === 0) {
@@ -1862,6 +1884,7 @@ function aiUpdate(team: number, dt: number) {
       let pick: string | null = null;
       if (game.t > 300) {
         if (hasDrill && countType('borer') < 2 && !anyQueued('borer')) pick = 'borer';   // burrowing assault drill
+        else if (hasCyberB && countType('spectre') < 3 && !anyQueued('spectre')) pick = 'spectre';   // cloaked raiders
         else if (countType('aircraft') < 3) pick = 'aircraft';
         else if (countType('artillery') < 2) pick = 'artillery';
         else if (countType('walker') < 2) pick = 'walker';
@@ -2202,6 +2225,7 @@ export function stepWorld(dt: number) {
   vaultTick(dt);
   governmentTick(dt);
   autoScoutTick(dt);
+  stealthTick(dt);
   processStrikes();
   visionAccum += dt;
   if (visionAccum >= 0.066) { computeVision(); visionAccum = 0; }   // player fog ~15Hz (AI targeting doesn't use it)

@@ -13,7 +13,7 @@ let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
 
 const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'wall', 'gate', 'palisade', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'idome', 'cyber', 'silo', 'drillbay'];
-const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'aegis', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'hunter', 'borer'];
+const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'aegis', 'recon', 'infantry', 'rocket', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'hunter', 'spectre', 'borer'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
 

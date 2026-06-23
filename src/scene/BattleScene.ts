@@ -4,7 +4,7 @@ import {
   idx, clamp, dist, T_WATER,
 } from '../sim/constants';
 import { game, resetState, isAllied, logMsg, setFocusHook } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, armPatrol, spawnParts, pendingStrikeList } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, armPatrol, spawnParts, pendingStrikeList, cloaked, cloakedToPlayer } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import grassTex from '../assets/terrain/grass.jpg?inline';
@@ -476,7 +476,7 @@ export class BattleScene extends Phaser.Scene {
       r.body.setTexture(key); this.setOrigin(r.body, key);
       if (r.barrel && hasBarrel) { const bk = `t_${u.type}_${u.team}`; r.barrel.setTexture(bk); this.setOrigin(r.barrel, bk); }
     }
-    const vis = canSee(u);
+    const vis = canSee(u) && !cloakedToPlayer(u);                    // a cloaked enemy Spectre is invisible to you
     const wv = this.cameras.main.worldView;                          // viewport culling — skip off-screen sprites
     if (!vis || u.x < wv.x - 48 || u.x > wv.right + 48 || u.y < wv.y - 48 || u.y > wv.bottom + 48) {
       r.body.setVisible(false); r.barrel?.setVisible(false); r.rotor?.setVisible(false); r.shadow?.setVisible(false); return;
@@ -487,7 +487,7 @@ export class BattleScene extends Phaser.Scene {
     const depth = air ? u.y + 4000 : u.y;         // …and draw above ground entities
     const mega = u.stack && u.stack > 1 ? 1 + Math.min(0.9, (u.stack - 1) * 0.06) : 1;   // merged collectors render bigger
     r.body.setVisible(vis).setDepth(depth).setPosition(u.x, dy).setRotation(u.facing + Math.PI / 2).setScale(mega)
-      .setAlpha((u.tunnelT ?? 0) > 0 ? 0.3 : u.disabledUntil > game.t ? 0.6 : 1);   // faded while burrowing underground
+      .setAlpha((u.tunnelT ?? 0) > 0 ? 0.3 : (U[u.type].stealth && cloaked(u)) ? 0.4 : u.disabledUntil > game.t ? 0.6 : 1);   // burrowing / cloaked → faded
     if (r.shadow) r.shadow.setVisible(vis).setDepth(u.y - 1).setPosition(u.x, u.y).setScale(0.8).setAlpha(0.45);
     if (r.barrel) r.barrel.setVisible(vis).setDepth(depth + 0.5).setPosition(u.x, dy).setRotation(u.aim + Math.PI / 2);
     if (r.rotor) r.rotor.setVisible(vis).setDepth(depth + 0.6).setPosition(u.x, dy).setRotation(game.t * 22)

@@ -112,6 +112,7 @@ export interface Unit {
   kills?: number;        // confirmed kills (drives veterancy)
   vet?: number;          // rank: 0 rookie · 1 veteran · 2 elite
   stack?: number;        // merged collectors: how many units this one represents (cargo/rate/hp scale ×stack)
+  revealT?: number;      // stealth units: game.t until which the cloak is dropped (fired recently / enemy nearby)
   dead?: boolean;
 }
 

@@ -432,6 +432,12 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillStyle = '#2c3a48';
     for (const sx of [-1, 1]) { g.save(); g.translate(cx + sx * 9, cy - 1); rr(g, -2.5, -5, 5, 10, 2); g.fill(); g.strokeStyle = col; g.stroke(); g.restore(); } // nacelles
     g.fillStyle = '#cdd9e3'; g.beginPath(); g.moveTo(cx, cy - 13); g.lineTo(cx - 2, cy - 7); g.lineTo(cx + 2, cy - 7); g.closePath(); g.fill(); // canopy
+  } else if (type === 'spectre') {
+    // stealth skimmer: a dark angular delta with a faint cyan edge-glow (reads as "cloaked")
+    g.fillStyle = '#171c24'; g.strokeStyle = '#5fe0ff'; g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(cx, cy - 13); g.lineTo(cx + 8, cy + 9); g.lineTo(cx, cy + 4); g.lineTo(cx - 8, cy + 9); g.closePath(); g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(95,224,255,.55)'; g.lineWidth = 1; g.beginPath(); g.moveTo(cx, cy - 9); g.lineTo(cx, cy + 2); g.stroke();   // spine
+    g.fillStyle = '#9fe8ff'; g.beginPath(); g.arc(cx, cy - 6, 1.3, 0, 7); g.fill();   // sensor
   }
   // heroes wear a golden crown + base ring so they read as unique
   if (d.hero) {

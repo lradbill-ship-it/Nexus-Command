@@ -149,6 +149,7 @@ export interface UnitDef {
   tunneler?: boolean;      // burrows through any terrain AND can strike underground units (Subterranean Borer)
   shield?: boolean;        // mobile missile interceptor — no weapon (Aegis Shield)
   survey?: boolean;        // long-range sense that locates buried Hero Vaults (Survey Hunter)
+  stealth?: boolean;       // cloaked — untargetable & hidden to enemies until it fires or an enemy gets close (Spectre)
   hero?: boolean;          // unique excavated super-unit (golden render; never deserts)
   auraHeal?: number;       // hp/sec healed to nearby allies (Warden hero aura)
   requires?: string;       // building type that must be built before this unit can be trained
@@ -173,6 +174,7 @@ export const U: Record<string, UnitDef> = {
   aircraft: { name: 'Wraith Gunship', cost: 600, hp: 240, speed: 158, radius: 10, sight: 10, buildTime: 16, dmg: 24, range: 150, rof: 0.6, splash: 26, air: true, antiAir: true, coolant: 6, alloy: 300, desc: 'VTOL gunship. Devastating splash strafes; flies over terrain; heavy coolant + alloy upkeep.' },
   borer: { name: 'Subterranean Borer', cost: 1500, hp: 520, speed: 72, radius: 13, sight: 7, buildTime: 24, dmg: 60, range: 150, rof: 1.6, splash: 30, coolant: 4, alloy: 450, tunneler: true, requires: 'drillbay', desc: 'Burrows through ANY terrain, strikes units underground, AND excavates Hero Vaults. Very costly; needs a Deep Bore Facility.' },
   hunter: { name: 'Survey Hunter', cost: 320, hp: 120, speed: 150, radius: 8, sight: 11, buildTime: 7, dmg: 3, range: 92, rof: 0.7, air: true, survey: true, requires: 'drillbay', desc: 'Fast airborne surveyor — flies the highlands to locate buried Hero Vaults. Lightly armed. Needs a Deep Bore Facility.' },
+  spectre: { name: 'Spectre', cost: 520, hp: 120, speed: 150, radius: 9, sight: 8, buildTime: 12, dmg: 22, range: 130, rof: 0.9, coolant: 2, alloy: 120, stealth: true, requires: 'cyber', desc: 'Cloaked strike skimmer — invisible & untargetable until it fires or an enemy gets close. Hit-and-run raider; fragile. Needs a Cyber Ops Center.' },
   // Heroes — never built; excavated from Hero Vaults by a Borer. cost/buildTime unused.
   titan: { name: 'Colossus Titan', cost: 0, hp: 1700, speed: 58, radius: 15, sight: 7, buildTime: 0, dmg: 46, range: 128, rof: 0.9, splash: 30, coolant: 3, hero: true, desc: 'HERO — a towering brawler. Massive armour and a crushing short-range cannon.' },
   siegelord: { name: 'Devastator', cost: 0, hp: 760, speed: 54, radius: 13, sight: 8, buildTime: 0, dmg: 95, range: 300, rof: 3.2, splash: 72, coolant: 4, hero: true, desc: 'HERO — siege artillery. Annihilating long-range splash; fragile up close.' },
