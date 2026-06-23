@@ -203,9 +203,9 @@ export class BattleScene extends Phaser.Scene {
     clearTerrainDirty();
     this.terrainImg.setTexture('terrain').setDisplaySize(WORLD_W, WORLD_H);   // bake is downscaled → scale back to world size
 
-    // camera to player's base (SW)
+    // camera to player's base (SW). Phones start zoomed in so units/terrain are big enough to tap.
     const bi = BASE_INFO[PLAYER];
-    this.cameras.main.setZoom(1);
+    this.cameras.main.setZoom(this.scale.width < 760 ? 1.7 : 1);
     this.cameras.main.centerOn((bi.tx + 1) * TILE, (bi.ty + 1) * TILE);
 
     game.started = start;

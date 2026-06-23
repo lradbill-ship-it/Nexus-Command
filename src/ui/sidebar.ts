@@ -76,6 +76,12 @@ export function setRestartHook(fn: () => void) { restartHook = fn; }
 let startHook: () => void = () => {};
 export function setStartHook(fn: () => void) { startHook = fn; }
 
+/** Slide the mobile command drawer shut (so the player returns to the full map to place/target). No-op on desktop. */
+function closeDrawer() {
+  const sb = document.getElementById('sidebar');
+  if (sb && sb.classList.contains('open')) { sb.classList.remove('open'); const dt = document.getElementById('drawerToggle'); if (dt) dt.textContent = '☰ BUILD'; }
+}
+
 /** Create the covert chip + diplomacy row for one faction if they don't exist yet.
  *  Idempotent, so it auto-extends the diplomacy UI to a faction that emerges mid-match (the Free Legion). */
 function ensureDipUI(f: number) {
@@ -110,7 +116,7 @@ export function makeUI() {
   for (const t of buildOrder) {
     const d = B[t];
     const btn = cmdButton('b_' + t, iconCanvas('b', t), d.name, '▣' + d.cost + (d.alloy ? ' ⬡' + d.alloy : '') + (d.wood ? ' 🪵' + d.wood : ''));
-    btn.title = d.desc; btn.onclick = () => startPlacing(t); bg.appendChild(btn);
+    btn.title = d.desc; btn.onclick = () => { startPlacing(t); closeDrawer(); }; bg.appendChild(btn);
   }
   const ug = $('unitBtns');
   for (const t of unitOrder) {
@@ -126,7 +132,7 @@ export function makeUI() {
     g.beginPath(); g.arc(20, 13, 8, 0, 7); g.stroke(); g.beginPath(); g.arc(20, 13, 4, 0, 7); g.stroke();
     if (k === 'thermo') { g.fillStyle = '#e8483a'; g.beginPath(); g.arc(20, 13, 2, 0, 7); g.fill(); }
     const btn = cmdButton('a_' + k, ic, a.name, '▣' + a.cost + (a.alloy ? ' ⬡' + a.alloy : '') + ' · ' + a.cd + 's', a.key);
-    btn.title = a.desc; btn.onclick = () => tryAbility(k); ag.appendChild(btn);
+    btn.title = a.desc; btn.onclick = () => { tryAbility(k); closeDrawer(); }; ag.appendChild(btn);
   }
   const cg = $('covBtns');
   for (const k of covertOrder) {
@@ -178,6 +184,8 @@ export function makeUI() {
   ($('endBtn') as HTMLButtonElement).onclick = () => { $('endOverlay').style.display = 'none'; restartHook(); };
   ($('helpBtn') as HTMLButtonElement).onclick = () => { $('helpOverlay').style.display = 'flex'; };
   ($('helpCloseBtn') as HTMLButtonElement).onclick = () => { $('helpOverlay').style.display = 'none'; };
+  const dt = $('drawerToggle') as HTMLButtonElement;
+  dt.onclick = () => { const open = $('sidebar').classList.toggle('open'); dt.textContent = open ? '✕ CLOSE' : '☰ BUILD'; };
 }
 
 export function logMsg(msg: string, cls?: string) {
