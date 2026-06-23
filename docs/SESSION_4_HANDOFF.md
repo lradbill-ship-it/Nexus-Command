@@ -7,6 +7,8 @@
 >
 > Older per‑feature detail: `docs/SESSION_3_HANDOFF.md` (Sessions 1–2 state) and `docs/SESSION_2_HANDOFF.md`. Original v1 mission/spec: `CLAUDE.md`.
 > Written at the end of **Session 3 (2026‑06‑23)**. Everything below is live on `main` + the gh‑pages link.
+>
+> **📌 SESSION 4 PROGRESS (2026‑06‑23, "do it all" delegate):** shipped + deployed 4 increments — (1) **sue‑for‑peace/ceasefires** (negotiate the Free Legion down), (2) **explicit relay targeting** (right‑click to seize), (3) **animated water shimmer**, (4) **explosion audio variety**. Full notes in `docs/TODO.md` §"Shipped in Session 4". **Two items HELD by Lane's call:** **balance/pacing tuning** (he'll PLAY the new build first — that's the standing next move) and the **Web‑Worker sim** (FPS runs fine on his device → not worth the rewrite). `main` tip after Session 4 work; live link in sync.
 
 ---
 

@@ -24,7 +24,8 @@ Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all 
 ## ▶ Up next — top candidates (curate to 3–5; these go on the cards first)
 - [ ] **More CC0 audio (optional)** — real CC0 **explosions + nuke blast + victory jingle** ship; ✅ Session 4 added **explosion variety** (asset‑free randomized sub‑thump/crackle, `2af2e56`). Still open: real CC0 samples for **weapons/UI** + distinct explosion sample *variants* — both a **by‑ear curation task for Lane** (I can't judge sound). Swapping a sample = drop a file in `src/assets/audio/`. **Enabler: `afconvert` on this Mac decodes OGG → transcode OGG CC0 → Safari‑safe AAC/M4A.**
 - [ ] **Society layer — deeper civilian diplomacy** (optional) — recruit/absorb civilian populations via diplomacy (not just conquest). ✅ The emergent faction can now be **negotiated with / sued for peace** (Session 4); remaining: *peaceful* recruitment/absorption of neutral civilian populations.
-- [ ] **Deeper perf — Web Worker sim** — if late‑game still bites on device, move the sim off the main thread (big architectural change; playtest‑gate it). **HELD pending Lane confirming FPS actually bites.**
+- [ ] **Deeper perf — Web Worker sim** — 🛑 **HELD (Lane 2026‑06‑23): late‑game FPS runs fine on his device** → not worth the big rewrite. Revisit only if FPS starts biting.
+- [ ] **Balance / pacing tuning** — 🛑 **HELD (Lane 2026‑06‑23): he'll PLAY the new Session‑4 build first, then report what felt off.** Ask‑first per `CLAUDE.md` (pacing). Likely dials when he's ready: Free Legion timing/strength, coolant in big air pushes, AI missile/EMP cadence, hero strength (handoff §8). **This is the standing next move once Lane has playtest data.**
 
 ## Backlog — Features
 - [ ] **Emergent factions** — neutral civilian populations coalesce into a NEW faction that can grow into a real threat (note #3).
