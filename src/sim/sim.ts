@@ -2150,6 +2150,11 @@ function patrolOrder(wx: number, wy: number) {
   }
   if (n) { hint(n + (n > 1 ? ' units' : ' unit') + ' on patrol — they will engage enemies entering the area'); sfx('click'); }
 }
+/** Drop a colored command-confirmation marker at a point (green move / red attack / cyan special). */
+function orderMark(x: number, y: number, kind: 'move' | 'attack' | 'special') {
+  const rgb = kind === 'attack' ? '232,72,58' : kind === 'special' ? '150,225,255' : '90,230,120';
+  game.parts.push({ type: 'order', x, y, t: 0, life: 0.55, rgb });
+}
 export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
   const sel = game.selection.filter(s => s.kind === 'u') as Unit[];
   if (!sel.length) {
@@ -2161,13 +2166,13 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
   const clickedVault = game.vaults.find(v => v.discovered && !v.done && dist(v, { x: wx, y: wy }) < 34);
   if (clickedVault && sel.some(s => U[s.type].tunneler)) {
     for (const u of sel) if (U[u.type].tunneler) { u.order = 'dig'; u.digVault = clickedVault.id; u.target = null; u.guard = null; setPath(u, clickedVault.x, clickedVault.y); }
-    hint('Borer dispatched to excavate the Hero Vault'); sfx('click');
+    hint('Borer dispatched to excavate the Hero Vault'); orderMark(clickedVault.x, clickedVault.y, 'special'); sfx('click');
     return;
   }
   // right-clicking a settlement you don't own tries to recruit it (paid); on failure,
   // fall through so the units simply move there and take it by presence.
   const clickedSettle = game.settlements.find(s => s.owner !== PLAYER && dist(s, { x: wx, y: wy }) < 30);
-  if (clickedSettle && tryRecruit(clickedSettle)) return;
+  if (clickedSettle && tryRecruit(clickedSettle)) { orderMark(clickedSettle.x, clickedSettle.y, 'special'); return; }
   // right-clicking a Command Relay you don't hold → send selected military to assault & secure it
   // (a neutral relay falls to presence; an enemy's must be shot offline first — amove fights its defenders).
   const clickedRelay = game.relays.find(r => r.owner !== PLAYER && !isAllied(PLAYER, r.owner) && dist(r, { x: wx, y: wy }) < 30);
@@ -2177,7 +2182,7 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
       const slots = formationSlots(force, clickedRelay.x, clickedRelay.y);
       for (let k = 0; k < force.length; k++) { const u = force[k]; u.order = 'amove'; u.target = null; u.guard = null; u.dest = slots[k]; setPath(u, slots[k].x, slots[k].y); }
       hint(clickedRelay.owner ? 'Assaulting the Command Relay — shoot it offline, then hold' : 'Securing the Command Relay');
-      sfx('click');
+      orderMark(clickedRelay.x, clickedRelay.y, 'special'); sfx('click');
       return;
     }
   }
@@ -2238,6 +2243,10 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
     u.dest = slots[k]; u.order = fromAmove && !support ? 'amove' : 'move'; u.target = null;
     setPath(u, slots[k].x, slots[k].y);
   }
+  // command-confirmation marker: red on an attack target, cyan on a special order, green on a plain move
+  if (tgt) orderMark(tgt.x, tgt.y, 'attack');
+  else if (guardT || repairB || garrisonB) orderMark((guardT || repairB || garrisonB)!.x, (guardT || repairB || garrisonB)!.y, 'special');
+  else orderMark(wx, wy, 'move');
   sfx('click');
 }
 const LINEAR_DEFENSE = (type: string) => type === 'wall' || type === 'gate' || type === 'palisade';

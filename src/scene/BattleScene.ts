@@ -638,6 +638,11 @@ export class BattleScene extends Phaser.Scene {
       if (p.type === 'ring') {
         const r = (p.big ? 16 : 9) + p.t * (p.big ? 170 : 95);
         a.lineStyle(3, 0xffb46e, k); a.strokeCircle(p.x, p.y, r);
+      } else if (p.type === 'order') {                                                  // command-confirmation marker (collapses inward)
+        const c = Phaser.Display.Color.RGBStringToColor('rgb(' + (p.rgb || '90,230,120') + ')').color;
+        const prog = p.t / p.life, r = 15 - prog * 7;
+        a.lineStyle(2, c, k); a.strokeCircle(p.x, p.y, r);
+        for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { a.beginPath(); a.moveTo(p.x + dx * (r + 5), p.y + dy * (r + 5)); a.lineTo(p.x + dx * r, p.y + dy * r); a.strokePath(); }
       } else if (p.type === 'shock') {
         const r = 20 + p.t * 96;                                                        // slower outer shockwave
         a.lineStyle(2, 0xfff0d2, k * 0.55); a.strokeCircle(p.x, p.y, r);
