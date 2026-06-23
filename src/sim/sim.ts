@@ -2000,6 +2000,12 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
     if (!isAllied(PLAYER, u2.team) || sel.includes(u2)) continue;
     if (tileVisible(u2.x, u2.y) && dist(u2, { x: wx, y: wy }) < U[u2.type].radius + 12) { guardT = u2; break; }
   }
+  // a Repair Rig right-clicking a friendly (damaged) building → mend THAT building specifically
+  let repairB: Building | null = null;
+  if (!tgt && !guardT && sel.some(s => U[s.type].repair)) for (const b of game.buildings) {
+    if (!isAllied(PLAYER, b.team) || b.progress < 1) continue;
+    if (Math.abs(wx - b.x) <= b.w / 2 + 6 && Math.abs(wy - b.y) <= b.h / 2 + 6) { repairB = b; break; }
+  }
   if (tgt && !isWar(PLAYER, tgt.team)) {
     const key = 'ag' + tgt.team;
     if (!game.aggroT[key] || game.t - game.aggroT[key] > 10) {
@@ -2014,10 +2020,12 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
     const support = isSupport(u.type);
     if (tgt && !support && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; u.guard = null; setPath(u, tgt.x, tgt.y); }
     else if (guardT && (!support || U[u.type].repair)) { u.order = 'guard'; u.guard = guardT; u.target = null; u.path = null; }
+    else if (repairB && U[u.type].repair) { u.order = 'guard'; u.guard = repairB; u.target = null; u.path = null; setPath(u, repairB.x, repairB.y); }
     else if (node && harvester && node.kind === U[u.type].harvests) { u.hNode = node; u.hState = 'go'; u.order = 'idle'; setPath(u, node.x, node.y); }
-    else if (!(guardT && support)) { u.guard = null; movers.push(u); }
+    else if (!(guardT && support) && !(repairB && U[u.type].repair)) { u.guard = null; movers.push(u); }
   }
   if (guardT && sel.some(s => !isSupport(s.type) || U[s.type].repair)) hint((sel.some(s => U[s.type].repair) ? 'Repairing & escorting ' : 'Escorting ') + U[guardT.type].name);
+  else if (repairB && sel.some(s => U[s.type].repair)) hint('Repair Rig dispatched to mend the ' + B[repairB.type].name);
   const slots = formationSlots(movers, wx, wy);
   for (let k = 0; k < movers.length; k++) {
     const u = movers[k], support = isSupport(u.type);

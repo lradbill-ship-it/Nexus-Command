@@ -108,7 +108,7 @@ export interface Unit {
   lastShot: number;
   resume?: string | null;
   savedDest?: Vec | null;
-  guard?: Unit | null;   // friendly unit this one is escorting (order === 'guard')
+  guard?: Unit | Building | null;   // friendly unit being escorted, OR a friendly building a Repair Rig is mending (order === 'guard')
   kills?: number;        // confirmed kills (drives veterancy)
   vet?: number;          // rank: 0 rookie · 1 veteran · 2 elite
   stack?: number;        // merged collectors: how many units this one represents (cargo/rate/hp scale ×stack)
