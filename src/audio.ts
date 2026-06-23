@@ -111,11 +111,16 @@ export function sfx(type: string, x?: number) {
         tone(pan, { w: 'triangle', f0: 2300, f1: 210, dur: 0.14, vol: 0.05 });
         tone(pan, { w: 'sine', f0: 130, f1: 55, dur: 0.18, vol: 0.07 }); break;
       case 'boom':
-        // real CC0 explosion sample; synth fallback (crack + body + low thump) until decoded
-        if (!playSample('explosion', 0.85, x)) {
+        // real CC0 explosion sample (pitch-varied per shot in playSample); synth fallback until decoded.
+        if (!playSample('explosion', 0.78 + Math.random() * 0.16, x)) {
           noiseHit(pan, { dur: 0.11, f0: 7000, f1: 1800, vol: 0.16, type: 'highpass' });
           noiseHit(pan, { dur: 0.3, f0: 2200, f1: 240, vol: 0.44, type: 'lowpass' });
           tone(pan, { w: 'triangle', f0: 170, f1: 58, dur: 0.17, vol: 0.3 });
+        } else {
+          // layer a randomized sub-thump (+ occasional debris crackle) so repeated blasts vary in
+          // weight & character — explosion variety without shipping more audio assets.
+          tone(pan, { w: 'sine', f0: 150 + Math.random() * 70, f1: 46, dur: 0.12 + Math.random() * 0.08, vol: 0.1 });
+          if (Math.random() < 0.5) noiseHit(pan, { dur: 0.16, f0: 5200, f1: 900, vol: 0.05, type: 'highpass' });
         }
         break;
       case 'bigboom':
