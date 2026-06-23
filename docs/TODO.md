@@ -9,7 +9,7 @@
 > so: put the 3–4 best candidates on cards, and **always also paste the full list (below) in the message**
 > so nothing is hidden — Lane can pick a card or name any other item. Then update this file.
 
-Last updated: **2026‑06‑19** (Session 3 — perf + AI parity Phase 1&2 shipped; doing the full list).
+Last updated: **2026‑06‑23** (end of Session 3 — full backlog shipped; canonical handoff: `docs/SESSION_4_HANDOFF.md`). Session 4 = balance tuning from playtests.
 
 ---
 
