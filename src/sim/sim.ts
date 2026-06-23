@@ -382,8 +382,8 @@ function settlementTick(dt: number) {
         for (let i = 0; i < n; i++) { const sp = freeSpotNear(s.x, s.y); const m = addUnit('militia', sp.x, sp.y, team); if (team === 0) orderMilitia(m); }
         s.pop = Math.max(8, s.pop - n * 3);                        // fighters leave the town
         const nearPlayer = game.buildings.some(b => isAllied(PLAYER, b.team) && dist(b, s) < 22 * TILE);
-        if (nearPlayer) { logMsg('⚠ A FREE MILITIA has risen up from an ungoverned settlement nearby!', 'war'); sfx('war'); }
-        else logMsg('A Free Militia has risen up from an ungoverned settlement.');
+        if (nearPlayer) { logMsg('⚠ A FREE MILITIA has risen up from an ungoverned settlement nearby!', 'war', { x: s.x, y: s.y }); sfx('war'); }
+        else logMsg('A Free Militia has risen up from an ungoverned settlement.', undefined, { x: s.x, y: s.y });
         if (!legionFounded && uprisings >= EMERGE_UPRISINGS) emergeFaction(s);   // sustained unrest coalesces into a real faction
       }
     } else if (s.unrest) s.unrest = Math.max(0, s.unrest - dt * 0.5);
@@ -440,7 +440,7 @@ function emergeFaction(s: Settlement) {
   for (const f of [2, 3, 4, 5, 6]) { const b = game.buildings.find(bb => bb.team === f); if (b) { const d = dist(b, s); if (d < nd) { nd = d; near = f; } } }
   for (const f of ALL_TEAMS) { if (f === T) continue; setRel(T, f, (f === PLAYER || f === near) ? -80 : -15); }
   emergeHook(T);                                                  // renderer bakes team-7 textures before they render
-  logMsg('⚠ THE FREE LEGION HAS RISEN — a faction forged from the uprisings now contests the map!', 'war'); sfx('war');
+  logMsg('⚠ THE FREE LEGION HAS RISEN — a faction forged from the uprisings now contests the map!', 'war', { x: s.x, y: s.y }); sfx('war');
   game.shake = Math.min(13, game.shake + 7);
 }
 
@@ -450,9 +450,9 @@ function captureRelay(r: Relay, team: number) {
   const prev = r.owner;
   r.owner = team; r.capT = 0; r.capBy = 0;
   game.parts.push({ type: 'ring', x: r.x, y: r.y, t: 0, life: 0.7, big: true });
-  if (team === PLAYER) { logMsg('Command Relay secured — bonus income & vision', 'good'); sfx('chime'); }
-  else if (prev === PLAYER) { logMsg(FAC[team].name + ' has seized a Command Relay from us', 'war'); sfx('war'); }
-  else if (isAllied(PLAYER, team)) logMsg(FAC[team].name + ' (ally) secured a Command Relay', 'good');
+  if (team === PLAYER) { logMsg('Command Relay secured — bonus income & vision', 'good', { x: r.x, y: r.y }); sfx('chime'); }
+  else if (prev === PLAYER) { logMsg(FAC[team].name + ' has seized a Command Relay from us', 'war', { x: r.x, y: r.y }); sfx('war'); }
+  else if (isAllied(PLAYER, team)) logMsg(FAC[team].name + ' (ally) secured a Command Relay', 'good', { x: r.x, y: r.y });
 }
 function relayTick(dt: number) {
   for (const r of game.relays) {
@@ -1770,7 +1770,7 @@ function aiUpdate(team: number, dt: number) {
           const travel = kind === 'thermo' ? THERMO_TRAVEL : NUKE_TRAVEL;
           pendingStrikes.push({ x: hq.x + (Math.random() * 90 - 45), y: hq.y + (Math.random() * 90 - 45), at: game.t + travel + 2, team, kind });
           ai.missileT = game.t + a.cd * 0.8 + Math.random() * 45;
-          if (tgt === PLAYER || isAllied(PLAYER, tgt)) { logMsg('⚠ INBOUND ' + (kind === 'thermo' ? 'THERMONUCLEAR' : 'BALLISTIC') + ' MISSILE from ' + FAC[team].name + ' — intercept or scatter!', 'war'); sfx('klaxon'); }
+          if (tgt === PLAYER || isAllied(PLAYER, tgt)) { logMsg('⚠ INBOUND ' + (kind === 'thermo' ? 'THERMONUCLEAR' : 'BALLISTIC') + ' MISSILE from ' + FAC[team].name + ' — intercept or scatter!', 'war', { x: hq.x, y: hq.y }); sfx('klaxon'); }
         } else {
           ai.missileT = game.t + 20;   // can't afford yet — re-check soon
         }

@@ -3,7 +3,7 @@ import {
   TILE, MAPW, MAPH, WORLD_W, WORLD_H, PLAYER, FAC, B, U, BASE_INFO,
   idx, clamp, dist, T_WATER,
 } from '../sim/constants';
-import { game, resetState, isAllied, logMsg } from '../sim/state';
+import { game, resetState, isAllied, logMsg, setFocusHook } from '../sim/state';
 import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, armPatrol, spawnParts, pendingStrikeList } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
@@ -92,6 +92,10 @@ export class BattleScene extends Phaser.Scene {
     setDryWaterHook(dryWaterAt);
     setEndHook((win) => this.onEnd(win));
     setEmergeHook((team) => buildTeamTextures(this, team));   // a faction emerged mid-match → bake its sprites before they render
+    setFocusHook((x, y) => {                                   // clicking a located feed alert jumps here + pings the spot
+      this.cameras.main.centerOn(x, y);
+      game.parts.push({ type: 'ring', x, y, t: 0, life: 1.0, big: true });
+    });
 
     this.cameras.main.setBackgroundColor('#0a0e08');
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);

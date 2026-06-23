@@ -146,6 +146,8 @@
   #conscriptBtn:disabled{opacity:.35;cursor:default;filter:grayscale(.5);}
   #log{font-size:9.6px;color:#93a2ae;line-height:1.6;padding:5px 8px;min-height:74px;max-height:104px;overflow:hidden;}
   #log .hot{color:var(--gold);} #log .war{color:#ff7d70;} #log .good{color:var(--green);}
+  #log .locable{cursor:pointer;} #log .locable::after{content:' ⌖';opacity:.5;}
+  #log .locable:hover{text-decoration:underline;filter:brightness(1.25);}
   /* overlays */
   .overlay{position:absolute;inset:0;background:rgba(4,6,9,.93);z-index:20;display:flex;align-items:center;justify-content:center;}
   .panelBox{width:min(660px,92%);max-height:92vh;max-height:92dvh;overflow-y:auto;padding:26px 32px;
@@ -263,6 +265,7 @@
           <li><b style="color:#9ec24f">REPAIR RIG</b> — mends friendly <b>units AND buildings</b> (right‑click a damaged unit to escort‑heal it, or a damaged building to mend it; idle rigs auto‑seek the wounded). <b>Burns WOOD</b> — needs a Lumber Mill + logged forest, or it can't repair anything.</li>
           <li><b>PATROL</b> — select combat units, press <kbd>P</kbd> (or tap ⚑ PATROL) and click a spot → they guard that whole area and hunt any enemy that enters it (far beyond weapon range)</li>
           <li><b>CONTROL GROUPS</b> — <kbd>Ctrl</kbd>+<kbd>1-9</kbd> assign · <kbd>1-9</kbd> recall</li>
+          <li><b>BATTLEFIELD FEED</b> — alerts marked <b>⌖</b> (inbound missiles, uprisings, the Legion rising, relay grabs) are <b>clickable → jump the camera</b> to where it happened</li>
           <li><b>CAMERA</b> — <kbd>W A S D</kbd> / arrows · <kbd>middle-mouse drag</kbd> · radar-map click/drag (the view never drifts on its own)</li>
           <li><b>TEMPO</b> — <kbd>Space</kbd> pause/resume · <kbd>[</kbd> <kbd>]</kbd> game speed 1×/2×/3× · <kbd>M</kbd> mute</li>
           <li><b>BUILD</b> — CONSTRUCT then place · <kbd>Del</kbd>/<kbd>Backspace</kbd> sell selected structure · <b>Walls</b> &amp; <b>Gates</b> shape chokepoints (your units pass your gate; enemies route around)</li>

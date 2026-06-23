@@ -1,5 +1,5 @@
 import { MAPW, MAPH, ALL_TEAMS, FAC, PERSONA_STYLE } from './constants';
-import type { GameState, DipState } from './types';
+import type { GameState, DipState, Vec } from './types';
 import type { LeaderStyle } from './constants';
 
 function createGame(): GameState {
@@ -70,13 +70,17 @@ export function resetState() {
 }
 
 // ── Decoupled UI hooks (set by the DOM layer; sim never touches the DOM) ──────
-type LogFn = (msg: string, cls?: string) => void;
+type LogFn = (msg: string, cls?: string, at?: Vec) => void;
 type HintFn = (msg: string) => void;
 let logHook: LogFn = () => {};
 let hintHook: HintFn = () => {};
+let focusHook: (x: number, y: number) => void = () => {};   // jump the camera to a world point (set by the scene)
 export function setLogHook(fn: LogFn) { logHook = fn; }
 export function setHintHook(fn: HintFn) { hintHook = fn; }
+export function setFocusHook(fn: (x: number, y: number) => void) { focusHook = fn; }
 export let lastHint = 0;
-export function logMsg(msg: string, cls?: string) { logHook(msg, cls); }
+/** Log a feed message; pass `at` to make the feed entry clickable → jumps the camera there. */
+export function logMsg(msg: string, cls?: string, at?: Vec) { logHook(msg, cls, at); }
+export function focusCamera(x: number, y: number) { focusHook(x, y); }
 export function hint(msg: string) { hintHook(msg); lastHint = game.t; }
 export function setLastHint(v: number) { lastHint = v; }

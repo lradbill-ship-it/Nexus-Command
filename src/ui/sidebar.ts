@@ -2,7 +2,7 @@ import {
   PLAYER, AIS, FAC, B, U, ABILITIES, COVERT, TILE, STYLES,
 } from '../sim/constants';
 import type { LeaderStyle } from '../sim/constants';
-import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, setHintHook } from '../sim/state';
+import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, setHintHook, focusCamera } from '../sim/state';
 import {
   startPlacing, trainUnit, cancelUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar, dipPeace, hasPeaceOffer,
   hasCyber, hasBuilding, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
@@ -192,9 +192,15 @@ export function makeUI() {
   dt.onclick = () => { const open = $('sidebar').classList.toggle('open'); dt.textContent = open ? '✕ CLOSE' : '☰ BUILD'; };
 }
 
-export function logMsg(msg: string, cls?: string) {
+export function logMsg(msg: string, cls?: string, at?: { x: number; y: number }) {
   const el = $('log'); const d = document.createElement('div'); if (cls) d.className = cls;
-  d.textContent = '› ' + msg; el.prepend(d);
+  d.textContent = '› ' + msg;
+  if (at) {                                   // located event → make the row a clickable jump-to-map link
+    d.classList.add('locable');
+    d.title = 'Jump to location';
+    d.onclick = () => focusCamera(at.x, at.y);
+  }
+  el.prepend(d);
   while (el.children.length > 7) el.lastChild!.remove();
 }
 
