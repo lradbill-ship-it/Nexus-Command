@@ -14,6 +14,7 @@ Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all 
 ---
 
 ## ✅ Shipped in Session 4 (newest first)
+- **Spectre — cloaked stealth unit** (`c8b2162`, live) — new Cyber‑gated strike skimmer (520cr+120 alloy): **invisible & untargetable until it fires or an enemy gets within 3 tiles**. Hit‑and‑run raider; fragile (120hp). Counterplay = proximity reveal + reveal‑on‑fire (spread out to spot enemy ones). **AI parity** (cyber‑owning AI fields them). 6/6 headless (cloak gating, proximity + fire reveal). Render: enemy cloaked hidden, own cloaked shimmer (RAF‑gated → Lane's eye). **Knobs:** `DETECT_R` 3·TILE, `REVEAL_LINGER` 1.6, stats in `U.spectre`.
 - **Orbital Ion Strike superweapon** (`a64ada6`, live) — new Silo‑gated ability (key **O**, 3500cr+400 alloy, 200s cd): near‑instant ion beam from orbit, short telegraph, **small 95px blast, UNINTERCEPTABLE** (no missile to dome) — surgical building‑killer + a counter to Iron‑Dome turtling, distinct from the nuke's wide AoE. **AI parity** (silo‑owning AI picks it too, distinct INBOUND warning). 6/6 headless (damages through an enemy dome; control nuke intercepted). **Knobs:** `ORBITAL_R` 95, `ORBITAL_TRAVEL` 1.6, detonate dmg 1500/2400, cost/cd in `ABILITIES.orbital`.
 - **Click feed alerts → jump to map** (`9eb50ec`, live) — located events (inbound missiles, militia uprisings, the Free Legion rising, relay grabs/losses) carry a world position; those feed rows show a **⌖** + hover highlight and are **clickable → camera centers there** (with a ring ping). Desktop click + mobile tap. Plumbing: `logMsg` gains optional `at` (state→sidebar) + `focusCamera`/`setFocusHook` bridge to the Phaser camera. 4/4 headless (DOM half; scene‑side camera is RAF‑gated → Lane's device).
 - **Repair Rigs mend buildings — explicit order** (`d934945`, live) — they always *could* (idle auto‑search includes buildings) but you couldn't assign one to a SPECIFIC building (escort was unit‑only) → looked broken. Now **right‑click a damaged building with a Repair Rig → it mends THAT building**. Widened `Unit.guard` to `Unit|Building`. **Reminder: rigs burn WOOD — with none they can't repair anything** (the usual confusion); help panel now says so. 5/5 headless.
@@ -36,7 +37,7 @@ Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all 
 - [x] **Explicit per‑unit relay targeting** — ✅ Session 4 (`a4120bd`): right‑click a relay with troops to send them to seize & hold it.
 - [ ] **Scripted campaign / mission mode** — long‑deferred; the engine favors emergent skirmish, so this is a separate mode.
 - [~] More superweapons / abilities — ✅ **orbital strike** done (`a64ada6`); still open: chrono‑freeze, carpet‑bomb, shield/overcharge, etc.
-- [ ] Garrisonable structures / repair‑reload / minelayer / stealth units — optional combat depth.
+- [~] Combat‑depth units — ✅ **stealth (Spectre)** done (`c8b2162`); still open: garrisonable structures, repair‑reload, minelayer, transport.
 
 ## Backlog — Art / Audio / Polish
 - [ ] **Real CC0 explosion/smoke sprite sheets** on deaths (deferred; harder to verify headlessly than terrain).
