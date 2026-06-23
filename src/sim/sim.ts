@@ -339,17 +339,24 @@ const SETTLE_R = 4 * TILE;   // capture influence radius
 const SETTLE_INCOME = 0.05;  // crystals/sec per population point an owned settlement yields (civilian economy)
 function captureSettlement(s: Settlement, team: number, militaryOnly: boolean) {
   const prev = s.owner;
+  if (prev === team) return;                                     // already ours — nothing to do
   s.owner = team; s.capT = 0; s.capBy = 0; s.unrest = 0;
-  game.pop[team] = (game.pop[team] || 0) + s.pop;                 // its citizens join your population
+  if (prev) game.pop[prev] = Math.max(0, (game.pop[prev] || 0) - s.pop);   // population TRANSFERS (no longer duplicated each flip)
+  game.pop[team] = (game.pop[team] || 0) + s.pop;                // its citizens join the new owner
   // intimidated (troops only) subjects resent it; persuaded/recruited ones welcome it
   game.happy[team] = clamp((game.happy[team] ?? 60) + (militaryOnly ? -6 : 6), 0, 100);
-  // conquest windfall — looted stores + a few citizens take up arms for the new owner (scales with population)
-  const loot = Math.round(s.pop * 8);
-  game.money[team] = (game.money[team] || 0) + loot;
-  const recruits = Math.min(3, 1 + (s.pop / 14 | 0));
-  for (let i = 0; i < recruits; i++) { const sp = freeSpotNear(s.x, s.y); addUnit('infantry', sp.x, sp.y, team); }
-  if (team === PLAYER) { logMsg((militaryOnly ? 'Intimidated' : 'Won over') + ' a settlement — +' + s.pop + ' pop, +' + loot + ' crystals, ' + recruits + ' recruits', 'good'); sfx('chime'); }
-  else if (prev === PLAYER) { logMsg(FAC[team].name + ' has seized one of our settlements', 'war'); sfx('war'); }
+  // conquest windfall — looted stores + citizens taking up arms — ONLY when LIBERATING a NEUTRAL town.
+  // Seizing it from another faction grants no fresh loot/recruits, so factions can't ping-pong a contested town to farm it.
+  if (prev === 0) {
+    const loot = Math.round(s.pop * 8);
+    game.money[team] = (game.money[team] || 0) + loot;
+    const recruits = Math.min(3, 1 + (s.pop / 14 | 0));
+    for (let i = 0; i < recruits; i++) { const sp = freeSpotNear(s.x, s.y); addUnit('infantry', sp.x, sp.y, team); }
+    if (team === PLAYER) { logMsg((militaryOnly ? 'Intimidated' : 'Won over') + ' a settlement — +' + s.pop + ' pop, +' + loot + ' crystals, ' + recruits + ' recruits', 'good'); sfx('chime'); }
+  } else {
+    if (team === PLAYER) { logMsg((militaryOnly ? 'Seized' : 'Annexed') + ' a settlement — +' + s.pop + ' pop', 'good'); sfx('chime'); }
+    else if (prev === PLAYER) { logMsg(FAC[team].name + ' has seized one of our settlements', 'war'); sfx('war'); }
+  }
 }
 function settlementTick(dt: number) {
   for (const s of game.settlements) {
@@ -360,7 +367,8 @@ function settlementTick(dt: number) {
     });
     const present = new Set<number>([...Object.keys(army), ...Object.keys(civ)].map(Number));
     const challengers = [...present].filter(t => t !== s.owner && t !== 0);      // militia (team 0) raid, they don't capture
-    if (challengers.length === 1) {                                // uncontested takeover
+    const ownerDefending = !!s.owner && present.has(s.owner);                    // the current owner has troops on it → it's defended
+    if (challengers.length === 1 && !ownerDefending) {             // sole challenger, owner not defending → takeover
       const team = challengers[0];
       s.capBy = team; s.capT += dt / 6;                            // ~6s of presence to flip
       if (s.capT >= 1) captureSettlement(s, team, !civ[team] && !!army[team]);   // troops-only ⇒ intimidation
