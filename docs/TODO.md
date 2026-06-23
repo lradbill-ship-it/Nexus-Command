@@ -14,6 +14,7 @@ Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all 
 ---
 
 ## ✅ Shipped in Session 4 (newest first)
+- **Orbital Ion Strike superweapon** (`a64ada6`, live) — new Silo‑gated ability (key **O**, 3500cr+400 alloy, 200s cd): near‑instant ion beam from orbit, short telegraph, **small 95px blast, UNINTERCEPTABLE** (no missile to dome) — surgical building‑killer + a counter to Iron‑Dome turtling, distinct from the nuke's wide AoE. **AI parity** (silo‑owning AI picks it too, distinct INBOUND warning). 6/6 headless (damages through an enemy dome; control nuke intercepted). **Knobs:** `ORBITAL_R` 95, `ORBITAL_TRAVEL` 1.6, detonate dmg 1500/2400, cost/cd in `ABILITIES.orbital`.
 - **Click feed alerts → jump to map** (`9eb50ec`, live) — located events (inbound missiles, militia uprisings, the Free Legion rising, relay grabs/losses) carry a world position; those feed rows show a **⌖** + hover highlight and are **clickable → camera centers there** (with a ring ping). Desktop click + mobile tap. Plumbing: `logMsg` gains optional `at` (state→sidebar) + `focusCamera`/`setFocusHook` bridge to the Phaser camera. 4/4 headless (DOM half; scene‑side camera is RAF‑gated → Lane's device).
 - **Repair Rigs mend buildings — explicit order** (`d934945`, live) — they always *could* (idle auto‑search includes buildings) but you couldn't assign one to a SPECIFIC building (escort was unit‑only) → looked broken. Now **right‑click a damaged building with a Repair Rig → it mends THAT building**. Widened `Unit.guard` to `Unit|Building`. **Reminder: rigs burn WOOD — with none they can't repair anything** (the usual confusion); help panel now says so. 5/5 headless.
 - **Explosion audio variety** (`2af2e56`, live) — layers a randomized sub‑thump + occasional debris crackle under the real CC0 explosion sample so repeated blasts vary in weight/character. **No new assets** (+172 bytes, code only); `playSample` already pitch‑varies. Weapon/UI fire stays procedural by design (too fast for samples). ⚠ sound is Lane's ear; real CC0 weapon/UI sample packs still a by‑ear curation task (pipeline proven).
@@ -34,7 +35,7 @@ Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all 
 - [ ] **Richer settlement absorption / civilian diplomacy** — recruit/adopt populations; absorbing faction gains their infrastructure + resources (note #7).
 - [x] **Explicit per‑unit relay targeting** — ✅ Session 4 (`a4120bd`): right‑click a relay with troops to send them to seize & hold it.
 - [ ] **Scripted campaign / mission mode** — long‑deferred; the engine favors emergent skirmish, so this is a separate mode.
-- [ ] More superweapons / abilities (orbital strike, chrono‑freeze, etc.) — optional.
+- [~] More superweapons / abilities — ✅ **orbital strike** done (`a64ada6`); still open: chrono‑freeze, carpet‑bomb, shield/overcharge, etc.
 - [ ] Garrisonable structures / repair‑reload / minelayer / stealth units — optional combat depth.
 
 ## Backlog — Art / Audio / Polish
