@@ -14,6 +14,7 @@ Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all 
 ---
 
 ## ✅ Shipped in Session 4 (newest first)
+- **Explicit Command Relay targeting** (`a4120bd`, live) — right‑click an enemy/neutral **Command Relay** with troops selected → the selected military `amove` onto it in formation to **seize & hold** it (neutral falls to presence; an enemy's gets shot offline en route). Support units excluded. Previously relays were only auto‑assaulted by whatever military happened to be present. Headless‑verified 4/4; intro/help updated.
 - **Sue for peace / ceasefires** (`eb2ffc0`, live) — wars can now END diplomatically, not only by annihilation, so the emergent **Free Legion is negotiable**. Player **SUE FOR PEACE** button in the Diplomacy panel (enabled at war) pays 400cr reparations; the target weighs the bid by how the war's going for it + persona (warlords resist unless beaten, merchants keen). **Proactive AI peace:** a badly‑losing faction de‑escalates — AI↔AI auto‑signs a ceasefire; an AI losing to the player stands up a **free standing offer** (button → ACCEPT PEACE) but never auto‑ends the *player's* war (annihilation stays the player's call). New `dip.truce` (pair→expiry) pins relations at the truce floor (−10) for 90s so peace doesn't instantly drift back to war; declaring war clears it. Headless‑verified 11/11; intro/help document it. **Tuning knobs:** `TRUCE_TIME` 90, `PEACE_COST` 400, `PEACE_PROPOSE_CD` 25, `TRUCE_FLOOR` −10, `PEACE_THRESH` per persona (warlord 0.35 … merchant 0.62).
 
 ---
@@ -26,7 +27,7 @@ Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all 
 ## Backlog — Features
 - [ ] **Emergent factions** — neutral civilian populations coalesce into a NEW faction that can grow into a real threat (note #3).
 - [ ] **Richer settlement absorption / civilian diplomacy** — recruit/adopt populations; absorbing faction gains their infrastructure + resources (note #7).
-- [ ] **Explicit per‑unit relay targeting** — click‑target a Command Relay to assault it (currently auto‑assaulted by present military).
+- [x] **Explicit per‑unit relay targeting** — ✅ Session 4 (`a4120bd`): right‑click a relay with troops to send them to seize & hold it.
 - [ ] **Scripted campaign / mission mode** — long‑deferred; the engine favors emergent skirmish, so this is a separate mode.
 - [ ] More superweapons / abilities (orbital strike, chrono‑freeze, etc.) — optional.
 - [ ] Garrisonable structures / repair‑reload / minelayer / stealth units — optional combat depth.
