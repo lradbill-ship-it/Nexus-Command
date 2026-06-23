@@ -68,6 +68,8 @@ function cmdButton(id: string, icon: HTMLCanvasElement, label: string, cost: str
   const c = document.createElement('span'); c.className = 'cost'; c.textContent = cost; btn.appendChild(c);
   if (key) { const k = document.createElement('span'); k.className = 'key'; k.textContent = key; btn.appendChild(k); }
   const cd = document.createElement('span'); cd.className = 'cd'; btn.appendChild(cd);
+  const qb = document.createElement('span'); qb.className = 'qbadge'; btn.appendChild(qb);        // production-queue count (units)
+  const ct = document.createElement('span'); ct.className = 'cdtxt'; btn.appendChild(ct);         // cooldown seconds (abilities)
   return btn;
 }
 
@@ -274,9 +276,19 @@ export function refresh() {
     btn.disabled = game.money[PLAYER] < B[t].cost || (B[t].alloy || 0) > alloyHave;
     btn.classList.toggle('armed', game.placing === t);
   }
+  const foundries = game.buildings.filter(b => b.team === PLAYER && b.type === 'foundry' && b.progress >= 1);
   for (const t of unitOrder) {
     const req = U[t].requires;
-    ($('u_' + t) as HTMLButtonElement).disabled = !hasF || game.money[PLAYER] < U[t].cost || (U[t].alloy || 0) > alloyHave || (!!req && !hasBuilding(req));
+    const btn = $('u_' + t) as HTMLButtonElement;
+    btn.disabled = !hasF || game.money[PLAYER] < U[t].cost || (U[t].alloy || 0) > alloyHave || (!!req && !hasBuilding(req));
+    // production feedback: a queue-count badge + a fill bar showing the current build's progress
+    let qn = 0, prog = 0;
+    for (const f of foundries) {
+      for (const q of f.queue) if (q === t) qn++;
+      if (f.queue[0] === t) prog = Math.max(prog, Math.min(1, f.queueT / (U[t].buildTime || 1)));
+    }
+    (btn.querySelector('.qbadge') as HTMLElement).textContent = qn ? '×' + qn : '';
+    const bar = btn.querySelector('.cd') as HTMLElement; bar.style.width = (prog * 100) + '%'; bar.style.background = '#5fbf4a';   // green = in production
   }
   for (const k of Object.keys(ABILITIES)) {
     const btn = $('a_' + k) as HTMLButtonElement;
@@ -284,11 +296,13 @@ export function refresh() {
     btn.disabled = !hasBuilding(ab.requires || 'cyber') || game.money[PLAYER] < ab.cost || (ab.alloy || 0) > alloyHave || game.cooldowns[k] > 0;
     btn.classList.toggle('armed', game.armed === k);
     (btn.querySelector('.cd') as HTMLElement).style.width = (game.cooldowns[k] > 0 ? game.cooldowns[k] / ab.cd * 100 : 0) + '%';
+    (btn.querySelector('.cdtxt') as HTMLElement).textContent = game.cooldowns[k] > 0 ? Math.ceil(game.cooldowns[k]) + 's' : '';
   }
   for (const k of covertOrder) {
     const btn = $('c_' + k) as HTMLButtonElement;
     btn.disabled = !hc || game.money[PLAYER] < COVERT[k].cost || game.covCd[k] > 0 || !!game.eliminated[game.covTarget] || isAllied(PLAYER, game.covTarget);
     (btn.querySelector('.cd') as HTMLElement).style.width = (game.covCd[k] > 0 ? game.covCd[k] / COVERT[k].cd * 100 : 0) + '%';
+    (btn.querySelector('.cdtxt') as HTMLElement).textContent = game.covCd[k] > 0 ? Math.ceil(game.covCd[k]) + 's' : '';
   }
   for (const f of AIS) ensureDipUI(f);   // a faction may have emerged mid-match → make sure its chip + row exist
   for (const f of AIS) {
