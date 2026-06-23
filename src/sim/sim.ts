@@ -683,6 +683,35 @@ export function sellSelected() {
   logMsg('Structure sold — refunded ' + cr + ' crystals' + (al ? ' + ' + al + ' alloy' : ''), 'good');
   sfx('place');
 }
+/** Merge the selected collector units (harvesters/tankers/haulers/loggers) of each type into one "mega"
+ *  collector that gathers + carries ×stack — same economic output, ONE entity (saves resources + micro). */
+export function combineSelected() {
+  const isCollector = (t: string) => !!(U[t].harvests || U[t].logs);
+  const sel = game.selection.filter((s): s is Unit => s.kind === 'u' && s.team === PLAYER && !s.dead && isCollector((s as Unit).type));
+  if (sel.length < 2) { hint('Select 2+ collectors of the same type to combine'); return; }
+  const byType: Record<string, Unit[]> = {};
+  for (const u of sel) (byType[u.type] = byType[u.type] || []).push(u);
+  const merged: Unit[] = []; let any = false;
+  for (const type in byType) {
+    const group = byType[type];
+    if (group.length < 2) { merged.push(...group); continue; }
+    any = true;
+    const stack = group.reduce((s, u) => s + (u.stack || 1), 0);
+    const keep = group[0];
+    keep.stack = stack;
+    keep.hpMax = U[type].hp * stack;
+    keep.hp = Math.min(keep.hpMax, group.reduce((s, u) => s + u.hp, 0));
+    keep.cargo = Math.min(U[type].cargo! * stack, group.reduce((s, u) => s + u.cargo, 0));
+    keep.order = 'idle'; keep.dest = null; keep.path = null; keep.hState = 'find'; keep.hNode = null; keep.chopTx = undefined; keep.tunnelT = 0;
+    const remove = new Set(group.slice(1));
+    game.units = game.units.filter(u => !remove.has(u));
+    merged.push(keep);
+  }
+  if (!any) { hint('Select 2+ of the SAME collector type to combine'); return; }
+  game.selection = merged;
+  logMsg('Collectors combined — ' + merged.filter(m => (m.stack || 1) > 1).map(m => '×' + m.stack + ' ' + U[m.type].name).join(', '), 'good');
+  sfx('place');
+}
 // ── Spatial grid — keeps separation & target-acquisition near O(n) at scale ───
 // (the 112² / 6-faction map can field hundreds of units; the old O(n²) scans
 //  spiked frame time in big battles).
@@ -881,7 +910,8 @@ function nearestDepot(u: Unit): Building | null {
   return best;
 }
 function updateHarvester(u: Unit, dt: number) {
-  const cap = U[u.type].cargo!;
+  const stack = u.stack || 1;                   // a merged "mega" collector carries + gathers ×stack (acts as N units, 1 entity)
+  const cap = U[u.type].cargo! * stack;
   const kind = resOf(u);
   if (u.hState === 'find') {
     u.tunnelT = 0; u.chopTx = undefined; u.hNode = null;    // surface & clear last leg's target
@@ -914,7 +944,7 @@ function updateHarvester(u: Unit, dt: number) {
     if (u.chopTx !== undefined) {                            // draining a water feature → coolant
       const i = idx(u.chopTx, u.chopTy!);
       if (game.waterAmt[i] <= 0) { dryWater(u.chopTx, u.chopTy!); u.chopTx = undefined; if (u.cargo > 0) toDepot(); else u.hState = 'find'; return; }
-      const take = Math.min(62 * laborFactor(u.team) * dt, game.waterAmt[i], cap - u.cargo);
+      const take = Math.min(62 * stack * laborFactor(u.team) * dt, game.waterAmt[i], cap - u.cargo);
       game.waterAmt[i] -= take; u.cargo += take;
       if (Math.random() < dt * 6) spawnParts('spark', u.chopTx * TILE + 16, u.chopTy! * TILE + 12, 1, '150,220,235');
       if (game.waterAmt[i] <= 0) { dryWater(u.chopTx, u.chopTy!); u.chopTx = undefined; }
@@ -923,7 +953,7 @@ function updateHarvester(u: Unit, dt: number) {
       return;
     }
     if (!u.hNode || u.hNode.amount <= 0) { u.hState = 'find'; return; }
-    const take = Math.min(62 * laborFactor(u.team) * dt, u.hNode.amount, cap - u.cargo);
+    const take = Math.min(62 * stack * laborFactor(u.team) * dt, u.hNode.amount, cap - u.cargo);
     u.hNode.amount -= take; u.cargo += take;
     if (Math.random() < dt * 6) spawnParts('spark', u.hNode.x, u.hNode.y - 4, 1, kind === 'crystal' ? '255,220,120' : '150,220,235');
     if (u.cargo >= cap - 0.5) toDepot();

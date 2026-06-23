@@ -265,6 +265,7 @@
           <li><b>TEMPO</b> — <kbd>Space</kbd> pause/resume · <kbd>[</kbd> <kbd>]</kbd> game speed 1×/2×/3× · <kbd>M</kbd> mute</li>
           <li><b>BUILD</b> — CONSTRUCT then place · <kbd>Del</kbd>/<kbd>Backspace</kbd> sell selected structure · <b>Walls</b> &amp; <b>Gates</b> shape chokepoints (your units pass your gate; enemies route around)</li>
           <li><b>SOCIETY</b> — grow population (Habitat / Market); <kbd>C</kbd> conscript; recruit or intimidate <b style="color:#b8bcc4">neutral settlements</b> (loot + recruits on capture)</li>
+          <li><b>COMBINE COLLECTORS</b> — select 2+ harvesters / tankers / haulers / loggers and press <kbd>G</kbd> (or tap ⊕ COMBINE) to merge them into one <b style="color:#5fe08a">mega‑collector</b> that gathers ×N — same output, one unit (saves resources + micro)</li>
           <li><b>CYBER</b> (Cyber Ops Center) — <kbd>E</kbd> EMP · <kbd>H</kbd> Hijack · <kbd>N</kbd> Ballistic &amp; <kbd>B</kbd> Thermonuclear missile (need a Missile Silo; an Iron Dome intercepts)</li>
           <li><b style="color:#d24ddd">THE FREE LEGION</b> — neglect ungoverned towns and they revolt; sustained uprisings coalesce into a hostile new faction. Govern the map or face it.</li>
           <li><b>VICTORY</b> — destroy every rival faction, including any that emerge. Hold <b style="color:#cfe6ee">★ Command Relays</b> for income + vision.</li>
@@ -283,6 +284,7 @@
     <div class="frame"><div class="screenIn"><canvas id="minimap" width="252" height="252"></canvas></div></div>
     <div class="frame"><div class="screenIn" id="selInfo">Nothing selected.</div></div>
     <button id="sellBtn" title="Sell the selected structure for a partial crystal refund (Del / Backspace)" style="display:none;margin:2px 8px 0;font:inherit;font-size:10px;letter-spacing:.12em;font-weight:700;padding:7px;cursor:pointer;color:#fff;background:linear-gradient(180deg,#b3463a,#7d2c24);border:1px solid #2a2e36;border-top-color:#c66;border-radius:2px;">✖ SELL STRUCTURE</button>
+    <button id="combineBtn" title="Merge the selected collectors into one mega-collector that gathers ×N (key: G)" style="display:none;margin:2px 8px 0;font:inherit;font-size:10px;letter-spacing:.1em;font-weight:700;padding:7px;cursor:pointer;color:#06210f;background:linear-gradient(180deg,#5fe08a,#2faf5a);border:1px solid #1c3a26;border-top-color:#9fe9b8;border-radius:2px;">⊕ COMBINE COLLECTORS</button>
     <button id="autoScoutBtn" title="Idle Recon Drones automatically scout the unexplored map (toggle)" style="margin:2px 8px 0;font:inherit;font-size:9.5px;letter-spacing:.1em;font-weight:700;padding:6px;cursor:pointer;color:#c8d4dc;background:linear-gradient(180deg,#2d3540,#1b212a);border:1px solid #424a56;border-radius:2px;">🔭 AUTO-SCOUT: OFF</button>
     <div class="tabRow">
       <button id="tabBase" class="on">BASE</button>

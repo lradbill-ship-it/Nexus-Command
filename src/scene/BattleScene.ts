@@ -4,7 +4,7 @@ import {
   idx, clamp, dist,
 } from '../sim/constants';
 import { game, resetState, isAllied, logMsg } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, spawnParts, pendingStrikeList } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, spawnParts, pendingStrikeList } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import grassTex from '../assets/terrain/grass.jpg?inline';
@@ -318,6 +318,7 @@ export class BattleScene extends Phaser.Scene {
       else if (k === 'm') toggleMute();
       else if (k === 't') { if (game.selection.some(s => s.kind === 'u')) game.armed = 'amove'; }
       else if (k === 'c') conscript(PLAYER);
+      else if (k === 'g') combineSelected();   // merge selected collectors into one mega-collector
       else if (k === 'delete' || k === 'backspace') { e.preventDefault(); sellSelected(); }
       else if (k === ' ') { e.preventDefault(); game.paused = !game.paused; logMsg(game.paused ? '⏸ Paused' : '▶ Resumed'); }
       else if (k === ']' || k === '+' || k === '=') { game.speed = Math.min(3, (game.speed || 1) + 1); game.paused = false; logMsg('▶▶ Game speed ' + game.speed + '×'); }
@@ -473,7 +474,8 @@ export class BattleScene extends Phaser.Scene {
     const bob = Math.sin(game.t * 3 + u.bob) * (air ? 2.5 : 1.5);
     const dy = u.y - (air ? ALT : 0) + bob;       // airborne units float above the deck
     const depth = air ? u.y + 4000 : u.y;         // …and draw above ground entities
-    r.body.setVisible(vis).setDepth(depth).setPosition(u.x, dy).setRotation(u.facing + Math.PI / 2)
+    const mega = u.stack && u.stack > 1 ? 1 + Math.min(0.9, (u.stack - 1) * 0.06) : 1;   // merged collectors render bigger
+    r.body.setVisible(vis).setDepth(depth).setPosition(u.x, dy).setRotation(u.facing + Math.PI / 2).setScale(mega)
       .setAlpha((u.tunnelT ?? 0) > 0 ? 0.3 : u.disabledUntil > game.t ? 0.6 : 1);   // faded while burrowing underground
     if (r.shadow) r.shadow.setVisible(vis).setDepth(u.y - 1).setPosition(u.x, u.y).setScale(0.8).setAlpha(0.45);
     if (r.barrel) r.barrel.setVisible(vis).setDepth(depth + 0.5).setPosition(u.x, dy).setRotation(u.aim + Math.PI / 2);

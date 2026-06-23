@@ -6,7 +6,7 @@ import { game, dip, rk, getRel, isWar, isAllied, stateOf, lastHint, setLogHook, 
 import {
   startPlacing, trainUnit, cancelUnit, tryAbility, runCovert, dipGift, dipTrade, dipAlly, dipWar,
   hasCyber, hasBuilding, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
-  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, sellSelected, setAutoScout, getAutoScout,
+  setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, sellSelected, combineSelected, setAutoScout, getAutoScout,
 } from '../sim/sim';
 
 let chosenLeader: LeaderStyle = 'industrialist';
@@ -178,6 +178,7 @@ export function makeUI() {
 
   ($('conscriptBtn') as HTMLButtonElement).onclick = () => conscript(PLAYER);
   ($('sellBtn') as HTMLButtonElement).onclick = () => sellSelected();
+  ($('combineBtn') as HTMLButtonElement).onclick = () => combineSelected();
   ($('autoScoutBtn') as HTMLButtonElement).onclick = () => setAutoScout(!getAutoScout());
   ($('restartBtn') as HTMLButtonElement).onclick = () => restartHook();
   ($('startBtn') as HTMLButtonElement).onclick = () => { $('introOverlay').style.display = 'none'; startHook(); };
@@ -310,17 +311,24 @@ function refreshSel() {
     let cr = 0; for (const b of sellable) cr += Math.round(B[b.type].cost * 0.5 * Math.min(1, b.progress));
     sellBtn.style.display = ''; sellBtn.textContent = '✖ SELL STRUCTURE' + (cr ? ' · +' + cr : '');
   } else sellBtn.style.display = 'none';
+  // COMBINE: offer when 2+ collectors of the same type are selected
+  const cb = $('combineBtn') as HTMLButtonElement;
+  const coll = game.selection.filter(s => s.kind === 'u' && (s as any).team === PLAYER && (U[(s as any).type].harvests || U[(s as any).type].logs)) as any[];
+  const counts: Record<string, number> = {}; for (const c of coll) counts[c.type] = (counts[c.type] || 0) + 1;
+  cb.style.display = Object.values(counts).some(n => n >= 2) ? '' : 'none';
   if (!game.selection.length) { el.innerHTML = 'Nothing selected.'; return; }
   if (game.selection.length === 1) {
     const sObj = game.selection[0];
     const d: any = sObj.kind === 'b' ? B[(sObj as any).type] : U[(sObj as any).type];
+    const stk = sObj.kind === 'u' ? ((sObj as any).stack || 1) : 1;
     let extra = '';
     if (sObj.kind === 'b' && (sObj as any).progress < 1) extra = `<br>Constructing ${Math.round((sObj as any).progress * 100)}%`;
     if (sObj.kind === 'b' && (sObj as any).type === 'foundry' && (sObj as any).queue.length) extra = `<br>Queue: ${(sObj as any).queue.length} (${U[(sObj as any).queue[0]].name})`;
-    if (sObj.kind === 'u' && U[(sObj as any).type].harvests) extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${d.cargo} ${d.harvests}`;
-    if (sObj.kind === 'u' && U[(sObj as any).type].logs) extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${d.cargo} wood`;
+    if (sObj.kind === 'u' && U[(sObj as any).type].harvests) extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${d.cargo * stk} ${d.harvests}`;
+    if (sObj.kind === 'u' && U[(sObj as any).type].logs) extra = `<br>Cargo ${Math.round((sObj as any).cargo)}/${d.cargo * stk} wood`;
     const vet = sObj.kind === 'u' ? ((sObj as any).vet || 0) : 0;
     const rank = vet >= 2 ? ' <b style="color:#ffd95a">★ ELITE</b>' : vet >= 1 ? ' <b style="color:#ffd95a">▲ VETERAN</b>' : '';
-    el.innerHTML = `<span class="nm">${d.name}</span>${rank}<br>HP ${Math.ceil(sObj.hp)}/${sObj.hpMax}${extra}`;
+    const mega = stk > 1 ? ` <b style="color:#5fe08a">×${stk}</b>` : '';
+    el.innerHTML = `<span class="nm">${d.name}</span>${mega}${rank}<br>HP ${Math.ceil(sObj.hp)}/${sObj.hpMax}${extra}`;
   } else el.innerHTML = `<span class="nm">${game.selection.length} units</span> in command group`;
 }
