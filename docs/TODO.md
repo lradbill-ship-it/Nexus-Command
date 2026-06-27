@@ -9,7 +9,12 @@
 > so: put the 3–4 best candidates on cards, and **always also paste the full list (below) in the message**
 > so nothing is hidden — Lane can pick a card or name any other item. Then update this file.
 
-Last updated: **2026‑06‑27** (Session 4 WRAPPED — 13 features/fixes shipped + live; Lane now playtesting). Canonical handoff: **`docs/SESSION_5_HANDOFF.md`**. Session 5 = **playtest‑driven balance pass** (the toolbox is full).
+Last updated: **2026‑06‑27** (Session 5 in progress — civilian‑diplomacy arc shipped + live). Canonical handoff: **`docs/SESSION_5_HANDOFF.md`**. Session 5 = **playtest‑driven balance pass** (the toolbox is full) + design‑first society depth.
+
+---
+
+## ✅ Shipped in Session 5 (newest first)
+- **Civilian diplomacy — Envoy + settlement affinity + town development** (`d0df3b4`, live) — the full "Hearts & Minds" arc (design‑first pick). **Envoy** (`U.envoy`, new unarmed diplomat support unit): right‑click a **neutral settlement** to *court* it — goodwill (`affinity`) builds ~15s → the town **voluntarily joins** (no resentment, +12 happy, a development head‑start). A lone envoy no longer triggers the 6s presence‑flip — pure diplomats win towns via affinity, troops/workers still flip by presence. **Development:** own a town → invest crystals over time (`DEV_COST`/s) to raise it through **3 tiers** — each scales the crystal yield (×1.6/tier), unlocks a **coolant** trickle (tier 2) then **alloy** (tier 3), grows pop toward `DEV_POP_CAP` 60, and at tier 3 raises a **local infantry guard**; station an Envoy to develop ~3× faster. **AI parity:** AI fields Envoys and dispatches them to court neutral towns. Help/legend + sprite + sidebar icon added. **12/12 headless** (courtship timing, no spontaneous join, dev tiers, envoy‑speeds‑dev, unarmed‑no‑crash, AI parity); tsc + bundle clean, artifact boots no errors. ⚠ FEEL/balance want Lane's playtest. **Knobs:** `AFFINITY_JOIN` 100, `AFFINITY_COURT` 6.5, `AFFINITY_DECAY` 2.0, `DEV_MAX` 3, `DEV_BASE` 0.05, `DEV_ENVOY` 0.12, `DEV_COST` 1.1, `DEV_POP_CAP` 60.
 
 ---
 
@@ -34,7 +39,7 @@ Last updated: **2026‑06‑27** (Session 4 WRAPPED — 13 features/fixes shippe
 ## ▶ Up next — top candidates (curate to 3–5; these go on the cards first)
 - [ ] **🎯 PLAYTEST‑DRIVEN BALANCE PASS — the #1 Session‑5 move.** Lane is now actively playing (found + got fixed 2 bugs in S4). Ask what felt off, then turn the §8 knobs (handoff). Likely dials: the new toys (**Spectre / Orbital / Overcharge / Minefield / Garrison** strength + cost), **Free Legion** timing/strength, coolant in big air pushes, AI missile/EMP cadence, hero strength. **Ask‑first** per `CLAUDE.md` (pacing). Needs his feel data — don't blind‑tune.
 - [ ] **More combat depth (optional, additive — Lane's been enjoying these)** — transport/APC (carry infantry), deployable turret, repair‑reload, chrono‑freeze / carpet‑bomb superweapons. Each = the established unit/ability pattern + AI parity + headless test.
-- [ ] **Society layer — deeper civilian diplomacy** (optional, design‑first/ask‑first) — *peaceful* recruitment/absorption of neutral civilian populations via diplomacy (builds on the new sue‑for‑peace). Bigger; sketch a design + check with Lane before building.
+- [x] **Society layer — deeper civilian diplomacy** — ✅ Session 5 (`d0df3b4`): Envoy courtship (peaceful annexation via affinity) + town development tiers. **Possible follow‑ons:** envoy can flip an *enemy's* town (defection), settlement build‑menu/selection UI, render the dev tier on the map, a "loyalty decays if neglected" pressure.
 - [ ] **More CC0 audio (optional, by‑ear)** — real CC0 weapon/UI samples + distinct explosion variants. Lane curates sound; drop files in `src/assets/audio/` (transcode OGG→AAC via `afconvert`). ✅ S4 added asset‑free explosion variety.
 - [ ] **Deeper perf — Web Worker sim** — 🛑 **HELD.** FPS was fine pre‑S4 garrison bug (now fixed). Revisit only if late‑game FPS still bites after the fix; re‑confirm with Lane first.
 
