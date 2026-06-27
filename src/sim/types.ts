@@ -170,6 +170,7 @@ export interface AIState {
   buffT?: number;     // next time this AI may Overcharge its army (needs a Cyber Ops Center)
   mineT?: number;     // next time this AI may lay a defensive Minefield (needs a Cyber Ops Center)
   envoyT?: number;    // throttle for fielding an Envoy to court a neutral settlement
+  chronoT?: number;   // next time this AI may cast Chrono Freeze (needs a Cyber Ops Center)
 }
 
 export interface GameState {

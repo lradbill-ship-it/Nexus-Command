@@ -193,6 +193,8 @@ export const ABILITIES: Record<string, AbilityDef> = {
   nuke: { name: 'Ballistic Missile', cost: 2000, cd: 150, key: 'N', requires: 'silo', desc: 'Long-range strike — a devastating area blast after a short flight. Needs a Missile Silo. Interceptable by Iron Dome.' },
   thermo: { name: 'Thermonuclear Missile', cost: 9000, alloy: 2500, cd: 360, key: 'B', requires: 'silo', desc: 'CONTINENT-CRACKER — a colossal blast that can erase an entire faction in one strike. Staggering cost; needs a Missile Silo. Interceptable by Iron Dome.' },
   orbital: { name: 'Orbital Ion Strike', cost: 3500, alloy: 400, cd: 200, key: 'O', requires: 'silo', desc: 'A pinpoint ion beam from orbit — near-instant and UNINTERCEPTABLE (no missile to shoot down). Small blast; surgically erases a key structure or tight cluster. Needs a Missile Silo.' },
+  chrono: { name: 'Chrono Freeze', cost: 1500, cd: 130, key: 'Z', requires: 'cyber', desc: 'Freeze every enemy unit in a wide zone for 6s — they can\'t move or fire. Set up a push or blunt an incoming assault. Needs a Cyber Ops Center.' },
+  carpet: { name: 'Carpet Bomb', cost: 2600, alloy: 200, cd: 170, key: 'X', requires: 'silo', desc: 'A bomber runs a LINE of blasts across the target — wide area denial, distinct from the nuke\'s single crater. Uninterceptable. Needs a Missile Silo.' },
 };
 
 export interface CovertDef { name: string; cost: number; cd: number; chance: number; desc: string; }

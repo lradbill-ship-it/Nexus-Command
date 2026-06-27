@@ -325,6 +325,8 @@ export class BattleScene extends Phaser.Scene {
       else if (k === 'o') tryAbility('orbital');
       else if (k === 'v') tryAbility('overcharge');
       else if (k === 'l') tryAbility('minefield');
+      else if (k === 'z') tryAbility('chrono');
+      else if (k === 'x') tryAbility('carpet');
       else if (k === 'u') ejectGarrison();        // unload a garrisoned building
       else if (k === 'm') toggleMute();
       else if (k === 't') { if (game.selection.some(s => s.kind === 'u')) game.armed = 'amove'; }

@@ -36,7 +36,7 @@ let autoScout = false;   // when on, idle Recon Drones auto-reveal the map (scou
 let autoScoutT = 0;      // throttle accumulator for auto-scout order assignment
 let aiAccum = 0;         // throttle accumulator for the strategic AI pass (build/train/wave) — not needed at 60Hz
 let visionAccum = 0;     // throttle accumulator for player fog-of-war recompute (~15Hz is imperceptible)
-type Strike = { x: number; y: number; at: number; team: number; kind: 'nuke' | 'thermo' | 'orbital' };
+type Strike = { x: number; y: number; at: number; team: number; kind: 'nuke' | 'thermo' | 'orbital' | 'carpet' };
 let pendingStrikes: Strike[] = [];   // in-flight missiles → detonate when game.t >= at (unless intercepted)
 // ── Ceasefire / sue-for-peace state ──────────────────────────────────────────
 let peaceCd: Record<string, number> = {};      // pair key → game.t until which the player can't re-propose peace (anti-spam)
@@ -1591,8 +1591,50 @@ export function castAbility(key: string, wx: number, wy: number) {
     spawnParts('spark', wx, wy, 10, '150,225,255');                                 // targeting laser paints the spot
     sfx('rail', wx);
     logMsg('⚡ ORBITAL ION STRIKE designated — beam fires in ' + ORBITAL_TRAVEL + 's (no intercepting this one)', 'war');
+  } else if (key === 'chrono') {
+    game.money[PLAYER] -= a.cost; game.cooldowns.chrono = a.cd * (styleMod(PLAYER).cdMul ?? 1);
+    const n = chronoFreeze(wx, wy, PLAYER);
+    sfx('emp', wx);
+    logMsg(n ? '❄ Chrono Freeze — ' + n + ' enemy units frozen for ' + CHRONO_DUR + 's' : 'Chrono Freeze — no enemies in range', 'hot');
+  } else if (key === 'carpet') {
+    game.money[PLAYER] -= a.cost; game.alloy[PLAYER] = (game.alloy[PLAYER] || 0) - (a.alloy || 0);
+    game.cooldowns.carpet = a.cd * (styleMod(PLAYER).cdMul ?? 1);
+    const from = game.buildings.find(b => b.team === PLAYER && b.type === 'hq') || game.buildings.find(b => b.team === PLAYER);
+    launchCarpet(wx, wy, PLAYER, from ? from.x : wx - 400, from ? from.y : wy);
+    sfx('rail', wx);
+    logMsg('✈ CARPET BOMB run inbound — a line of blasts in ' + NUKE_TRAVEL + 's', 'war');
   }
   game.armed = null;
+}
+const CHRONO_R = 200;        // chrono-freeze zone radius (px)
+const CHRONO_DUR = 6;        // seconds enemy units stay frozen
+/** Freeze all of byTeam's enemies' units within CHRONO_R around (x,y) for CHRONO_DUR seconds. Returns count. */
+function chronoFreeze(x: number, y: number, byTeam: number): number {
+  game.parts.push({ type: 'ring', x, y, t: 0, life: 0.9, big: true });
+  game.parts.push({ type: 'emp', x, y, t: 0, life: 0.9 });
+  let n = 0; const hitFac: Record<number, number> = {};
+  for (const u of game.units) if (!isAllied(byTeam, u.team) && u.team !== 0 && dist(u, { x, y }) < CHRONO_R) { u.disabledUntil = game.t + CHRONO_DUR; u.moving = false; u.path = null; spawnParts('spark', u.x, u.y, 3, '150,220,255'); n++; hitFac[u.team] = 1; }
+  for (const f in hitFac) if (byTeam === PLAYER && !isWar(PLAYER, +f)) addRel(PLAYER, +f, -12);   // freezing a non-enemy's army is a hostile act
+  return n;
+}
+const CARPET_COUNT = 7;      // blasts dropped along the run
+const CARPET_SPACING = 78;   // px between successive blasts
+const CARPET_R = 112;        // each blast's radius
+/** Queue a strafing line of blasts across (tx,ty), oriented along the bomber's approach (from fx,fy). */
+function launchCarpet(tx: number, ty: number, team: number, fx: number, fy: number) {
+  let dx = tx - fx, dy = ty - fy; const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+  const startK = -(CARPET_COUNT - 1) / 2;
+  for (let i = 0; i < CARPET_COUNT; i++) {
+    const k = startK + i;
+    pendingStrikes.push({ x: tx + dx * k * CARPET_SPACING, y: ty + dy * k * CARPET_SPACING, at: game.t + NUKE_TRAVEL + i * 0.18, team, kind: 'carpet' });
+  }
+}
+function detonateCarpet(x: number, y: number, byTeam: number) {
+  detonate(x, y, byTeam, CARPET_R, 520, 440);
+  spawnParts('fire', x, y, 28, '255,170,70'); spawnParts('smoke', x, y, 16, '78,76,80'); spawnParts('debris', x, y, 12, '120,120,128');
+  game.parts.push({ type: 'ring', x, y, t: 0, life: 0.7, big: false });
+  game.parts.push({ type: 'flash', x, y, t: 0, life: 0.2, big: false });
+  scorchHook(x, y, CARPET_R * 0.6); game.shake = Math.min(14, game.shake + 4); sfx('boom', x);
 }
 const NUKE_TRAVEL = 4;       // seconds from launch to impact
 const NUKE_R = 150;          // ballistic blast radius (px)
@@ -1710,9 +1752,10 @@ function processStrikes() {
   if (!due.length) return;
   pendingStrikes = pendingStrikes.filter(s => s.at > game.t);
   for (const s of due) {
-    if (s.kind !== 'orbital' && tryIntercept(s)) continue;        // orbital is a beam from orbit — nothing to shoot down
+    if (s.kind !== 'orbital' && s.kind !== 'carpet' && tryIntercept(s)) continue;   // orbital = beam, carpet = spread bombs → nothing to shoot down
     if (s.kind === 'thermo') detonateThermo(s.x, s.y, s.team);
     else if (s.kind === 'orbital') detonateOrbital(s.x, s.y, s.team);
+    else if (s.kind === 'carpet') detonateCarpet(s.x, s.y, s.team);
     else detonateNuke(s.x, s.y, s.team);
   }
 }
@@ -1990,20 +2033,27 @@ function aiUpdate(team: number, dt: number) {
       if (hq) {
         const canThermo = game.money[team] >= ABILITIES.thermo.cost && (game.alloy[team] || 0) >= (ABILITIES.thermo.alloy || 0);
         const canOrbital = game.money[team] >= ABILITIES.orbital.cost && (game.alloy[team] || 0) >= (ABILITIES.orbital.alloy || 0);
-        let kind: 'nuke' | 'thermo' | 'orbital';
+        const canCarpet = game.money[team] >= ABILITIES.carpet.cost && (game.alloy[team] || 0) >= (ABILITIES.carpet.alloy || 0);
+        let kind: 'nuke' | 'thermo' | 'orbital' | 'carpet';
         if (canThermo && Math.random() < (persona === 'warlord' ? 0.45 : 0.3)) kind = 'thermo';
-        else if (canOrbital && Math.random() < 0.5) kind = 'orbital';   // surgical, uninterceptable — punishes a dome-turtle
+        else if (canOrbital && Math.random() < 0.4) kind = 'orbital';   // surgical, uninterceptable — punishes a dome-turtle
+        else if (canCarpet && Math.random() < 0.4) kind = 'carpet';     // wide line of blasts — area denial
         else kind = 'nuke';
         const a = ABILITIES[kind];
         if (game.money[team] >= a.cost && (game.alloy[team] || 0) >= (a.alloy || 0)) {
           game.money[team] -= a.cost; game.alloy[team] -= (a.alloy || 0);
-          const travel = kind === 'thermo' ? THERMO_TRAVEL : kind === 'orbital' ? ORBITAL_TRAVEL : NUKE_TRAVEL;
-          const scatter = kind === 'orbital' ? 14 : 45;                // orbital is precise — aim right at the structure
-          pendingStrikes.push({ x: hq.x + (Math.random() * 2 - 1) * scatter, y: hq.y + (Math.random() * 2 - 1) * scatter, at: game.t + travel + 2, team, kind });
           ai.missileT = game.t + a.cd * 0.8 + Math.random() * 45;
+          if (kind === 'carpet') {
+            const ownHq = game.buildings.find(b => b.team === team && b.type === 'hq') || game.buildings.find(b => b.team === team);
+            launchCarpet(hq.x, hq.y, team, ownHq ? ownHq.x : hq.x - 400, ownHq ? ownHq.y : hq.y);
+          } else {
+            const travel = kind === 'thermo' ? THERMO_TRAVEL : kind === 'orbital' ? ORBITAL_TRAVEL : NUKE_TRAVEL;
+            const scatter = kind === 'orbital' ? 14 : 45;                // orbital is precise — aim right at the structure
+            pendingStrikes.push({ x: hq.x + (Math.random() * 2 - 1) * scatter, y: hq.y + (Math.random() * 2 - 1) * scatter, at: game.t + travel + 2, team, kind });
+          }
           if (tgt === PLAYER || isAllied(PLAYER, tgt)) {
-            const label = kind === 'thermo' ? 'THERMONUCLEAR MISSILE' : kind === 'orbital' ? 'ORBITAL ION STRIKE' : 'BALLISTIC MISSILE';
-            logMsg('⚠ INBOUND ' + label + ' from ' + FAC[team].name + (kind === 'orbital' ? ' — no intercept, scatter!' : ' — intercept or scatter!'), 'war', { x: hq.x, y: hq.y }); sfx('klaxon');
+            const label = kind === 'thermo' ? 'THERMONUCLEAR MISSILE' : kind === 'orbital' ? 'ORBITAL ION STRIKE' : kind === 'carpet' ? 'CARPET BOMB RUN' : 'BALLISTIC MISSILE';
+            logMsg('⚠ INBOUND ' + label + ' from ' + FAC[team].name + (kind === 'orbital' || kind === 'carpet' ? ' — no intercept, scatter!' : ' — intercept or scatter!'), 'war', { x: hq.x, y: hq.y }); sfx('klaxon');
           }
         } else {
           ai.missileT = game.t + 20;   // can't afford yet — re-check soon
@@ -2057,6 +2107,17 @@ function aiUpdate(team: number, dt: number) {
       game.money[team] -= ABILITIES.minefield.cost; ai.mineT = game.t + 80 + Math.random() * 60;
       layMinefield(hq.x + dx / len * 130, hq.y + dy / len * 130, team);
     } else ai.mineT = game.t + 20;
+  }
+  // Cyber: Chrono Freeze — lock down a dense cluster of an enemy's combatants (pays the cost).
+  if (game.t >= (ai.chronoT ?? 0) && game.money[team] >= ABILITIES.chrono.cost && game.buildings.some(b => b.team === team && b.type === 'cyber' && b.progress >= 1)) {
+    const foes = game.units.filter(u => isWar(team, u.team) && !isSupport(u.type) && !U[u.type].hero);
+    let best: Unit | null = null, bn = 0;
+    for (const u of foes) { const near = foes.reduce((s, o) => s + (dist(o, u) < CHRONO_R ? 1 : 0), 0); if (near > bn) { bn = near; best = u; } }
+    if (best && bn >= 4) {
+      game.money[team] -= ABILITIES.chrono.cost; ai.chronoT = game.t + 110 + Math.random() * 60;
+      chronoFreeze(best.x, best.y, team);
+      if (tileVisible(best.x, best.y)) { logMsg(FAC[team].name + ' froze our advance with a Chrono Freeze', 'war'); sfx('emp', best.x); }
+    } else ai.chronoT = game.t + 15;
   }
   // Garrison: occasionally tuck a spare IDLE infantryman into a nearby building for defense (never the whole army).
   if (Math.random() < dt * 0.15) {
