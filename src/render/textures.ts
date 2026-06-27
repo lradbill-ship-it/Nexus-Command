@@ -335,6 +335,20 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.strokeStyle = `rgba(${rgb},.9)`; g.lineWidth = 1.4; g.beginPath(); g.moveTo(cx + 6, cy - 9); g.lineTo(cx + 6, cy - 18); g.stroke();   // flag pole
     g.fillStyle = col; g.beginPath(); g.moveTo(cx + 6, cy - 18); g.lineTo(cx + 14, cy - 16); g.lineTo(cx + 6, cy - 13); g.closePath(); g.fill();   // pennant
     g.fillStyle = `rgba(${rgb},.8)`; g.fillRect(cx - 10, cy + 3, 2.5, 5); g.fillRect(cx + 7.5, cy + 3, 2.5, 5);
+  } else if (type === 'transport') {
+    // APC: a long boxy armored hull with a rear ramp + side ports
+    g.fillStyle = '#1a232e'; g.fillRect(cx - 13, cy - 6, 3.4, 22); g.fillRect(cx + 9.6, cy - 6, 3.4, 22);   // tracks
+    rr(g, cx - 11, cy - 14, 22, 28, 4); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(160,195,220,.55)'; g.fillRect(cx - 6, cy - 11, 12, 4);                              // forward vision slit
+    g.strokeStyle = `rgba(${rgb},.85)`; g.lineWidth = 1.2; g.strokeRect(cx - 7, cy + 6, 14, 7);             // rear ramp outline
+    g.fillStyle = '#2c3744'; g.fillRect(cx - 9, cy - 3, 3, 6); g.fillRect(cx + 6, cy - 3, 3, 6);            // side firing ports
+  } else if (type === 'sentrypod') {
+    // Sentry Pod: a stowed turret on a tracked carriage (packed-up barrel)
+    g.fillStyle = '#1a232e'; g.fillRect(cx - 12, cy - 5, 3.2, 18); g.fillRect(cx + 8.8, cy - 5, 3.2, 18);   // tracks
+    rr(g, cx - 10, cy - 9, 20, 20, 5); g.fill(); g.stroke();
+    g.fillStyle = '#2c3744'; g.beginPath(); g.arc(cx, cy, 6, 0, 7); g.fill();
+    g.strokeStyle = '#aebcc8'; g.lineWidth = 2.4; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 2, cy - 12); g.stroke();   // stowed barrel
+    g.fillStyle = `rgba(${rgb},.8)`; g.beginPath(); g.arc(cx, cy, 2.4, 0, 7); g.fill();
   } else if (type === 'borer') {
     // subterranean borer: heavy hull + big conical drill bit up front
     g.fillStyle = '#1a232e'; g.fillRect(cx - 13, cy - 6, 3.6, 18); g.fillRect(cx + 9.4, cy - 6, 3.6, 18);   // tracks

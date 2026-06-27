@@ -83,6 +83,7 @@ export interface Building {
   lastShot?: number;
   rally?: Vec;
   garrison?: { type: string; hp: number; vet?: number }[];   // infantry sheltering inside → defensive fire; eject if it falls
+  fromPod?: boolean;     // this turret was deployed from a Sentry Pod (can be packed back into one)
   dead?: boolean;
 }
 
@@ -93,10 +94,11 @@ export interface Unit {
   team: number;
   x: number; y: number;
   hpMax: number; hp: number;
-  order: 'idle' | 'move' | 'amove' | 'attack' | 'guard' | 'dig' | 'patrol' | 'enter' | 'court';
+  order: 'idle' | 'move' | 'amove' | 'attack' | 'guard' | 'dig' | 'patrol' | 'enter' | 'court' | 'board';
   dest: Vec | null;
   digVault?: number;     // vault id a Borer is excavating (order === 'dig')
   courtId?: number;      // settlement id an Envoy is courting/developing (order === 'court')
+  cargoUnits?: { type: string; hp: number; vet?: number }[];   // passengers riding inside a transport (APC)
   target: Entity | null;
   path: Vec[] | null;
   finalDest?: Vec;

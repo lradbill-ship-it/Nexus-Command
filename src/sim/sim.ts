@@ -707,7 +707,10 @@ function destroy(e: Entity, fromTeam: number) {
     removeBuildingTiles(e as Building);
     game.buildings = game.buildings.filter(b => b !== e);
     logMsg((e.team === PLAYER ? 'Our ' : FAC[e.team].name + ' ') + B[(e as Building).type].name + ' destroyed', e.team === PLAYER ? 'war' : undefined);
-  } else game.units = game.units.filter(u => u !== e);
+  } else {
+    if ((e as Unit).cargoUnits?.length) unloadTransport(e as Unit, true);   // a downed transport spills its passengers out wounded
+    game.units = game.units.filter(u => u !== e);
+  }
   game.selection = game.selection.filter(s => s !== e);
   if (fromTeam && fromTeam !== e.team && !isAllied(fromTeam, e.team)) addRel(fromTeam, e.team, big ? -16 : -5);
   if (big) checkElimination(e.team);
@@ -921,7 +924,7 @@ function separation() {
 
 // Non-combat economy/support units (harvesters, loggers, repair rigs) — never
 // desert in a revolt, count as civilians at settlements, and don't take attack orders.
-export const isSupport = (type: string) => !!(U[type].harvests || U[type].logs || U[type].repair || U[type].shield || U[type].diplomat);
+export const isSupport = (type: string) => !!(U[type].harvests || U[type].logs || U[type].repair || U[type].shield || U[type].diplomat || U[type].transport || U[type].deployable);
 
 // ── Garrison: infantry shelter inside a building → defensive fire; eject if it falls ──
 const GARRISON_CAP = 5;          // occupants per building
@@ -950,8 +953,56 @@ function ejectFrom(b: Building, hurt: boolean) {
 }
 export function ejectGarrison() {
   let n = 0;
-  for (const s of game.selection) if (s.kind === 'b' && (s as Building).team === PLAYER && (s as Building).garrison?.length) { n += (s as Building).garrison!.length; ejectFrom(s as Building, false); }
-  if (n) { hint(n + ' troops disembarked'); sfx('click'); } else hint('No garrisoned building selected');
+  for (const s of game.selection) {
+    if (s.kind === 'b' && (s as Building).team === PLAYER && (s as Building).garrison?.length) { n += (s as Building).garrison!.length; ejectFrom(s as Building, false); }
+    else if (s.kind === 'u' && (s as Unit).team === PLAYER && (s as Unit).cargoUnits?.length) { n += (s as Unit).cargoUnits!.length; unloadTransport(s as Unit, false); }
+  }
+  if (n) { hint(n + ' troops disembarked'); sfx('click'); } else hint('Select a garrisoned building or a loaded transport to unload');
+}
+// ── Transport / APC: loads infantry, ferries them, unloads on command ─────────
+function enterTransport(u: Unit, t: Unit): boolean {
+  if (!t.cargoUnits) t.cargoUnits = [];
+  if (t.cargoUnits.length >= (U[t.type].capacity || 5)) return false;
+  t.cargoUnits.push({ type: u.type, hp: u.hp, vet: u.vet });
+  game.units = game.units.filter(x => x !== u);
+  game.selection = game.selection.filter(s => s !== u);
+  return true;
+}
+/** Disembark every passenger of a transport beside it (wounded if the carrier was destroyed). */
+function unloadTransport(t: Unit, hurt: boolean) {
+  if (!t.cargoUnits || !t.cargoUnits.length) return;
+  for (const g of t.cargoUnits) {
+    const s = freeSpotNear(t.x, t.y + 18);
+    const u = addUnit(g.type, s.x, s.y, t.team);
+    u.hp = hurt ? Math.max(1, Math.min(g.hp, u.hpMax) * 0.5) : Math.min(g.hp, u.hpMax);
+    u.vet = g.vet || 0;
+  }
+  t.cargoUnits = [];
+}
+// ── Deployable Sentry Pod: a mobile unit ⇄ a fixed Sentry Turret ──────────────
+/** Deploy selected Sentry Pods into turrets, OR pack selected pod-turrets back into pods. Toggles on the selection. */
+export function toggleDeploy() {
+  if (game.over) return;
+  const pods = game.selection.filter((s): s is Unit => s.kind === 'u' && s.team === PLAYER && !!U[s.type].deployable);
+  const podTurrets = game.selection.filter((s): s is Building => s.kind === 'b' && s.team === PLAYER && !!s.fromPod);
+  if (pods.length) {
+    let n = 0;
+    for (const p of pods) {
+      const tx = Math.round(p.x / TILE - B.turret.w / 2), ty = Math.round(p.y / TILE - B.turret.h / 2);
+      if (!footprintFree('turret', tx, ty)) continue;
+      const b = addBuilding('turret', tx, ty, PLAYER, true); b.fromPod = true; b.hp = p.hp;
+      game.units = game.units.filter(x => x !== p); game.selection = game.selection.filter(s => s !== p); n++;
+    }
+    if (n) { hint(n + ' Sentry Pod' + (n > 1 ? 's' : '') + ' deployed'); sfx('place'); } else hint('No clear ground to deploy here');
+  } else if (podTurrets.length) {
+    let n = 0;
+    for (const b of podTurrets) {
+      const sp = freeSpotNear(b.x, b.y + b.h * 0.6);
+      const u = addUnit('sentrypod', sp.x, sp.y, PLAYER); u.hp = Math.min(u.hpMax, b.hp);
+      removeBuildingTiles(b); game.buildings = game.buildings.filter(x => x !== b); game.selection = game.selection.filter(s => s !== b); n++;
+    }
+    if (n) { hint(n + ' turret' + (n > 1 ? 's' : '') + ' packed up'); sfx('click'); }
+  } else hint('Select a Sentry Pod to deploy, or a deployed turret to pack up');
 }
 
 // ── Stealth (Spectre): cloaked & untargetable until it fires or an enemy gets close ──
@@ -1304,6 +1355,11 @@ function updateUnit(u: Unit, dt: number) {
     else u.moving = false;
     return;
   }
+  if (U[u.type].transport || U[u.type].deployable) {                   // APC / Sentry Pod — unarmed mover (no targeting)
+    if ((u.order === 'move' || u.order === 'amove') && u.dest) { if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; } }
+    else u.moving = false;
+    return;
+  }
   // drop a target that's dead — or that dived underground (only a tunneler can keep hitting it)
   if (u.target && (u.target.dead || (u.target.kind === 'u' && ((u.target as Unit).tunnelT ?? 0) > 0 && !U[u.type].tunneler))) u.target = null;
   if (u.order === 'dig') {                                              // Borer excavating a Hero Vault
@@ -1319,6 +1375,14 @@ function updateUnit(u: Unit, dt: number) {
     else if (dist(u, b) - Math.max(b.w, b.h) / 2 <= 22) { enterGarrison(u, b); return; }   // arrived → board (unit removed)
     else if (game.t - (u.enterT ?? game.t) > 15) { u.order = 'idle'; u.guard = null; u.path = null; }   // can't reach in time → give up (never thrash A* forever)
     else { const d2 = u.dest || b; u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.5; setPath(u, d2.x, d2.y); } followPath(u, dt); return; }   // approach a passable spot beside it (the centre is solid)
+    return;
+  }
+  if (u.order === 'board') {                                            // infantry moving to board a transport
+    const t = u.guard as Unit | null;
+    if (!t || t.dead || !U[t.type]?.transport || (t.cargoUnits?.length || 0) >= (U[t.type].capacity || 5)) { u.order = 'idle'; u.guard = null; u.path = null; }
+    else if (dist(u, t) <= U[t.type].radius + U[u.type].radius + 12) { enterTransport(u, t); return; }   // arrived → load (unit removed)
+    else if (game.t - (u.enterT ?? game.t) > 15) { u.order = 'idle'; u.guard = null; u.path = null; }    // can't reach in time → give up
+    else { u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.5; setPath(u, t.x, t.y); } followPath(u, dt); return; }
     return;
   }
   if (u.order === 'guard') {
@@ -2165,6 +2229,32 @@ function aiUpdate(team: number, dt: number) {
       if (tgt) { idleEnvoy.order = 'court'; idleEnvoy.courtId = tgt.id; idleEnvoy.target = null; const sp = freeSpotNear(tgt.x, tgt.y); idleEnvoy.dest = sp; setPath(idleEnvoy, sp.x, sp.y); }
     }
   }
+  // Combat-vehicle parity: Sentry Pods (deploy forward turrets) + APC transports (ferry infantry to the front)
+  if (game.t > 280) {
+    const fVeh = foundries.find(fo => fo.queue.length < 2);
+    if (fVeh && countType('sentrypod') < 1 && !anyQueued('sentrypod') && game.money[team] > 900 && Math.random() < dt * 0.05) { fVeh.queue.push('sentrypod'); game.money[team] -= U.sentrypod.cost; }
+    const idlePod = game.units.find(u => u.team === team && U[u.type].deployable && u.order === 'idle');
+    if (idlePod) {
+      const tx = Math.round(idlePod.x / TILE - B.turret.w / 2), ty = Math.round(idlePod.y / TILE - B.turret.h / 2);
+      if (footprintFree('turret', tx, ty)) { const b = addBuilding('turret', tx, ty, team, true); b.fromPod = true; b.hp = idlePod.hp; game.units = game.units.filter(x => x !== idlePod); }
+    }
+    if (fVeh && countType('transport') < 1 && !anyQueued('transport') && game.money[team] > 1100 && Math.random() < dt * 0.04) { fVeh.queue.push('transport'); game.money[team] -= U.transport.cost; }
+    const apc = game.units.find(u => u.team === team && U[u.type].transport);
+    if (apc) {
+      const cap = U.transport.capacity || 5;
+      if ((apc.cargoUnits?.length || 0) < cap) {                          // load nearby idle infantry
+        const inf = game.units.find(u => u.team === team && U[u.type].infantry && u.order === 'idle' && !U[u.type].hero && dist(u, apc) < 10 * TILE);
+        if (inf) { inf.order = 'board'; inf.guard = apc; inf.target = null; inf.enterT = game.t; setPath(inf, apc.x, apc.y); }
+      }
+      if ((apc.cargoUnits?.length || 0) >= 2) {                           // loaded → drive to an enemy building & disembark
+        const enemyB = game.buildings.filter(b => isWar(team, b.team)).sort((a, b) => dist(apc, a) - dist(apc, b))[0];
+        if (enemyB) {
+          if (dist(apc, enemyB) < 220) { unloadTransport(apc, false); apc.order = 'idle'; }
+          else if (apc.order === 'idle' || !apc.path) { apc.order = 'move'; apc.dest = { x: enemyB.x, y: enemyB.y }; setPath(apc, enemyB.x, enemyB.y); }
+        }
+      }
+    }
+  }
   const army = game.units.filter(u => u.team === team && !isSupport(u.type));
   if (foundries.length && game.money[team] > 900) {
     const f = foundries.find(fo => fo.queue.length < 2);
@@ -2357,6 +2447,8 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
     if (!isAllied(PLAYER, u2.team) || sel.includes(u2)) continue;
     if (tileVisible(u2.x, u2.y) && dist(u2, { x: wx, y: wy }) < U[u2.type].radius + 12) { guardT = u2; break; }
   }
+  // infantry right-clicking a friendly transport with room → board it (load up)
+  const boardT: Unit | null = (guardT && U[guardT.type].transport && (guardT.cargoUnits?.length || 0) < (U[guardT.type].capacity || 5)) ? guardT : null;
   // a Repair Rig right-clicking a friendly (damaged) building → mend THAT building specifically
   let repairB: Building | null = null;
   if (!tgt && !guardT && sel.some(s => U[s.type].repair)) for (const b of game.buildings) {
@@ -2382,13 +2474,15 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
     const harvester = !!U[u.type].harvests;
     const support = isSupport(u.type);
     if (tgt && !support && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; u.guard = null; setPath(u, tgt.x, tgt.y); }
+    else if (boardT && canGarrison(u.type)) { u.order = 'board'; u.guard = boardT; u.target = null; u.enterT = game.t; setPath(u, boardT.x, boardT.y); }
     else if (guardT && (!support || U[u.type].repair)) { u.order = 'guard'; u.guard = guardT; u.target = null; u.path = null; }
     else if (repairB && U[u.type].repair) { u.order = 'guard'; u.guard = repairB; u.target = null; u.path = null; setPath(u, repairB.x, repairB.y); }
     else if (garrisonB && canGarrison(u.type)) { u.order = 'enter'; u.guard = garrisonB; u.target = null; u.enterT = game.t; const sp = freeSpotNear(garrisonB.x, garrisonB.y + garrisonB.h * 0.6); u.dest = sp; setPath(u, sp.x, sp.y); }
     else if (node && harvester && node.kind === U[u.type].harvests) { u.hNode = node; u.hState = 'go'; u.order = 'idle'; setPath(u, node.x, node.y); }
     else if (!(guardT && support) && !(repairB && U[u.type].repair) && !(garrisonB && canGarrison(u.type))) { u.guard = null; movers.push(u); }
   }
-  if (guardT && sel.some(s => !isSupport(s.type) || U[s.type].repair)) hint((sel.some(s => U[s.type].repair) ? 'Repairing & escorting ' : 'Escorting ') + U[guardT.type].name);
+  if (boardT && sel.some(s => canGarrison(s.type))) hint('Boarding the ' + U[boardT.type].name + ' — press U to unload');
+  else if (guardT && sel.some(s => !isSupport(s.type) || U[s.type].repair)) hint((sel.some(s => U[s.type].repair) ? 'Repairing & escorting ' : 'Escorting ') + U[guardT.type].name);
   else if (repairB && sel.some(s => U[s.type].repair)) hint('Repair Rig dispatched to mend the ' + B[repairB.type].name);
   else if (garrisonB && sel.some(s => canGarrison(s.type))) hint('Garrisoning the ' + B[garrisonB.type].name + ' — press U to unload');
   const slots = formationSlots(movers, wx, wy);

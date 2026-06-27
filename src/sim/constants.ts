@@ -149,6 +149,9 @@ export interface UnitDef {
   tunneler?: boolean;      // burrows through any terrain AND can strike underground units (Subterranean Borer)
   shield?: boolean;        // mobile missile interceptor — no weapon (Aegis Shield)
   diplomat?: boolean;      // unarmed envoy — courts neutral settlements (peaceful annexation) & develops owned ones
+  transport?: boolean;     // armored carrier — loads infantry, ferries them, unloads on command (APC)
+  capacity?: number;       // passengers a transport can carry
+  deployable?: boolean;    // mobile unit that deploys into a fixed Sentry Turret (and undeploys back)
   survey?: boolean;        // long-range sense that locates buried Hero Vaults (Survey Hunter)
   stealth?: boolean;       // cloaked — untargetable & hidden to enemies until it fires or an enemy gets close (Spectre)
   hero?: boolean;          // unique excavated super-unit (golden render; never deserts)
@@ -165,6 +168,8 @@ export const U: Record<string, UnitDef> = {
   logger: { name: 'Logger Rig', cost: 250, hp: 300, speed: 72, radius: 11, sight: 5, buildTime: 9, cargo: 150, logs: true, desc: 'Fells & clears forest for wood — opening new ground. Delivers to a Lumber Mill or HQ.' },
   repair: { name: 'Repair Rig', cost: 350, hp: 270, speed: 80, radius: 10, sight: 5, buildTime: 10, repair: true, desc: 'Mobile mender — heals friendly units & buildings, burning wood. Escort one (right-click) or it auto-seeks the wounded.' },
   envoy: { name: 'Envoy', cost: 150, hp: 90, speed: 90, radius: 8, sight: 6, buildTime: 7, diplomat: true, desc: 'Unarmed diplomat. Right-click a neutral settlement to win its people over peacefully (no resentment, a loyalty bonus) — or station one in your own town to develop it. Fragile; defend it.' },
+  transport: { name: 'APC Transport', cost: 500, hp: 380, speed: 112, radius: 11, sight: 6, buildTime: 11, transport: true, capacity: 5, desc: 'Fast armored carrier. Right-click a friendly infantry unit to load (up to 5); move it, then press U (or the UNLOAD button) to disembark. Unarmed but tough — if it falls, survivors spill out wounded.' },
+  sentrypod: { name: 'Sentry Pod', cost: 360, hp: 240, speed: 70, radius: 11, sight: 7, buildTime: 9, deployable: true, desc: 'Mobile defense pod — drive it to the front and DEPLOY (Y) into a fixed Sentry Turret; select the turret and press Y to pack it up and redeploy elsewhere.' },
   recon: { name: 'Recon Drone', cost: 150, hp: 78, speed: 140, radius: 8, sight: 9, buildTime: 6, dmg: 4, range: 96, rof: 0.4, air: true, desc: 'Fast scout quadcopter — flies over terrain; only AA can hit it.' },
   infantry: { name: 'Rifle Trooper', cost: 90, hp: 70, speed: 70, radius: 7, sight: 6, buildTime: 4, dmg: 5, range: 98, rof: 0.5, infantry: true, desc: 'Cheap massable foot soldier.' },
   militia: { name: 'Free Militia', cost: 0, hp: 85, speed: 66, radius: 7, sight: 6, buildTime: 0, dmg: 6, range: 100, rof: 0.6, infantry: true, desc: 'Armed civilians risen from an ungoverned settlement — hostile to every faction.' },

@@ -4,7 +4,7 @@ import {
   idx, clamp, dist, T_WATER,
 } from '../sim/constants';
 import { game, resetState, isAllied, logMsg, setFocusHook } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, armPatrol, spawnParts, pendingStrikeList, cloaked, cloakedToPlayer, buffed, ejectGarrison } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, armPatrol, spawnParts, pendingStrikeList, cloaked, cloakedToPlayer, buffed, ejectGarrison, toggleDeploy } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import grassTex from '../assets/terrain/grass.jpg?inline';
@@ -327,7 +327,8 @@ export class BattleScene extends Phaser.Scene {
       else if (k === 'l') tryAbility('minefield');
       else if (k === 'z') tryAbility('chrono');
       else if (k === 'x') tryAbility('carpet');
-      else if (k === 'u') ejectGarrison();        // unload a garrisoned building
+      else if (k === 'u') ejectGarrison();        // unload a garrisoned building or a loaded transport
+      else if (k === 'y') toggleDeploy();         // deploy a Sentry Pod into a turret (or pack one up)
       else if (k === 'm') toggleMute();
       else if (k === 't') { if (game.selection.some(s => s.kind === 'u')) game.armed = 'amove'; }
       else if (k === 'c') conscript(PLAYER);
