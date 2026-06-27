@@ -124,6 +124,7 @@ export interface Unit {
   stack?: number;        // merged collectors: how many units this one represents (cargo/rate/hp scale ×stack)
   revealT?: number;      // stealth units: game.t until which the cloak is dropped (fired recently / enemy nearby)
   buffUntil?: number;    // Overcharge: game.t until which this unit has the combat-stim (+dmg/+speed) buff
+  enterT?: number;       // game.t an 'enter' (garrison) order began → give up if it can't reach in time
   dead?: boolean;
 }
 

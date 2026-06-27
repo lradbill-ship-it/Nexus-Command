@@ -1250,6 +1250,7 @@ function updateUnit(u: Unit, dt: number) {
     const b = u.guard as Building | null;
     if (!b || b.dead || !garrisonable(b) || (b.garrison?.length || 0) >= GARRISON_CAP) { u.order = 'idle'; u.guard = null; u.path = null; }
     else if (dist(u, b) - Math.max(b.w, b.h) / 2 <= 22) { enterGarrison(u, b); return; }   // arrived → board (unit removed)
+    else if (game.t - (u.enterT ?? game.t) > 15) { u.order = 'idle'; u.guard = null; u.path = null; }   // can't reach in time → give up (never thrash A* forever)
     else { const d2 = u.dest || b; u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.5; setPath(u, d2.x, d2.y); } followPath(u, dt); return; }   // approach a passable spot beside it (the centre is solid)
     return;
   }
@@ -1607,12 +1608,14 @@ const MINE_ARM = 1.5;        // arming delay before a mine is live
 const MINE_TRIGGER = 30;     // an enemy this close trips it
 const MINE_R = 92;           // blast radius
 let mineTrip = 0;
+const MINE_GLOBAL_CAP = 240;  // hard cap on live mines (AI lays them over a long match) — drop the oldest past this
 function layMinefield(x: number, y: number, team: number) {
   for (let i = 0; i < MINE_COUNT; i++) {
     const a = Math.random() * Math.PI * 2, r = Math.random() * MINE_SPREAD;
     const mx = clamp(x + Math.cos(a) * r, TILE, WORLD_W - TILE), my = clamp(y + Math.sin(a) * r, TILE, WORLD_H - TILE);
     game.mines.push({ id: nextId++, x: mx, y: my, team, armAt: game.t + MINE_ARM });
   }
+  if (game.mines.length > MINE_GLOBAL_CAP) game.mines.splice(0, game.mines.length - MINE_GLOBAL_CAP);
 }
 function mineTick(dt: number) {
   mineTrip += dt; if (mineTrip < 0.15) return; mineTrip = 0;     // ~7Hz proximity scan
@@ -1993,7 +1996,7 @@ function aiUpdate(team: number, dt: number) {
     const inf = game.units.find(u => u.team === team && U[u.type].infantry && u.order === 'idle' && !U[u.type].hero);
     if (inf) {
       const b = game.buildings.find(bb => bb.team === team && garrisonable(bb) && (bb.garrison?.length || 0) < GARRISON_CAP && dist(bb, inf) < 12 * TILE);
-      if (b) { inf.order = 'enter'; inf.guard = b; inf.target = null; setPath(inf, b.x, b.y); }
+      if (b) { inf.order = 'enter'; inf.guard = b; inf.target = null; inf.enterT = game.t; const sp = freeSpotNear(b.x, b.y + b.h * 0.6); inf.dest = sp; setPath(inf, sp.x, sp.y); }   // path to a passable spot beside it (centre is solid → A* would fail & thrash)
     }
   }
   // conscript from a surplus population when short on crystals (the people as a reserve)
@@ -2230,7 +2233,7 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
     if (tgt && !support && eligibleTarget(u, tgt)) { u.order = 'attack'; u.target = tgt; u.guard = null; setPath(u, tgt.x, tgt.y); }
     else if (guardT && (!support || U[u.type].repair)) { u.order = 'guard'; u.guard = guardT; u.target = null; u.path = null; }
     else if (repairB && U[u.type].repair) { u.order = 'guard'; u.guard = repairB; u.target = null; u.path = null; setPath(u, repairB.x, repairB.y); }
-    else if (garrisonB && canGarrison(u.type)) { u.order = 'enter'; u.guard = garrisonB; u.target = null; const sp = freeSpotNear(garrisonB.x, garrisonB.y + garrisonB.h * 0.6); u.dest = sp; setPath(u, sp.x, sp.y); }
+    else if (garrisonB && canGarrison(u.type)) { u.order = 'enter'; u.guard = garrisonB; u.target = null; u.enterT = game.t; const sp = freeSpotNear(garrisonB.x, garrisonB.y + garrisonB.h * 0.6); u.dest = sp; setPath(u, sp.x, sp.y); }
     else if (node && harvester && node.kind === U[u.type].harvests) { u.hNode = node; u.hState = 'go'; u.order = 'idle'; setPath(u, node.x, node.y); }
     else if (!(guardT && support) && !(repairB && U[u.type].repair) && !(garrisonB && canGarrison(u.type))) { u.guard = null; movers.push(u); }
   }
