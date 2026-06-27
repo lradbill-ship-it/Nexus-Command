@@ -148,6 +148,7 @@ export interface UnitDef {
   repair?: boolean;        // mends friendly units & buildings, burning wood (Repair Rig)
   tunneler?: boolean;      // burrows through any terrain AND can strike underground units (Subterranean Borer)
   shield?: boolean;        // mobile missile interceptor — no weapon (Aegis Shield)
+  diplomat?: boolean;      // unarmed envoy — courts neutral settlements (peaceful annexation) & develops owned ones
   survey?: boolean;        // long-range sense that locates buried Hero Vaults (Survey Hunter)
   stealth?: boolean;       // cloaked — untargetable & hidden to enemies until it fires or an enemy gets close (Spectre)
   hero?: boolean;          // unique excavated super-unit (golden render; never deserts)
@@ -163,6 +164,7 @@ export const U: Record<string, UnitDef> = {
   hauler: { name: 'Alloy Hauler', cost: 450, hp: 320, speed: 68, radius: 11, sight: 5, buildTime: 11, cargo: 170, harvests: 'alloy', desc: 'Hauls alloy ore to a Smelter. Alloy builds advanced units.' },
   logger: { name: 'Logger Rig', cost: 250, hp: 300, speed: 72, radius: 11, sight: 5, buildTime: 9, cargo: 150, logs: true, desc: 'Fells & clears forest for wood — opening new ground. Delivers to a Lumber Mill or HQ.' },
   repair: { name: 'Repair Rig', cost: 350, hp: 270, speed: 80, radius: 10, sight: 5, buildTime: 10, repair: true, desc: 'Mobile mender — heals friendly units & buildings, burning wood. Escort one (right-click) or it auto-seeks the wounded.' },
+  envoy: { name: 'Envoy', cost: 150, hp: 90, speed: 90, radius: 8, sight: 6, buildTime: 7, diplomat: true, desc: 'Unarmed diplomat. Right-click a neutral settlement to win its people over peacefully (no resentment, a loyalty bonus) — or station one in your own town to develop it. Fragile; defend it.' },
   recon: { name: 'Recon Drone', cost: 150, hp: 78, speed: 140, radius: 8, sight: 9, buildTime: 6, dmg: 4, range: 96, rof: 0.4, air: true, desc: 'Fast scout quadcopter — flies over terrain; only AA can hit it.' },
   infantry: { name: 'Rifle Trooper', cost: 90, hp: 70, speed: 70, radius: 7, sight: 6, buildTime: 4, dmg: 5, range: 98, rof: 0.5, infantry: true, desc: 'Cheap massable foot soldier.' },
   militia: { name: 'Free Militia', cost: 0, hp: 85, speed: 66, radius: 7, sight: 6, buildTime: 0, dmg: 6, range: 100, rof: 0.6, infantry: true, desc: 'Armed civilians risen from an ungoverned settlement — hostile to every faction.' },

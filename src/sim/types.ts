@@ -34,6 +34,8 @@ export interface Settlement {
   capT: number;                // capture progress 0..1
   seed: number;                // render variation
   unrest?: number;             // ungoverned-town unrest accrual → a Free Militia uprising (team 0)
+  affinity?: Record<number, number>; // peaceful goodwill 0..100 a faction's Envoys have built up courting this town
+  dev?: number;                // development tier progress 0..DEV_MAX (owned towns invested in → richer yields)
 }
 
 // Proximity mines — scattered by the Minefield ability; hidden from the enemy, they
@@ -91,9 +93,10 @@ export interface Unit {
   team: number;
   x: number; y: number;
   hpMax: number; hp: number;
-  order: 'idle' | 'move' | 'amove' | 'attack' | 'guard' | 'dig' | 'patrol' | 'enter';
+  order: 'idle' | 'move' | 'amove' | 'attack' | 'guard' | 'dig' | 'patrol' | 'enter' | 'court';
   dest: Vec | null;
   digVault?: number;     // vault id a Borer is excavating (order === 'dig')
+  courtId?: number;      // settlement id an Envoy is courting/developing (order === 'court')
   target: Entity | null;
   path: Vec[] | null;
   finalDest?: Vec;
@@ -166,6 +169,7 @@ export interface AIState {
   hijackT: number;    // next time this AI may hijack an enemy unit (needs a Cyber Ops Center)
   buffT?: number;     // next time this AI may Overcharge its army (needs a Cyber Ops Center)
   mineT?: number;     // next time this AI may lay a defensive Minefield (needs a Cyber Ops Center)
+  envoyT?: number;    // throttle for fielding an Envoy to court a neutral settlement
 }
 
 export interface GameState {

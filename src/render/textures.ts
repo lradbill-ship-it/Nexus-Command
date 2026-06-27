@@ -328,6 +328,13 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillStyle = 'rgba(127,224,127,.95)'; g.fillRect(cx - 2.4, cy - 7, 4.8, 14); g.fillRect(cx - 7, cy - 2.4, 14, 4.8);
     g.fillStyle = `rgba(${rgb},.8)`; g.fillRect(cx - 12, cy + 4, 2.5, 5); g.fillRect(cx + 9.5, cy + 4, 2.5, 5);
     g.fillStyle = '#9fb6c8'; g.fillRect(cx - 6, cy - 15, 12, 4);
+  } else if (type === 'diplomat' || type === 'envoy') {
+    // envoy: a light civilian staff car flying a faction pennant — clearly unarmed
+    rr(g, cx - 8, cy - 11, 16, 22, 6); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(190,220,240,.85)'; rr(g, cx - 5, cy - 6, 10, 9, 2); g.fill();   // cabin glass
+    g.strokeStyle = `rgba(${rgb},.9)`; g.lineWidth = 1.4; g.beginPath(); g.moveTo(cx + 6, cy - 9); g.lineTo(cx + 6, cy - 18); g.stroke();   // flag pole
+    g.fillStyle = col; g.beginPath(); g.moveTo(cx + 6, cy - 18); g.lineTo(cx + 14, cy - 16); g.lineTo(cx + 6, cy - 13); g.closePath(); g.fill();   // pennant
+    g.fillStyle = `rgba(${rgb},.8)`; g.fillRect(cx - 10, cy + 3, 2.5, 5); g.fillRect(cx + 7.5, cy + 3, 2.5, 5);
   } else if (type === 'borer') {
     // subterranean borer: heavy hull + big conical drill bit up front
     g.fillStyle = '#1a232e'; g.fillRect(cx - 13, cy - 6, 3.6, 18); g.fillRect(cx + 9.4, cy - 6, 3.6, 18);   // tracks

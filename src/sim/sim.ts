@@ -337,14 +337,24 @@ export function conscript(team: number) {
 // ── Neutral settlements: recruit / persuade / intimidate (DESIGN_SPEC_v4 §3.2) ─
 const SETTLE_R = 4 * TILE;   // capture influence radius
 const SETTLE_INCOME = 0.05;  // crystals/sec per population point an owned settlement yields (civilian economy)
-function captureSettlement(s: Settlement, team: number, militaryOnly: boolean) {
+// ── Civilian diplomacy: Envoys court neutral towns (peaceful annexation) & develop owned ones ──
+const AFFINITY_JOIN = 100;   // goodwill at which a courted neutral town voluntarily joins the courting faction
+const AFFINITY_COURT = 6.5;  // goodwill/sec a stationed Envoy builds (≈15s for one envoy; faster with several)
+const AFFINITY_DECAY = 2.0;  // goodwill/sec a town loses toward a faction no longer courting it
+const DEV_MAX = 3;           // development tiers an owned town can reach
+const DEV_BASE = 0.05;       // tier-progress/sec for a peaceful, owned town (≈20s/tier on its own)
+const DEV_ENVOY = 0.12;      // extra tier-progress/sec while one of the owner's Envoys is stationed there
+const DEV_COST = 1.1;        // crystals/sec the owner invests while a town is developing ("developed for them")
+const DEV_POP_CAP = 60;      // a fully-developed town grows its population toward this
+function captureSettlement(s: Settlement, team: number, militaryOnly: boolean, peaceful = false) {
   const prev = s.owner;
   if (prev === team) return;                                     // already ours — nothing to do
-  s.owner = team; s.capT = 0; s.capBy = 0; s.unrest = 0;
+  s.owner = team; s.capT = 0; s.capBy = 0; s.unrest = 0; s.affinity = {};   // capture resets any courtship
   if (prev) game.pop[prev] = Math.max(0, (game.pop[prev] || 0) - s.pop);   // population TRANSFERS (no longer duplicated each flip)
   game.pop[team] = (game.pop[team] || 0) + s.pop;                // its citizens join the new owner
-  // intimidated (troops only) subjects resent it; persuaded/recruited ones welcome it
-  game.happy[team] = clamp((game.happy[team] ?? 60) + (militaryOnly ? -6 : 6), 0, 100);
+  // intimidated (troops only) subjects resent it; recruited ones welcome it; a peacefully-courted town joins gladly
+  game.happy[team] = clamp((game.happy[team] ?? 60) + (militaryOnly ? -6 : peaceful ? 12 : 6), 0, 100);
+  if (peaceful && prev === 0) s.dev = Math.max(s.dev || 0, 0.4);  // a town won over by diplomacy starts part-developed (loyalty head-start)
   // conquest windfall — looted stores + citizens taking up arms — ONLY when LIBERATING a NEUTRAL town.
   // Seizing it from another faction grants no fresh loot/recruits, so factions can't ping-pong a contested town to farm it.
   if (prev === 0) {
@@ -352,7 +362,7 @@ function captureSettlement(s: Settlement, team: number, militaryOnly: boolean) {
     game.money[team] = (game.money[team] || 0) + loot;
     const recruits = Math.min(3, 1 + (s.pop / 14 | 0));
     for (let i = 0; i < recruits; i++) { const sp = freeSpotNear(s.x, s.y); addUnit('infantry', sp.x, sp.y, team); }
-    if (team === PLAYER) { logMsg((militaryOnly ? 'Intimidated' : 'Won over') + ' a settlement — +' + s.pop + ' pop, +' + loot + ' crystals, ' + recruits + ' recruits', 'good'); sfx('chime'); }
+    if (team === PLAYER) { logMsg((militaryOnly ? 'Intimidated' : peaceful ? 'Peacefully won over' : 'Won over') + ' a settlement — +' + s.pop + ' pop, +' + loot + ' crystals, ' + recruits + ' recruits', 'good', { x: s.x, y: s.y }); sfx('chime'); }
   } else {
     if (team === PLAYER) { logMsg((militaryOnly ? 'Seized' : 'Annexed') + ' a settlement — +' + s.pop + ' pop', 'good'); sfx('chime'); }
     else if (prev === PLAYER) { logMsg(FAC[team].name + ' has seized one of our settlements', 'war'); sfx('war'); }
@@ -360,25 +370,70 @@ function captureSettlement(s: Settlement, team: number, militaryOnly: boolean) {
 }
 function settlementTick(dt: number) {
   for (const s of game.settlements) {
-    const army: Record<number, number> = {}, civ: Record<number, number> = {};
+    const army: Record<number, number> = {}, civ: Record<number, number> = {}, envoy: Record<number, number> = {};
     forNearbyUnits(s.x, s.y, SETTLE_R, (u) => {
       if (dist(u, s) > SETTLE_R) return;
-      if (isSupport(u.type)) civ[u.team] = (civ[u.team] || 0) + 1; else army[u.team] = (army[u.team] || 0) + 1;
+      if (U[u.type].diplomat) envoy[u.team] = (envoy[u.team] || 0) + 1;          // diplomats court (affinity), they don't presence-capture
+      else if (isSupport(u.type)) civ[u.team] = (civ[u.team] || 0) + 1;
+      else army[u.team] = (army[u.team] || 0) + 1;
     });
-    const present = new Set<number>([...Object.keys(army), ...Object.keys(civ)].map(Number));
-    const challengers = [...present].filter(t => t !== s.owner && t !== 0);      // militia (team 0) raid, they don't capture
-    const ownerDefending = !!s.owner && present.has(s.owner);                    // the current owner has troops on it → it's defended
-    if (challengers.length === 1 && !ownerDefending) {             // sole challenger, owner not defending → takeover
-      const team = challengers[0];
-      s.capBy = team; s.capT += dt / 6;                            // ~6s of presence to flip
-      if (s.capT >= 1) captureSettlement(s, team, !civ[team] && !!army[team]);   // troops-only ⇒ intimidation
-    } else if (challengers.length === 0) {
-      s.capT = Math.max(0, s.capT - dt / 10); if (s.capT === 0) s.capBy = 0;     // unattended → cools off
-    } else {
-      s.capT = Math.max(0, s.capT - dt / 18);                      // contested → stalls
+    const present = new Set<number>([...Object.keys(army), ...Object.keys(civ), ...Object.keys(envoy)].map(Number));
+    const capForce = (t: number) => (army[t] || 0) + (civ[t] || 0);              // troops/workers flip a town by presence; lone envoys don't
+    const challengers = [...present].filter(t => t !== s.owner && t !== 0 && capForce(t) > 0);   // militia (team 0) raid, they don't capture
+    const ownerDefending = !!s.owner && capForce(s.owner) > 0;                   // the current owner has troops/workers on it → it's defended
+    const enemyArmy = Object.keys(army).map(Number).filter(t => t !== s.owner && t !== 0);   // contesting military presence
+
+    // ── Peaceful courtship: Envoys win over a NEUTRAL town's people over time ──
+    s.affinity = s.affinity || {};
+    let courtTeam = 0, joined = false;
+    if (!s.owner) {
+      const courting = Object.keys(envoy).map(Number).filter(t => t > 0);
+      for (const t of Object.keys(s.affinity).map(Number)) {                     // decay goodwill for anyone no longer courting
+        if (!courting.includes(t)) s.affinity[t] = Math.max(0, (s.affinity[t] || 0) - AFFINITY_DECAY * dt);
+      }
+      for (const t of courting) s.affinity[t] = Math.min(AFFINITY_JOIN, (s.affinity[t] || 0) + AFFINITY_COURT * dt);
+      let bestAff = 0;                                                           // the leading courter (for the capture-ring readout)
+      for (const t of courting) { const a = s.affinity[t] || 0; if (a > bestAff) { bestAff = a; courtTeam = t; } }
+      // a fully-courted town joins peacefully — provided no rival's army is contesting it
+      if (courtTeam && (s.affinity[courtTeam] || 0) >= AFFINITY_JOIN && enemyArmy.filter(t => t !== courtTeam).length === 0) {
+        captureSettlement(s, courtTeam, false, true); joined = true;
+      }
     }
-    // an owned settlement is a working town — its citizens yield a crystal trickle to the owner
-    if (s.owner) game.money[s.owner] += s.pop * SETTLE_INCOME * dt;
+
+    if (!joined) {
+      if (challengers.length === 1 && !ownerDefending) {            // sole challenger, owner not defending → takeover
+        const team = challengers[0];
+        s.capBy = team; s.capT += dt / 6;                           // ~6s of presence to flip
+        if (s.capT >= 1) captureSettlement(s, team, !civ[team] && !!army[team]);   // troops-only ⇒ intimidation
+      } else if (!s.owner && courtTeam && challengers.length === 0) {
+        s.capBy = courtTeam; s.capT = (s.affinity[courtTeam] || 0) / AFFINITY_JOIN;   // surface courtship in the capture ring
+      } else if (challengers.length === 0) {
+        s.capT = Math.max(0, s.capT - dt / 10); if (s.capT === 0) s.capBy = 0;    // unattended → cools off
+      } else {
+        s.capT = Math.max(0, s.capT - dt / 18);                     // contested → stalls
+      }
+    }
+
+    // ── Owned town: scaled income + development (invest crystals → richer infrastructure) ──
+    if (s.owner) {
+      const tier = Math.floor(s.dev || 0);
+      game.money[s.owner] += s.pop * SETTLE_INCOME * (1 + tier * 0.6) * dt;       // yields grow with development
+      if (tier >= 2) game.water[s.owner] = (game.water[s.owner] || 0) + s.pop * 0.012 * dt;   // a developed town refines coolant
+      if (tier >= 3) game.alloy[s.owner] = (game.alloy[s.owner] || 0) + s.pop * 0.006 * dt;   // …and works alloy
+      const peaceful = enemyArmy.length === 0;
+      if (peaceful && (s.dev || 0) < DEV_MAX && game.money[s.owner] > DEV_COST) {
+        const before = Math.floor(s.dev || 0);
+        s.dev = Math.min(DEV_MAX, (s.dev || 0) + (DEV_BASE + (envoy[s.owner] ? DEV_ENVOY : 0)) * dt);
+        game.money[s.owner] -= DEV_COST * dt;                       // the investment ("must be developed for them")
+        if (s.pop < DEV_POP_CAP) s.pop += ((DEV_POP_CAP - s.pop) * 0.02 + 0.03) * dt;   // a thriving town grows
+        const after = Math.floor(s.dev);
+        if (after > before) {                                       // reached a new development tier
+          game.pop[s.owner] = (game.pop[s.owner] || 0) + 6;
+          if (after >= 3) { const sp = freeSpotNear(s.x, s.y); addUnit('infantry', sp.x, sp.y, s.owner); }   // a fully-built town raises a local guard
+          if (s.owner === PLAYER) { logMsg('A settlement advanced to development tier ' + after + ' — richer yields' + (after >= 3 ? ' & a local guard' : ''), 'good', { x: s.x, y: s.y }); sfx('chime'); }
+        }
+      }
+    }
     // Civilian uprising: a large, ungoverned (neutral, uncontested) town foments unrest → an armed mob takes up arms
     if (!s.owner && s.pop >= UPRISING_POP && challengers.length === 0) {
       s.unrest = (s.unrest || 0) + dt;
@@ -866,7 +921,7 @@ function separation() {
 
 // Non-combat economy/support units (harvesters, loggers, repair rigs) — never
 // desert in a revolt, count as civilians at settlements, and don't take attack orders.
-export const isSupport = (type: string) => !!(U[type].harvests || U[type].logs || U[type].repair || U[type].shield);
+export const isSupport = (type: string) => !!(U[type].harvests || U[type].logs || U[type].repair || U[type].shield || U[type].diplomat);
 
 // ── Garrison: infantry shelter inside a building → defensive fire; eject if it falls ──
 const GARRISON_CAP = 5;          // occupants per building
@@ -1233,6 +1288,18 @@ function updateUnit(u: Unit, dt: number) {
   }
   if (U[u.type].repair) { updateRepair(u, dt); return; }
   if (U[u.type].shield) {                                               // Aegis — mobile missile interceptor (no weapon); cooldown ticks above
+    if ((u.order === 'move' || u.order === 'amove') && u.dest) { if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; } }
+    else u.moving = false;
+    return;
+  }
+  if (U[u.type].diplomat) {                                             // Envoy — unarmed; courts a settlement or just moves (never engages)
+    if (u.order === 'court') {
+      const s = game.settlements.find(x => x.id === u.courtId);
+      if (!s) { u.order = 'idle'; u.courtId = undefined; u.path = null; }
+      else if (dist(u, s) > SETTLE_R - 14) { u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.6; setPath(u, s.x, s.y); } followPath(u, dt); }
+      else { u.moving = false; u.path = null; }                         // parked inside the influence radius → courting/developing (settlementTick does the work)
+      return;
+    }
     if ((u.order === 'move' || u.order === 'amove') && u.dest) { if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; } }
     else u.moving = false;
     return;
@@ -2024,6 +2091,19 @@ function aiUpdate(team: number, dt: number) {
     if (hasMill && countType('repair') < 2 && !anyQueued('repair') && game.money[team] > 800) { fSup.queue.push('repair'); game.money[team] -= U.repair.cost; }
     else if (hasDrill && countType('hunter') < 1 && !anyQueued('hunter') && game.money[team] > 900) { fSup.queue.push('hunter'); game.money[team] -= U.hunter.cost; }
   }
+  // Diplomacy parity: field an Envoy and send it to court the nearest neutral settlement (peaceful expansion).
+  const neutralSettles = game.settlements.filter(s => !s.owner);
+  if (neutralSettles.length) {
+    const fEnv = foundries.find(fo => fo.queue.length < 2);
+    if (fEnv && countType('envoy') < 2 && !anyQueued('envoy') && game.money[team] > 500 && game.t >= (ai.envoyT ?? 0)) {
+      fEnv.queue.push('envoy'); game.money[team] -= U.envoy.cost; ai.envoyT = game.t + 60 + Math.random() * 40;
+    }
+    const idleEnvoy = game.units.find(u => u.team === team && U[u.type].diplomat && u.order === 'idle');
+    if (idleEnvoy) {
+      const tgt = neutralSettles.slice().sort((a, b) => dist(idleEnvoy, a) - dist(idleEnvoy, b))[0];
+      if (tgt) { idleEnvoy.order = 'court'; idleEnvoy.courtId = tgt.id; idleEnvoy.target = null; const sp = freeSpotNear(tgt.x, tgt.y); idleEnvoy.dest = sp; setPath(idleEnvoy, sp.x, sp.y); }
+    }
+  }
   const army = game.units.filter(u => u.team === team && !isSupport(u.type));
   if (foundries.length && game.money[team] > 900) {
     const f = foundries.find(fo => fo.queue.length < 2);
@@ -2172,10 +2252,20 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
     hint('Borer dispatched to excavate the Hero Vault'); orderMark(clickedVault.x, clickedVault.y, 'special'); sfx('click');
     return;
   }
-  // right-clicking a settlement you don't own tries to recruit it (paid); on failure,
-  // fall through so the units simply move there and take it by presence.
-  const clickedSettle = game.settlements.find(s => s.owner !== PLAYER && dist(s, { x: wx, y: wy }) < 30);
-  if (clickedSettle && tryRecruit(clickedSettle)) { orderMark(clickedSettle.x, clickedSettle.y, 'special'); return; }
+  // right-clicking a settlement with an Envoy selected → court it peacefully (neutral) or develop it (your own).
+  // Without an Envoy: a non-owned town tries the paid instant recruit, else units move there & take it by presence.
+  const clickedSettle = game.settlements.find(s => dist(s, { x: wx, y: wy }) < 30);
+  if (clickedSettle) {
+    const envoys = sel.filter(u => U[u.type].diplomat);
+    if (envoys.length && (clickedSettle.owner === PLAYER || clickedSettle.owner === 0 || !isAllied(PLAYER, clickedSettle.owner))) {
+      for (const u of envoys) { u.order = 'court'; u.courtId = clickedSettle.id; u.target = null; u.guard = null; const sp = freeSpotNear(clickedSettle.x, clickedSettle.y); u.dest = sp; setPath(u, sp.x, sp.y); }
+      const others = sel.filter(u => !U[u.type].diplomat);          // any escorts tag along to the town
+      if (others.length) { const slots = formationSlots(others, clickedSettle.x, clickedSettle.y); for (let k = 0; k < others.length; k++) { const u = others[k]; u.order = 'move'; u.target = null; u.guard = null; u.dest = slots[k]; setPath(u, slots[k].x, slots[k].y); } }
+      hint(clickedSettle.owner === PLAYER ? 'Envoy developing the settlement — investing in its infrastructure' : 'Envoy courting the settlement — winning its people over peacefully');
+      orderMark(clickedSettle.x, clickedSettle.y, 'special'); sfx('click'); return;
+    }
+    if (clickedSettle.owner !== PLAYER && tryRecruit(clickedSettle)) { orderMark(clickedSettle.x, clickedSettle.y, 'special'); return; }
+  }
   // right-clicking a Command Relay you don't hold → send selected military to assault & secure it
   // (a neutral relay falls to presence; an enemy's must be shot offline first — amove fights its defenders).
   const clickedRelay = game.relays.find(r => r.owner !== PLAYER && !isAllied(PLAYER, r.owner) && dist(r, { x: wx, y: wy }) < 30);
