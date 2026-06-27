@@ -1,10 +1,11 @@
 # CLAUDE.md — Project Stratadug
 
-> ⚡ **Session 4+ START HERE:** read **`docs/SESSION_4_HANDOFF.md`** first (then `docs/TODO.md`, the living backlog).
+> ⚡ **Session 5+ START HERE:** read **`docs/SESSION_5_HANDOFF.md`** first (then `docs/TODO.md`, the living backlog).
 > It has the current state, the deploy process + gotchas, the full system inventory, the tuning knobs, and — important —
 > **the workflow rule: at session start and after every task, present Lane the entire TODO as multiple‑choice
-> cards (`AskUserQuestion`) and let him pick what's next.** Older per‑feature detail is in
-> `docs/SESSION_3_HANDOFF.md` / `docs/SESSION_2_HANDOFF.md`; the notes below are the original v1 mission/spec.
+> cards (`AskUserQuestion`) and let him pick what's next.** Session 5 = playtest‑driven balance pass. Older per‑feature
+> detail is in `docs/SESSION_4_HANDOFF.md` / `SESSION_3_HANDOFF.md` / `SESSION_2_HANDOFF.md`; the notes below are the
+> original v1 mission/spec.
 
 You are picking up an in-progress game project. Read this file, then `docs/DESIGN_SPEC.md`, then skim `playable/nexus-command-v2.html` (the current best playable build) before writing any code.
 

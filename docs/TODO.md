@@ -9,7 +9,7 @@
 > so: put the 3–4 best candidates on cards, and **always also paste the full list (below) in the message**
 > so nothing is hidden — Lane can pick a card or name any other item. Then update this file.
 
-Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all of it"; shipping backlog in increments). Canonical handoff: `docs/SESSION_4_HANDOFF.md`.
+Last updated: **2026‑06‑27** (Session 4 WRAPPED — 13 features/fixes shipped + live; Lane now playtesting). Canonical handoff: **`docs/SESSION_5_HANDOFF.md`**. Session 5 = **playtest‑driven balance pass** (the toolbox is full).
 
 ---
 
@@ -32,10 +32,11 @@ Last updated: **2026‑06‑23** (Session 4 in progress — Lane delegated "all 
 ---
 
 ## ▶ Up next — top candidates (curate to 3–5; these go on the cards first)
-- [ ] **More CC0 audio (optional)** — real CC0 **explosions + nuke blast + victory jingle** ship; ✅ Session 4 added **explosion variety** (asset‑free randomized sub‑thump/crackle, `2af2e56`). Still open: real CC0 samples for **weapons/UI** + distinct explosion sample *variants* — both a **by‑ear curation task for Lane** (I can't judge sound). Swapping a sample = drop a file in `src/assets/audio/`. **Enabler: `afconvert` on this Mac decodes OGG → transcode OGG CC0 → Safari‑safe AAC/M4A.**
-- [ ] **Society layer — deeper civilian diplomacy** (optional) — recruit/absorb civilian populations via diplomacy (not just conquest). ✅ The emergent faction can now be **negotiated with / sued for peace** (Session 4); remaining: *peaceful* recruitment/absorption of neutral civilian populations.
-- [ ] **Deeper perf — Web Worker sim** — 🛑 **HELD (Lane 2026‑06‑23): late‑game FPS runs fine on his device** → not worth the big rewrite. Revisit only if FPS starts biting.
-- [ ] **Balance / pacing tuning** — 🛑 **HELD (Lane 2026‑06‑23): he'll PLAY the new Session‑4 build first, then report what felt off.** Ask‑first per `CLAUDE.md` (pacing). Likely dials when he's ready: Free Legion timing/strength, coolant in big air pushes, AI missile/EMP cadence, hero strength (handoff §8). **This is the standing next move once Lane has playtest data.**
+- [ ] **🎯 PLAYTEST‑DRIVEN BALANCE PASS — the #1 Session‑5 move.** Lane is now actively playing (found + got fixed 2 bugs in S4). Ask what felt off, then turn the §8 knobs (handoff). Likely dials: the new toys (**Spectre / Orbital / Overcharge / Minefield / Garrison** strength + cost), **Free Legion** timing/strength, coolant in big air pushes, AI missile/EMP cadence, hero strength. **Ask‑first** per `CLAUDE.md` (pacing). Needs his feel data — don't blind‑tune.
+- [ ] **More combat depth (optional, additive — Lane's been enjoying these)** — transport/APC (carry infantry), deployable turret, repair‑reload, chrono‑freeze / carpet‑bomb superweapons. Each = the established unit/ability pattern + AI parity + headless test.
+- [ ] **Society layer — deeper civilian diplomacy** (optional, design‑first/ask‑first) — *peaceful* recruitment/absorption of neutral civilian populations via diplomacy (builds on the new sue‑for‑peace). Bigger; sketch a design + check with Lane before building.
+- [ ] **More CC0 audio (optional, by‑ear)** — real CC0 weapon/UI samples + distinct explosion variants. Lane curates sound; drop files in `src/assets/audio/` (transcode OGG→AAC via `afconvert`). ✅ S4 added asset‑free explosion variety.
+- [ ] **Deeper perf — Web Worker sim** — 🛑 **HELD.** FPS was fine pre‑S4 garrison bug (now fixed). Revisit only if late‑game FPS still bites after the fix; re‑confirm with Lane first.
 
 ## Backlog — Features
 - [ ] **Emergent factions** — neutral civilian populations coalesce into a NEW faction that can grow into a real threat (note #3).
