@@ -168,6 +168,16 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     g.fillStyle = '#2a3340'; g.beginPath(); g.arc(rcx, rcy, fw * 0.42, 0, 7); g.fill();
     g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(rcx, rcy, fw * 0.42, 0, 7); g.stroke();
     g.fillStyle = '#1a222c'; g.beginPath(); g.arc(rcx, rcy, fw * 0.24, 0, 7); g.fill();
+  } else if (type === 'tesla') {
+    // Tesla coil: armored base, a ribbed mast, and a glowing electrode orb crackling at the top
+    g.fillStyle = '#2a3340'; g.beginPath(); g.arc(rcx, rcy + fh * 0.18, fw * 0.4, 0, 7); g.fill();
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(rcx, rcy + fh * 0.18, fw * 0.4, 0, 7); g.stroke();
+    g.fillStyle = '#3a4650'; g.fillRect(rcx - 2.5, rcy - fh * 0.4, 5, fh * 0.6);   // mast
+    g.strokeStyle = '#6f8294'; g.lineWidth = 1; for (let yy = -0.32; yy < 0.12; yy += 0.1) { g.beginPath(); g.moveTo(rcx - 3, rcy + fh * yy); g.lineTo(rcx + 3, rcy + fh * yy); g.stroke(); }   // coil ribs
+    const eg = g.createRadialGradient(rcx, rcy - fh * 0.42, 1, rcx, rcy - fh * 0.42, fw * 0.22);
+    eg.addColorStop(0, 'rgba(225,245,255,.98)'); eg.addColorStop(0.5, 'rgba(140,205,255,.85)'); eg.addColorStop(1, 'rgba(60,120,190,.2)');
+    g.fillStyle = eg; g.beginPath(); g.arc(rcx, rcy - fh * 0.42, fw * 0.2, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(190,230,255,.9)'; g.lineWidth = 1; for (const a2 of [-0.6, 0.5, 2.4]) { g.beginPath(); g.moveTo(rcx, rcy - fh * 0.42); g.lineTo(rcx + Math.cos(a2) * fw * 0.3, rcy - fh * 0.42 + Math.sin(a2) * fw * 0.3); g.stroke(); }   // static arcs
   } else if (type === 'cyber') {
     // glass data dome
     const dg = g.createRadialGradient(rcx, rcy, 2, rcx, rcy, fw * 0.3);

@@ -743,6 +743,30 @@ function fireAt(src: Entity, target: Entity, dmg: number, rail: boolean, splash 
   spawnParts('muzzle', src.x, src.y, 2, '255,235,180');
   sfx(rail ? 'rail' : 'shot', src.x);
 }
+// ── Arc Tower: chain-lightning that jumps between clustered ground enemies ──
+const TESLA_JUMP = 120;       // max distance a bolt arcs to the next target
+const TESLA_FALLOFF = 0.72;   // damage retained per chain hop
+/** Fire a chain-lightning zap from Arc Tower `b` starting at `first`, arcing through up to `def.chain` ground targets. */
+function teslaZap(b: Building, first: Entity) {
+  const d = B[b.type], hit = new Set<Entity>();
+  let from: Entity = b, tgt: Entity | null = first, dmg = d.dmg!;
+  for (let i = 0; i < (d.chain || 1) && tgt; i++) {
+    hit.add(tgt);
+    game.parts.push({ type: 'arc', x: from.x, y: from.y, x2: tgt.x, y2: tgt.y, t: 0, life: 0.16, rgb: '170,225,255' });
+    spawnParts('spark', tgt.x, tgt.y, 4, '190,230,255');
+    damage(tgt, dmg, b.team);
+    from = tgt; dmg *= TESLA_FALLOFF;
+    // hop to the nearest not-yet-hit hostile ground unit within arc range
+    let next: Entity | null = null, nd = TESLA_JUMP;
+    forNearbyUnits(from.x, from.y, TESLA_JUMP, (u) => {
+      if (u.dead || hit.has(u) || !isWar(b.team, u.team) || isAir(u) || cloaked(u) || (u.tunnelT ?? 0) > 0) return;
+      const dd = dist(from, u); if (dd < nd) { nd = dd; next = u; }
+    });
+    tgt = next;
+  }
+  game.shake = Math.min(11, game.shake + 1);
+  sfx('rail', b.x);
+}
 // ── Shield Projector: a building field that absorbs part of incoming damage to nearby allies ──
 const SHIELD_R = 6 * TILE;     // field radius
 const SHIELD_ABSORB = 0.5;     // fraction of incoming damage the field soaks (while it has energy)
@@ -1581,7 +1605,7 @@ function updateBuilding(b: Building, dt: number) {
   if (b.disabledUntil > game.t) return;
   if (b.type === 'idome') b.cooldown = Math.max(0, b.cooldown - dt);   // Iron Dome interceptor recharge
   if (b.type === 'shieldgen') b.shieldE = Math.min(SHIELD_MAX, (b.shieldE ?? SHIELD_MAX) + SHIELD_REGEN * dt * pw.factor);   // Shield Projector reserve recharges (scaled by power)
-  if (b.type === 'turret' || b.type === 'aaturret') {
+  if (b.type === 'turret' || b.type === 'aaturret' || b.type === 'tesla') {
     b.cooldown = Math.max(0, b.cooldown - dt);
     if (b.target && (b.target.dead || dist(b, b.target) > d.range! + 30 || !eligibleTarget(b, b.target) || (b.target.kind === 'u' && ((b.target as Unit).tunnelT ?? 0) > 0))) b.target = null;   // turrets can't hit the underground
     if (!b.target) b.target = nearestHostile(b, d.range!, b.team, b.team === PLAYER);
@@ -1589,7 +1613,11 @@ function updateBuilding(b: Building, dt: number) {
       const want = Math.atan2(b.target.y - b.y, b.target.x - b.x);
       const da = ((want - b.aim + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
       b.aim += clamp(da, -5 * dt, 5 * dt);
-      if (b.cooldown <= 0 && Math.abs(da) < 0.4) { fireAt(b, b.target, d.dmg!, false); b.cooldown = d.rof! / pw.factor * rofMult(b); }
+      // Arc Tower zaps instantly (no barrel to traverse); turrets must finish aiming.
+      if (b.cooldown <= 0 && (b.type === 'tesla' || Math.abs(da) < 0.4)) {
+        if (b.type === 'tesla') teslaZap(b, b.target); else fireAt(b, b.target, d.dmg!, false);
+        b.cooldown = d.rof! / pw.factor * rofMult(b);
+      }
     } else b.aim += dt * 0.4;
   }
   // garrisoned infantry lay down defensive fire from inside the structure
@@ -2142,6 +2170,7 @@ function aiTech(team: number) {
     if (game.t > 300 && !count('idome') && place('idome', 5, 6, 600)) return;
     if (game.t > 420 && !count('silo') && place('silo', 7, 4, 1100)) return;
   }
+  if (game.t > 320 && count('tesla') < 2 && place('tesla', 5 + count('tesla') * 3, 10, 700)) return;  // chain-lightning anti-swarm defense
   if (game.t > 380 && !count('shieldgen') && place('shieldgen', 6, 8, 1200)) return;  // damage-absorbing field over the base
   if (game.t > 340 && !count('cyber') && place('cyber', -4, 9, 1400)) return;       // EMP / covert legitimacy
   if (game.t > 480 && !count('drillbay') && place('drillbay', 9, 8, 1800)) return;  // Subterranean Borer + Hero excavation

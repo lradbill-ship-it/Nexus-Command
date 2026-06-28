@@ -92,6 +92,7 @@ export interface BuildingDef {
   rof?: number;
   antiAir?: boolean;       // can engage airborne units
   airOnly?: boolean;       // engages ONLY airborne units (flak)
+  chain?: number;          // chain-lightning: max targets a single zap arcs through (Arc Tower)
   water?: number;          // +coolant trickled per second (passive floor)
   coolant?: number;        // coolant consumed per second while active
   accepts?: ResourceKind;  // harvested resource this structure is a drop-off for
@@ -115,6 +116,7 @@ export const B: Record<string, BuildingDef> = {
   smelter: { name: 'Alloy Smelter', w: 2, h: 2, hp: 440, cost: 500, power: -15, buildTime: 11, sight: 4, hgt: 19, accepts: 'alloy', freeUnit: 'hauler', desc: 'Alloy hauler drop-off. Free Hauler on completion. Alloy builds advanced war machines.' },
   mill: { name: 'Lumber Mill', w: 2, h: 2, hp: 460, cost: 400, power: -10, buildTime: 10, sight: 4, hgt: 18, accepts: 'wood', freeUnit: 'logger', desc: 'Logger drop-off. Free Logger on completion. Wood fuels Repair Rigs.' },
   aaturret: { name: 'Flak Cannon', w: 1, h: 1, hp: 460, cost: 500, power: -10, buildTime: 9, sight: 10, hgt: 8, dmg: 9, range: 285, rof: 0.42, antiAir: true, airOnly: true, coolant: 3, alloy: 150, desc: 'Long-range anti-air flak. Engages aircraft only. Needs alloy.' },
+  tesla: { name: 'Arc Tower', w: 1, h: 1, hp: 480, cost: 650, power: -25, buildTime: 11, sight: 9, hgt: 12, dmg: 22, range: 200, rof: 1.5, alloy: 180, chain: 4, desc: 'Chain-lightning point-defense. Each zap arcs between several clustered ground enemies (damage falls off per jump) — devastating vs swarms. Power-hungry; needs alloy.' },
   habitat: { name: 'Habitat Block', w: 2, h: 2, hp: 360, cost: 250, power: -5, buildTime: 8, sight: 3, hgt: 22, house: 45, civic: 2, desc: 'Housing for +45 citizens. Population = labor & conscripts.' },
   market: { name: 'Civic Market', w: 2, h: 2, hp: 340, cost: 350, power: -8, buildTime: 9, sight: 3, hgt: 18, civic: 16, desc: 'Meets civic needs (+happiness). Happy citizens work faster.' },
   cyber: { name: 'Cyber Ops Center', w: 2, h: 2, hp: 740, cost: 800, power: -20, buildTime: 14, sight: 6, hgt: 20, alloy: 300, desc: 'Unlocks cyber abilities & covert missions. Needs alloy.' },

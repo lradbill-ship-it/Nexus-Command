@@ -12,7 +12,7 @@ import {
 let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
 
-const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'wall', 'gate', 'palisade', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'idome', 'shieldgen', 'cyber', 'silo', 'drillbay'];
+const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'wall', 'gate', 'palisade', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'tesla', 'idome', 'shieldgen', 'cyber', 'silo', 'drillbay'];
 const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'envoy', 'aegis', 'recon', 'infantry', 'rocket', 'transport', 'sentrypod', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'hunter', 'spectre', 'borer', 'cartman', 'kenny', 'stan', 'kyle'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
@@ -33,6 +33,7 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'habitat') { g.fillStyle = '#3a4f63'; g.fillRect(13, 11, 14, 9); g.strokeRect(13, 11, 14, 9); g.fillStyle = '#9fd9cc'; g.beginPath(); g.moveTo(12, 11); g.lineTo(20, 5); g.lineTo(28, 11); g.closePath(); g.stroke(); g.fillStyle = '#69d84f'; g.fillRect(18, 15, 4, 5); }
     else if (type === 'market') { g.fillStyle = '#caa05a'; for (let i = 0; i < 4; i++) { g.fillRect(12 + i * 4, 8, 3, 4); } g.strokeStyle = '#e0c089'; g.strokeRect(12, 12, 16, 8); g.fillStyle = '#9fd9cc'; g.fillRect(14, 14, 3, 4); g.fillRect(23, 14, 3, 4); }
     else if (type === 'aaturret') { g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#cdd9e3'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - 2, cy); g.lineTo(cx + 5, cy - 8); g.moveTo(cx + 2, cy); g.lineTo(cx + 9, cy - 6); g.stroke(); }
+    else if (type === 'tesla') { g.strokeStyle = '#9fb3c2'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx, 21); g.lineTo(cx, 9); g.stroke(); g.fillStyle = 'rgba(170,225,255,.85)'; g.beginPath(); g.arc(cx, 8, 4, 0, 7); g.fill(); g.strokeStyle = '#aee0ff'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx + 6, 5); g.lineTo(cx + 1, 12); g.lineTo(cx + 5, 12); g.lineTo(cx, 20); g.stroke(); }
     else if (type === 'cyber') { g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fillStyle = 'rgba(155,111,232,.5)'; g.fill(); g.strokeStyle = '#b07dff'; g.stroke(); }
     else if (type === 'drillbay') { g.fillStyle = '#1a2735'; g.fillRect(12, 11, 16, 9); g.strokeRect(12, 11, 16, 9); g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(15, 20); g.lineTo(20, 7); g.lineTo(25, 20); g.stroke(); g.fillStyle = '#9fb3c2'; g.beginPath(); g.moveTo(20, 10); g.lineTo(23, 17); g.lineTo(17, 17); g.closePath(); g.fill(); }
     else if (type === 'silo') { g.fillStyle = '#11161d'; g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fill(); g.strokeStyle = '#e8b64c'; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.stroke(); g.fillStyle = '#cdd9e3'; g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fill(); g.fillStyle = '#e8483a'; g.beginPath(); g.arc(cx, cy, 1.5, 0, 7); g.fill(); }

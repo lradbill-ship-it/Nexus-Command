@@ -659,6 +659,18 @@ export class BattleScene extends Phaser.Scene {
         const prog = p.t / p.life, r = 15 - prog * 7;
         a.lineStyle(2, c, k); a.strokeCircle(p.x, p.y, r);
         for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { a.beginPath(); a.moveTo(p.x + dx * (r + 5), p.y + dy * (r + 5)); a.lineTo(p.x + dx * r, p.y + dy * r); a.strokePath(); }
+      } else if (p.type === 'arc') {                                                   // chain-lightning bolt (jagged line p→p2)
+        const x2 = p.x2 ?? p.x, y2 = p.y2 ?? p.y;
+        const dx = x2 - p.x, dy = y2 - p.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+        const segs = Math.max(3, Math.min(9, (len / 22) | 0));
+        const c = Phaser.Display.Color.RGBStringToColor('rgb(' + (p.rgb || '170,225,255') + ')').color;
+        const jag = (amp: number, w: number, colr: number, al: number) => {
+          a.lineStyle(w, colr, al * k); a.beginPath(); a.moveTo(p.x, p.y);
+          for (let i = 1; i < segs; i++) { const f = i / segs, off = (Math.random() - 0.5) * amp * Math.sin(f * Math.PI); a.lineTo(p.x + dx * f + nx * off, p.y + dy * f + ny * off); }
+          a.lineTo(x2, y2); a.strokePath();
+        };
+        jag(14, 3.2, c, 0.5);            // soft outer glow
+        jag(14, 1.3, 0xffffff, 0.95);    // bright white core
       } else if (p.type === 'shock') {
         const r = 20 + p.t * 96;                                                        // slower outer shockwave
         a.lineStyle(2, 0xfff0d2, k * 0.55); a.strokeCircle(p.x, p.y, r);

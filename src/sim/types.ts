@@ -157,6 +157,7 @@ export interface Particle {
   type: string;
   x: number; y: number;
   vx?: number; vy?: number;
+  x2?: number; y2?: number;   // endpoint for line FX (chain-lightning arc)
   t: number; life: number;
   rgb?: string;
   size?: number;
