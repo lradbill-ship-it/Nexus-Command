@@ -131,6 +131,7 @@ export interface Unit {
   revealT?: number;      // stealth units: game.t until which the cloak is dropped (fired recently / enemy nearby)
   buffUntil?: number;    // Overcharge: game.t until which this unit has the combat-stim (+dmg/+speed) buff
   enterT?: number;       // game.t an 'enter' (garrison) order began → give up if it can't reach in time
+  authT?: number;        // Cartman: game.t of the next "RESPECT MY AUTHORITAH" stun pulse
   dead?: boolean;
 }
 

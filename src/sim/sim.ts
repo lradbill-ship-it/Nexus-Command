@@ -632,6 +632,23 @@ function auraTick(u: Unit, dt: number) {
   });
 }
 
+// ── Cartman: the "RESPECT MY AUTHORITAH" stun pulse ───────────────────────────
+const AUTHORITAH_CD = 13;        // seconds between pulses
+const AUTHORITAH_DUR = 3;        // seconds nearby enemies are stunned
+const CARTMAN_QUIPS = ['RESPECT MY AUTHORITAAH!', 'You will respect my authoritah!', 'Whatever, I do what I want!', 'Screw you guys!', 'Stop being such a bunch of dildos!'];
+function authoritahTick(u: Unit) {
+  if ((u.authT ?? 0) > game.t) return;
+  if (u.authT === undefined) { u.authT = game.t + AUTHORITAH_CD; return; }   // arm on first sight, don't fire instantly
+  const r = U[u.type].authoritah!;
+  let n = 0; const hitFac: Record<number, number> = {};
+  for (const o of game.units) if (!isAllied(u.team, o.team) && o.team !== 0 && !U[o.type].hero && dist(o, u) < r) { o.disabledUntil = game.t + AUTHORITAH_DUR; o.moving = false; o.path = null; spawnParts('spark', o.x, o.y, 3, '255,210,90'); n++; hitFac[o.team] = 1; }
+  u.authT = game.t + AUTHORITAH_CD;
+  if (!n) return;
+  game.parts.push({ type: 'ring', x: u.x, y: u.y, t: 0, life: 0.7, big: true });
+  for (const f in hitFac) if (u.team === PLAYER && !isWar(PLAYER, +f)) addRel(PLAYER, +f, -8);   // bellowing at a non-enemy sours relations
+  if (u.team === PLAYER || tileVisible(u.x, u.y)) { logMsg('🗣 Cartman: "' + CARTMAN_QUIPS[Math.random() * CARTMAN_QUIPS.length | 0] + '" — ' + n + ' stunned', u.team === PLAYER ? 'good' : 'war', { x: u.x, y: u.y }); sfx('emp', u.x); }
+}
+
 // ── Crystal regeneration ──────────────────────────────────────────────────────
 // Living fields slowly regrow, and fresh formations crystallize at random sites
 // over the course of a match so the economy never permanently dries up.
@@ -1336,6 +1353,7 @@ function updateUnit(u: Unit, dt: number) {
   u.cooldown = Math.max(0, u.cooldown - dt);
   if (U[u.type].tunneler && u.moving && Math.random() < dt * 7) spawnParts('debris', u.x, u.y + 6, 1, '120,100,72');   // burrow spoil trail
   if (U[u.type].auraHeal) auraTick(u, dt);                              // Warden hero — constant heal aura
+  if (U[u.type].authoritah) authoritahTick(u);                          // Cartman — periodic "RESPECT MY AUTHORITAH" stun
   if ((u.vet || 0) >= 2 && u.hp < u.hpMax) u.hp = Math.min(u.hpMax, u.hp + 4 * dt);   // Elite units self-repair slowly
   // turret aim smoothing
   let want = u.facing;
@@ -2236,6 +2254,7 @@ function aiUpdate(team: number, dt: number) {
   if (fSup) {
     if (hasMill && countType('repair') < 2 && !anyQueued('repair') && game.money[team] > 800) { fSup.queue.push('repair'); game.money[team] -= U.repair.cost; }
     else if (hasDrill && countType('hunter') < 1 && !anyQueued('hunter') && game.money[team] > 900) { fSup.queue.push('hunter'); game.money[team] -= U.hunter.cost; }
+    else if (hasCyberB && countType('cartman') < 1 && !anyQueued('cartman') && game.money[team] > 1500 && Math.random() < dt * 0.03) { fSup.queue.push('cartman'); game.money[team] -= U.cartman.cost; }   // a special character — one Cartman per AI, occasionally
   }
   // Diplomacy parity: field an Envoy and send it to court the nearest neutral settlement (peaceful expansion).
   const neutralSettles = game.settlements.filter(s => !s.owner);
@@ -2566,6 +2585,7 @@ export function trainUnit(t: string) {
   if (!fs.length) { hint('Build a War Foundry first'); return; }
   const req = U[t].requires;
   if (req && !hasBuilding(req)) { hint('Requires a ' + B[req].name); return; }
+  if (U[t].unique && (game.units.some(u => u.team === PLAYER && u.type === t) || fs.some(f => f.queue.includes(t)))) { hint('You already command your ' + U[t].name); return; }
   if (game.money[PLAYER] < U[t].cost) { hint('Insufficient crystals'); return; }
   if (alloyCost(PLAYER, U[t].alloy) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy — build an Alloy Smelter'); return; }
   fs.sort((a, b) => a.queue.length - b.queue.length);

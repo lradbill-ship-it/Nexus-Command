@@ -358,6 +358,16 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillStyle = '#2c3744'; g.beginPath(); g.arc(cx, cy, 6, 0, 7); g.fill();
     g.strokeStyle = '#aebcc8'; g.lineWidth = 2.4; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 2, cy - 12); g.stroke();   // stowed barrel
     g.fillStyle = `rgba(${rgb},.8)`; g.beginPath(); g.arc(cx, cy, 2.4, 0, 7); g.fill();
+  } else if (type === 'cartman') {
+    // Cartman: round body in a red coat, teal beanie with a yellow puff — faction-tinted trim
+    g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(cx, cy + 11, 12, 4, 0, 0, 7); g.fill();   // shadow
+    g.fillStyle = '#c0392b'; g.beginPath(); g.ellipse(cx, cy + 3, 12, 10, 0, 0, 7); g.fill();           // red coat body
+    g.strokeStyle = col; g.lineWidth = 1.6; g.beginPath(); g.ellipse(cx, cy + 3, 12, 10, 0, 0, 7); g.stroke();
+    g.fillStyle = '#e7c9a0'; g.beginPath(); g.arc(cx, cy - 5, 7, 0, 7); g.fill();                        // face
+    g.fillStyle = '#27a3b8'; g.beginPath(); g.arc(cx, cy - 8, 7.5, Math.PI, 0); g.fill();                // teal beanie
+    g.fillRect(cx - 7.5, cy - 9, 15, 2.5);                                                               // beanie brim
+    g.fillStyle = '#f2d23a'; g.beginPath(); g.arc(cx, cy - 16, 2.6, 0, 7); g.fill();                     // yellow puff
+    g.fillStyle = '#2a2a2a'; g.beginPath(); g.arc(cx - 2.6, cy - 5, 1, 0, 7); g.fill(); g.beginPath(); g.arc(cx + 2.6, cy - 5, 1, 0, 7); g.fill();   // eyes
   } else if (type === 'borer') {
     // subterranean borer: heavy hull + big conical drill bit up front
     g.fillStyle = '#1a232e'; g.fillRect(cx - 13, cy - 6, 3.6, 18); g.fillRect(cx + 9.4, cy - 6, 3.6, 18);   // tracks
