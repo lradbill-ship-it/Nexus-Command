@@ -766,13 +766,15 @@ function damage(e: Entity, amt: number, fromTeam: number) { e.hitT = game.t; e.h
 function destroy(e: Entity, fromTeam: number) {
   if (e.dead) return; e.dead = true;
   const big = e.kind === 'b';
-  spawnParts('fire', e.x, e.y, big ? 30 : 13, '255,160,60');
-  spawnParts('ember', e.x, e.y, big ? 22 : 10, '255,198,104');
-  spawnParts('debris', e.x, e.y, big ? 14 : 7, '120,120,128');
-  spawnParts('smoke', e.x, e.y, big ? 16 : 6, '70,70,76');
+  spawnParts('spark', e.x, e.y, big ? 24 : 11, '255,238,190');                          // sharp initial burst → a crisper pop
+  spawnParts('fire', e.x, e.y, big ? 32 : 15, '255,160,60');
+  spawnParts('ember', e.x, e.y, big ? 26 : 13, '255,198,104');
+  spawnParts('debris', e.x, e.y, big ? 16 : 8, '120,120,128');
+  spawnParts('smoke', e.x, e.y, big ? 18 : 7, '70,70,76');
   game.parts.push({ type: 'ring', x: e.x, y: e.y, t: 0, life: 0.7, big });
   if (big) game.parts.push({ type: 'shock', x: e.x, y: e.y, t: 0, life: 0.85, big });   // slower outer shockwave
-  game.parts.push({ type: 'flash', x: e.x, y: e.y, t: 0, life: 0.16, big });
+  game.parts.push({ type: 'flash', x: e.x, y: e.y, t: 0, life: big ? 0.3 : 0.2, big });  // brighter, longer core flash
+  game.parts.push({ type: 'flash', x: e.x, y: e.y, t: 0, life: 0.12 });                  // hot white inner pop
   scorchHook(e.x, e.y, big ? Math.max((e as Building).w, (e as Building).h) * 0.6 : 15);
   game.shake = Math.min(11, game.shake + (big ? 7 : 2));
   sfx(big ? 'bigboom' : 'boom', e.x);
