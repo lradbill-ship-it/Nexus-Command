@@ -599,6 +599,19 @@ export class BattleScene extends Phaser.Scene {
       }
       g.fillStyle(tint, 0.9); g.fillCircle(v.x, v.y, 3 + pulse * 1.6);                // core gem
     }
+    // Shield Projector fields — a faint hex-ring dome over the protected radius, brightness ∝ remaining energy
+    const SHIELD_R = 6 * 24;   // matches sim SHIELD_R (6 tiles)
+    for (const b of game.buildings) {
+      if (b.type !== 'shieldgen' || b.progress < 1) continue;
+      const tx = b.x / TILE | 0, ty = b.y / TILE | 0;
+      if (!game.explored[idx(tx, ty)]) continue;
+      const e = Math.max(0, Math.min(1, (b.shieldE ?? 0) / 1200));
+      if (e <= 0.02) continue;
+      const col = Phaser.Display.Color.HexStringToColor(FAC[b.team].col).color;
+      const pulse = 0.5 + 0.5 * Math.sin(game.t * 1.6);
+      g.fillStyle(col, 0.05 * e); g.fillCircle(b.x, b.y, SHIELD_R);
+      g.lineStyle(2, col, (0.25 + 0.35 * e) * (0.7 + 0.3 * pulse)); g.strokeCircle(b.x, b.y, SHIELD_R);
+    }
   }
 
   private syncCrystals() {

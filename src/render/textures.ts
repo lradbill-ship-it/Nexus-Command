@@ -258,6 +258,15 @@ function buildingCanvas(type: string, team: number): [HTMLCanvasElement, number,
     g.fillStyle = '#2a3340'; g.fillRect(rcx - fw * 0.3, rcy + 2, fw * 0.6, 3);
     g.strokeStyle = '#c9d6e0'; g.lineWidth = 2; g.beginPath(); g.moveTo(rcx - 5, rcy); g.lineTo(rcx - 10, rcy - 9); g.moveTo(rcx + 5, rcy); g.lineTo(rcx + 10, rcy - 9); g.stroke();
     g.fillStyle = '#9fdcff'; g.beginPath(); g.arc(rcx - 10, rcy - 9, 1.7, 0, 7); g.fill(); g.beginPath(); g.arc(rcx + 10, rcy - 9, 1.7, 0, 7); g.fill();
+  } else if (type === 'shieldgen') {
+    // shield projector: a domed emitter with a glowing energy core + arcing field lines
+    g.fillStyle = '#2a3340'; g.beginPath(); g.arc(rcx, rcy + 3, fw * 0.26, Math.PI, 0); g.fill();
+    const cg = g.createRadialGradient(rcx, rcy, 1, rcx, rcy, fw * 0.22);
+    cg.addColorStop(0, 'rgba(170,220,255,.95)'); cg.addColorStop(1, 'rgba(70,130,190,.35)');
+    g.fillStyle = cg; g.beginPath(); g.arc(rcx, rcy, fw * 0.16, 0, 7); g.fill();
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(rcx, rcy, fw * 0.16, 0, 7); g.stroke();
+    g.strokeStyle = 'rgba(150,210,255,.7)'; g.lineWidth = 1.4;
+    for (let i = 0; i < 3; i++) { const rr2 = fw * (0.22 + i * 0.07); g.beginPath(); g.arc(rcx, rcy, rr2, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); }
   } else if (type === 'wall') {
     // crenellated battlement notches along the top + a heavy faction-tinted course
     g.fillStyle = '#39434f';

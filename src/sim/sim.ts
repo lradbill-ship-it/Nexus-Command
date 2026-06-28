@@ -688,7 +688,26 @@ function fireAt(src: Entity, target: Entity, dmg: number, rail: boolean, splash 
   spawnParts('muzzle', src.x, src.y, 2, '255,235,180');
   sfx(rail ? 'rail' : 'shot', src.x);
 }
-function damage(e: Entity, amt: number, fromTeam: number) { e.hp -= amt; if (e.hp <= 0) destroy(e, fromTeam); }
+// ── Shield Projector: a building field that absorbs part of incoming damage to nearby allies ──
+const SHIELD_R = 6 * TILE;     // field radius
+const SHIELD_ABSORB = 0.5;     // fraction of incoming damage the field soaks (while it has energy)
+const SHIELD_MAX = 1200;       // absorb energy pool per projector
+const SHIELD_REGEN = 45;       // energy/sec recharge
+/** Soak part of `amt` for entity `e` from a ready friendly Shield Projector in range; drains its reserve. Returns the reduced damage. */
+function applyShield(e: Entity, amt: number): number {
+  if (e.kind === 'b' && (e as Building).type === 'shieldgen') return amt;   // a projector doesn't shield itself (no infinite tank)
+  let best: Building | null = null;
+  for (const b of game.buildings) {
+    if (b.type !== 'shieldgen' || b.progress < 1 || (b.shieldE ?? 0) <= 0 || b.disabledUntil > game.t || !isAllied(b.team, e.team)) continue;
+    if (dist(b, e) <= SHIELD_R) { best = b; break; }
+  }
+  if (!best) return amt;
+  const soak = Math.min(amt * SHIELD_ABSORB, best.shieldE ?? 0);
+  best.shieldE = (best.shieldE ?? 0) - soak;
+  if (Math.random() < 0.25) game.parts.push({ type: 'spark', x: e.x, y: e.y, t: 0, life: 0.25, rgb: '150,210,255' });   // shimmer on absorb
+  return amt - soak;
+}
+function damage(e: Entity, amt: number, fromTeam: number) { e.hp -= applyShield(e, amt); if (e.hp <= 0) destroy(e, fromTeam); }
 function destroy(e: Entity, fromTeam: number) {
   if (e.dead) return; e.dead = true;
   const big = e.kind === 'b';
@@ -1488,6 +1507,7 @@ function updateBuilding(b: Building, dt: number) {
   }
   if (b.disabledUntil > game.t) return;
   if (b.type === 'idome') b.cooldown = Math.max(0, b.cooldown - dt);   // Iron Dome interceptor recharge
+  if (b.type === 'shieldgen') b.shieldE = Math.min(SHIELD_MAX, (b.shieldE ?? SHIELD_MAX) + SHIELD_REGEN * dt * pw.factor);   // Shield Projector reserve recharges (scaled by power)
   if (b.type === 'turret' || b.type === 'aaturret') {
     b.cooldown = Math.max(0, b.cooldown - dt);
     if (b.target && (b.target.dead || dist(b, b.target) > d.range! + 30 || !eligibleTarget(b, b.target) || (b.target.kind === 'u' && ((b.target as Unit).tunnelT ?? 0) > 0))) b.target = null;   // turrets can't hit the underground
@@ -2048,6 +2068,7 @@ function aiTech(team: number) {
     if (game.t > 300 && !count('idome') && place('idome', 5, 6, 600)) return;
     if (game.t > 420 && !count('silo') && place('silo', 7, 4, 1100)) return;
   }
+  if (game.t > 380 && !count('shieldgen') && place('shieldgen', 6, 8, 1200)) return;  // damage-absorbing field over the base
   if (game.t > 340 && !count('cyber') && place('cyber', -4, 9, 1400)) return;       // EMP / covert legitimacy
   if (game.t > 480 && !count('drillbay') && place('drillbay', 9, 8, 1800)) return;  // Subterranean Borer + Hero excavation
   if (game.t > 600 && count('idome') < 2 && place('idome', 8, 7, 1400)) return;     // a 2nd dome for a sprawling base

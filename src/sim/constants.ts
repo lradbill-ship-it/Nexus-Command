@@ -100,6 +100,7 @@ export interface BuildingDef {
   wood?: number;           // wood build-cost (timber structures like palisades)
   house?: number;          // civilian housing capacity provided
   civic?: number;          // happiness contribution (civic needs met)
+  shield?: number;         // projects a damage-absorbing shield field over nearby allies (Shield Projector)
   desc: string;
 }
 
@@ -120,6 +121,7 @@ export const B: Record<string, BuildingDef> = {
   drillbay: { name: 'Deep Bore Facility', w: 3, h: 2, hp: 980, cost: 1200, power: -25, buildTime: 18, sight: 5, hgt: 22, alloy: 300, desc: 'Hallmark works. Unlocks the Subterranean Borer — a burrowing assault drill. Needs alloy.' },
   silo: { name: 'Missile Silo', w: 2, h: 2, hp: 820, cost: 1400, power: -25, buildTime: 16, sight: 5, hgt: 24, alloy: 400, desc: 'Launch platform. Unlocks Ballistic & Thermonuclear missile strikes. Needs alloy.' },
   idome: { name: 'Iron Dome', w: 2, h: 2, hp: 560, cost: 900, power: -20, buildTime: 12, sight: 6, hgt: 16, alloy: 250, desc: 'Intercepts inbound ballistic & thermonuclear missiles over a wide radius. Recharges between intercepts.' },
+  shieldgen: { name: 'Shield Projector', w: 2, h: 2, hp: 620, cost: 950, power: -25, buildTime: 13, sight: 6, hgt: 16, alloy: 200, shield: 1, desc: 'Projects an energy field that absorbs half of all incoming damage to nearby allies — until its reserve is spent, then it recharges. Needs power + alloy.' },
   wall: { name: 'Fortified Wall', w: 1, h: 1, hp: 1200, cost: 70, power: 0, buildTime: 4, sight: 2, hgt: 13, desc: 'Impassable barrier. Cheap and tough; no power. Build lines to funnel attackers into your turrets.' },
   palisade: { name: 'Timber Palisade', w: 1, h: 1, hp: 650, cost: 20, wood: 40, power: 0, buildTime: 3, sight: 2, hgt: 12, desc: 'Cheap barrier built from wood — quick early defense. Weaker than a Fortified Wall; needs a Logger economy.' },
   gate: { name: 'Blast Gate', w: 1, h: 1, hp: 1000, cost: 120, power: 0, buildTime: 5, sight: 3, hgt: 13, desc: 'A doorway in your wall line: your forces (and allies) pass through freely; enemies are blocked and must route around or smash it down.' },

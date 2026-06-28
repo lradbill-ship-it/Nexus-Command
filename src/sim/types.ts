@@ -84,6 +84,7 @@ export interface Building {
   rally?: Vec;
   garrison?: { type: string; hp: number; vet?: number }[];   // infantry sheltering inside → defensive fire; eject if it falls
   fromPod?: boolean;     // this turret was deployed from a Sentry Pod (can be packed back into one)
+  shieldE?: number;      // Shield Projector: remaining absorb energy (drains soaking damage, recharges over time)
   dead?: boolean;
 }
 

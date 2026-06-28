@@ -12,7 +12,7 @@ import {
 let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
 
-const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'wall', 'gate', 'palisade', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'idome', 'cyber', 'silo', 'drillbay'];
+const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'wall', 'gate', 'palisade', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'idome', 'shieldgen', 'cyber', 'silo', 'drillbay'];
 const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'envoy', 'aegis', 'recon', 'infantry', 'rocket', 'transport', 'sentrypod', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'hunter', 'spectre', 'borer'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
@@ -37,6 +37,7 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'drillbay') { g.fillStyle = '#1a2735'; g.fillRect(12, 11, 16, 9); g.strokeRect(12, 11, 16, 9); g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(15, 20); g.lineTo(20, 7); g.lineTo(25, 20); g.stroke(); g.fillStyle = '#9fb3c2'; g.beginPath(); g.moveTo(20, 10); g.lineTo(23, 17); g.lineTo(17, 17); g.closePath(); g.fill(); }
     else if (type === 'silo') { g.fillStyle = '#11161d'; g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.fill(); g.strokeStyle = '#e8b64c'; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.stroke(); g.fillStyle = '#cdd9e3'; g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fill(); g.fillStyle = '#e8483a'; g.beginPath(); g.arc(cx, cy, 1.5, 0, 7); g.fill(); }
     else if (type === 'idome') { g.fillStyle = 'rgba(150,210,255,.6)'; g.beginPath(); g.arc(cx, cy + 3, 8, Math.PI, 0); g.fill(); g.strokeStyle = '#9fdcff'; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy + 3, 8, Math.PI, 0); g.stroke(); g.strokeStyle = '#c9d6e0'; g.beginPath(); g.moveTo(cx - 3, cy + 2); g.lineTo(cx - 6, cy - 4); g.moveTo(cx + 3, cy + 2); g.lineTo(cx + 6, cy - 4); g.stroke(); }
+    else if (type === 'shieldgen') { g.fillStyle = 'rgba(170,220,255,.85)'; g.beginPath(); g.arc(cx, cy, 4, 0, 7); g.fill(); g.strokeStyle = '#9fdcff'; g.lineWidth = 1.4; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(cx, cy, 6 + i * 3, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); } }
     else if (type === 'wall') { g.fillStyle = '#3a4552'; g.fillRect(11, 10, 18, 10); g.strokeStyle = '#9fd9cc'; g.strokeRect(11, 10, 18, 10); g.fillStyle = '#2c3744'; for (let i = 0; i < 4; i++) g.fillRect(12 + i * 5, 6, 3, 4); }
     else if (type === 'gate') { g.fillStyle = '#3a4552'; g.fillRect(10, 8, 6, 12); g.fillRect(24, 8, 6, 12); g.strokeStyle = '#9fd9cc'; g.strokeRect(10, 8, 6, 12); g.strokeRect(24, 8, 6, 12); g.strokeStyle = '#69d84f'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(20, 8); g.lineTo(20, 20); g.stroke(); }
     else if (type === 'palisade') { g.strokeStyle = '#9c7338'; g.lineWidth = 2.4; for (let i = 0; i < 4; i++) { const x = 13 + i * 5; g.beginPath(); g.moveTo(x, 19); g.lineTo(x, 8); g.stroke(); g.fillStyle = '#7a5a2c'; g.beginPath(); g.moveTo(x - 2, 8); g.lineTo(x + 2, 8); g.lineTo(x, 5); g.closePath(); g.fill(); } }
