@@ -14,6 +14,7 @@ Last updated: **2026‑06‑27** (Session 5 in progress — civilian‑diplomacy
 ---
 
 ## ✅ Shipped in Session 5 (newest first)
+- **Polish: Conquest victory/defeat screens** (`faccb37`, live) — celebratory 🏆 victory (glowing title + territory/War-Tech summary) and somber 🏴 defeat, centered, reusing the verified panelBox styling. Victory screen driven-to + screenshot-verified.
 - **Polish: UI chrome** (`7e9800c`, live) — intro title glow + glowing underline accent; tactile primary buttons (hover lift + gold glow + active press); faction-card + command-button hovers. Screenshot-verified.
 - **Polish: weightier death explosions** (`c6d249f`, live) — crisper death pop (initial spark burst + brighter/longer core flash + hot white inner flash + a touch more fire/ember/debris). Sim-side; clean build. (Look = device call.)
 - **Polish: combat hit-flash + punchier impacts** (`d6ce36e`, live) — units & buildings flash hot-red ~0.08s when damaged (`Entity.hitT` set in `damage()`; tint in syncUnit/syncBuilding, composes with Overcharge/construction tints); bumped impact spark + a crisp flash particle per direct hit. tsc/bundle clean, boots clean. (Feel = device call.)
