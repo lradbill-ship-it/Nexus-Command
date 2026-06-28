@@ -873,12 +873,18 @@ export function combineSelected() {
 const GCELL = 64;
 const GW = Math.ceil(WORLD_W / GCELL), GH = Math.ceil(WORLD_H / GCELL);
 let unitGrid: Unit[][] = [];
+let gridUsed: number[] = [];   // indices of non-empty cells last build → clear only these (not all ~15k cells)
 function rebuildUnitGrid() {
-  unitGrid = new Array(GW * GH);
-  for (let i = 0; i < unitGrid.length; i++) unitGrid[i] = [];
+  // PERF: allocate the cell arrays ONCE and reuse them every frame. Reallocating ~GW*GH (~15k on the 3× map)
+  // arrays twice per frame was the dominant GC-pressure source (→ ~30ms stutter spikes). Now zero per-frame alloc.
+  if (unitGrid.length !== GW * GH) { unitGrid = new Array(GW * GH); for (let i = 0; i < unitGrid.length; i++) unitGrid[i] = []; gridUsed = []; }
+  else { for (let k = 0; k < gridUsed.length; k++) unitGrid[gridUsed[k]].length = 0; }
+  gridUsed.length = 0;
   for (const u of game.units) {
     const gx = clamp(u.x / GCELL | 0, 0, GW - 1), gy = clamp(u.y / GCELL | 0, 0, GH - 1);
-    unitGrid[gy * GW + gx].push(u);
+    const idx = gy * GW + gx, cell = unitGrid[idx];
+    if (cell.length === 0) gridUsed.push(idx);
+    cell.push(u);
   }
 }
 function forNearbyUnits(x: number, y: number, r: number, fn: (u: Unit) => void) {
@@ -981,19 +987,26 @@ function followPath(u: Unit, dt: number) {
 }
 function separation() {
   rebuildUnitGrid();                                       // fresh buckets from post-movement positions
+  // PERF: iterate the 3×3 cell neighbourhood inline (no per-unit closure → no allocation in this hot per-frame loop)
   for (const a of game.units) {
     if (phasing(a)) continue;                              // air & burrowing units occupy separate layers
     const ar = U[a.type].radius;
-    forNearbyUnits(a.x, a.y, GCELL, (b) => {
-      if (a.id >= b.id || phasing(b)) return;              // each ground pair resolved once
-      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
-      const min = ar + U[b.type].radius;
-      if (d > 0 && d < min) {
-        const push = (min - d) / 2, ux = dx / d, uy = dy / d;
-        if (!unitBlocked(a.x - ux * push, a.y - uy * push, a.team)) { a.x -= ux * push; a.y -= uy * push; }
-        if (!unitBlocked(b.x + ux * push, b.y + uy * push, b.team)) { b.x += ux * push; b.y += uy * push; }
+    const cx = clamp(a.x / GCELL | 0, 0, GW - 1), cy = clamp(a.y / GCELL | 0, 0, GH - 1);
+    for (let gy = Math.max(0, cy - 1); gy <= Math.min(GH - 1, cy + 1); gy++)
+      for (let gx = Math.max(0, cx - 1); gx <= Math.min(GW - 1, cx + 1); gx++) {
+        const cell = unitGrid[gy * GW + gx];
+        for (let k = 0; k < cell.length; k++) {
+          const b = cell[k];
+          if (a.id >= b.id || phasing(b)) continue;        // each ground pair resolved once
+          const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+          const min = ar + U[b.type].radius;
+          if (d > 0 && d < min) {
+            const push = (min - d) / 2, ux = dx / d, uy = dy / d;
+            if (!unitBlocked(a.x - ux * push, a.y - uy * push, a.team)) { a.x -= ux * push; a.y -= uy * push; }
+            if (!unitBlocked(b.x + ux * push, b.y + uy * push, b.team)) { b.x += ux * push; b.y += uy * push; }
+          }
+        }
       }
-    });
   }
 }
 
