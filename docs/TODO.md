@@ -13,6 +13,11 @@ Last updated: **2026‑06‑28** (Session 5 WRAPPED — ~18 increments shipped +
 
 ---
 
+## ✅ Shipped in Session 6 (newest first)
+- **Arc Tower — chain-lightning anti-swarm building** (`affb52f`, live) — new `B.tesla` (650cr + 180 alloy, power −25, needs alloy): a point-defense whose zap **arcs between up to 4 clustered ground enemies**, damage falling off per hop, so a single Arc Tower shreds massed infantry/militia where the single-target Sentinel Turret can't. Range 200 / dmg 22 / rof 1.5. `teslaZap()` hooked into the turret branch of `updateBuilding` (fires instantly, no barrel traverse); new `'arc'` particle (jagged double-stroke bolt, `Particle.x2/y2`); Tesla-coil building sprite + sidebar button/icon + DEFENSE legend entry. **AI parity** (`aiTech` builds up to 2, alloy-gated, t>320). 5/5 headless (chains to 4, reaches beyond its own range via the chain, caps at 4, isolated enemy spared, damage falls off −44→−16); tsc + single-file build clean, artifact boots no errors. ⚠ the lightning *look* is RAF-gated headless → Lane's eyes on device. **Knobs:** `TESLA_JUMP` 120, `TESLA_FALLOFF` 0.72, `chain` 4, `B.tesla` dmg/range/rof/cost.
+
+---
+
 ## ✅ Shipped in Session 5 (newest first)
 - **Polish: Conquest victory/defeat screens** (`faccb37`, live) — celebratory 🏆 victory (glowing title + territory/War-Tech summary) and somber 🏴 defeat, centered, reusing the verified panelBox styling. Victory screen driven-to + screenshot-verified.
 - **Polish: UI chrome** (`7e9800c`, live) — intro title glow + glowing underline accent; tactile primary buttons (hover lift + gold glow + active press); faction-card + command-button hovers. Screenshot-verified.
@@ -52,7 +57,7 @@ Last updated: **2026‑06‑28** (Session 5 WRAPPED — ~18 increments shipped +
 ## ▶ Up next — top candidates (curate to 3–5; these go on the cards first)
 - [ ] **🎯 PLAYTEST‑DRIVEN BALANCE + FEEL PASS — the #1 Session‑6 move.** ALL of Session 5 (~18 increments) is unplaytested. Ask what felt off, then turn the §8 knobs (handoff). Likely dials: **special‑character strength** (Cartman stun / Kenny respawn / Stan rally / Kyle heal), **Conquest pacing** (incursion frequency, War‑Tech snowball, reinforcement bonus), **Shield Projector** balance, **Chrono/Carpet** cost, civilian‑diplomacy timing. Plus **battlefield FPS on Lane's device** (sim is now fast post‑perf‑pass; render is the only unmeasured piece). **Ask‑first** per `CLAUDE.md`.
 - [ ] **Conquest depth (slices)** — defender‑tailored battles (battle reflects the defending faction + territory strength); carry‑over unit veterancy (beyond credits/War‑Tech); mission‑objective variants per territory; bigger/varied world maps.
-- [ ] **More combat depth / characters (additive)** — repair‑reload, cloak‑field, EMP‑grenade, Arc/Tesla tower; more special characters (Butters/Randy/Chef…) via the established pattern; a character team‑up synergy buff.
+- [~] **More combat depth / characters (additive)** — ✅ **Arc/Tesla tower** (S6, `affb52f`); still open: repair‑reload, cloak‑field, EMP‑grenade; more special characters (Butters/Randy/Chef…) via the established pattern; a character team‑up synergy buff.
 - [ ] **Battlefield visuals (needs Lane's eyes)** — richer sprites/lighting/FX. Render is RAF‑gated headless → can't verify; have Lane direct it from his device. (Verifiable UI polish is largely done.)
 - [ ] **More CC0 audio (optional, by‑ear)** — real CC0 weapon/UI samples + distinct explosion variants. `src/assets/audio/` (OGG→AAC via `afconvert`).
 - [ ] **Deeper perf — Web Worker sim** — 🛑 **HELD.** Session‑5 perf pass made the sim very fast (avg <2ms/step, GC spikes killed). Unwarranted unless Lane's device shows a render‑side FPS problem specifically.
