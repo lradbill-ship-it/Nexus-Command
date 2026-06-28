@@ -40,6 +40,7 @@ export class BattleScene extends Phaser.Scene {
   private settleGfx!: Phaser.GameObjects.Graphics;
   private waterGfx!: Phaser.GameObjects.Graphics;   // animated water sheen — additive glints over visible water tiles
   private waterAccum = 0;                            // throttle for the water shimmer (~30Hz; slow motion, cheap)
+  private simAccum = 0;                              // fixed-timestep accumulator (keeps real-time pace below 60fps)
   private overlay!: Phaser.GameObjects.Graphics;
   private vignette!: Phaser.GameObjects.Image;
   private recs = new Map<number, SpriteRec>();
@@ -368,13 +369,21 @@ export class BattleScene extends Phaser.Scene {
 
   // ── main loop ──────────────────────────────────────────────────────────────
   update(_time: number, delta: number) {
-    const dt = clamp(delta / 1000, 0, 0.05);
+    // Real elapsed seconds this frame, clamped so a stall/tab-switch can't dump one huge step.
+    const frame = clamp(delta / 1000, 0, 0.25);
     if (game.started && !game.over) {
-      this.panCamera(dt);
-      // Pause = 0 sub-steps; 2×/3× = that many fixed sub-steps (each at the real frame dt, so movement &
-      // pathfinding stay stable rather than taking one oversized step).
-      const subSteps = game.paused ? 0 : (game.speed || 1);
-      for (let i = 0; i < subSteps; i++) stepWorld(dt);
+      this.panCamera(frame);
+      // Fixed-timestep accumulator: advance the sim in steady 1/60s steps to consume the REAL time elapsed
+      // (× game speed). This keeps the game running at true real-time pace even when the device renders below
+      // 60fps — instead of going into slow-motion. Capped at MAX_CATCHUP steps/frame to avoid a spiral of death.
+      const FIXED = 1 / 60, MAX_CATCHUP = 12;   // up to 12 sim steps/frame → 1× real-time down to ~5fps, 2× down to ~10fps
+      if (game.paused) this.simAccum = 0;
+      else {
+        this.simAccum += frame * (game.speed || 1);
+        let steps = 0;
+        while (this.simAccum >= FIXED && steps < MAX_CATCHUP) { stepWorld(FIXED); this.simAccum -= FIXED; steps++; }
+        if (steps >= MAX_CATCHUP) this.simAccum = 0;   // can't keep up (very low fps) — drop the backlog
+      }
       if (game.parts.length < 180 && Math.random() < 0.3) {     // faint ambient dust drifting across the view
         const wv = this.cameras.main.worldView;
         spawnParts('mote', wv.x + Math.random() * wv.width, wv.y + Math.random() * wv.height, 1, '198,210,196');
