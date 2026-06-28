@@ -683,6 +683,31 @@ function forceLightningTick(u: Unit) {
   if (u.team === PLAYER || tileVisible(u.x, u.y)) { logMsg('⚡ ' + FAC[u.team].name + ' Sith Lord unleashes Force Lightning', u.team === PLAYER ? 'good' : 'war', { x: u.x, y: u.y }); sfx('emp', u.x); }
 }
 
+// ── Bounty Hunter: periodic homing-seeker missile salvo at several nearby enemies ──
+const SEEKER_CD = 6;         // seconds between salvos
+const SEEKER_RANGE = 300;    // lock-on range
+const SEEKER_DMG = 56;       // damage per seeker
+const SEEKER_SPLASH = 34;    // small blast on each impact
+const SEEKER_SPEED = 300;    // slow homing missile (vs hitscan blasters)
+function seekerSalvoTick(u: Unit) {
+  if ((u.authT ?? 0) > game.t) return;
+  if (u.authT === undefined) { u.authT = game.t + SEEKER_CD; return; }   // arm on first sight
+  const locks: Unit[] = [];
+  forNearbyUnits(u.x, u.y, SEEKER_RANGE, (o) => {
+    if (o.dead || !isWar(u.team, o.team) || o.team === 0 || cloaked(o) || (o.tunnelT ?? 0) > 0) return;
+    locks.push(o);
+  });
+  if (!locks.length) { u.authT = game.t + 1; return; }
+  u.authT = game.t + SEEKER_CD;
+  locks.sort((a, b) => dist(u, a) - dist(u, b));
+  const n = Math.min(U[u.type].seekerSalvo || 1, locks.length);
+  for (let i = 0; i < n; i++) {
+    game.shots.push({ x: u.x, y: u.y, target: locks[i], dmg: SEEKER_DMG, team: u.team, speed: SEEKER_SPEED, col: FAC[u.team].col, rail: false, splash: SEEKER_SPLASH, by: u });
+  }
+  spawnParts('smoke', u.x, u.y, 4, '150,150,156'); spawnParts('muzzle', u.x, u.y, 3, '255,210,150');
+  sfx('rail', u.x);
+}
+
 // ── Stan: leadership rally aura (allied combat units near him hit harder & move faster) ──
 function rallyTick(u: Unit) {
   const r = U[u.type].rallyAura!;
@@ -1463,6 +1488,7 @@ function updateUnit(u: Unit, dt: number) {
   if (U[u.type].auraHeal) auraTick(u, dt);                              // Warden hero — constant heal aura
   if (U[u.type].authoritah) authoritahTick(u);                          // Cartman — periodic "RESPECT MY AUTHORITAH" stun
   if (U[u.type].forceLightning) forceLightningTick(u);                  // Sith Lord — periodic Force-Lightning chain (damage + stun)
+  if (U[u.type].seekerSalvo) seekerSalvoTick(u);                        // Bounty Hunter — periodic homing-seeker missile salvo
   if (U[u.type].rallyAura) rallyTick(u);                                // Stan — leadership rally aura (+dmg/+speed to nearby allies)
   if ((u.vet || 0) >= 2 && u.hp < u.hpMax) u.hp = Math.min(u.hpMax, u.hp + 4 * dt);   // Elite units self-repair slowly
   // turret aim smoothing
@@ -2383,7 +2409,7 @@ function aiUpdate(team: number, dt: number) {
     if (hasMill && countType('repair') < 2 && !anyQueued('repair') && game.money[team] > 800) { fSup.queue.push('repair'); game.money[team] -= U.repair.cost; }
     else if (hasDrill && countType('hunter') < 1 && !anyQueued('hunter') && game.money[team] > 900) { fSup.queue.push('hunter'); game.money[team] -= U.hunter.cost; }
     else if (hasCyberB && game.money[team] > 1500 && Math.random() < dt * 0.03) {   // a special character — one of each per AI, occasionally
-      const special = ['cartman', 'kenny', 'stan', 'kyle', 'jedi', 'sith'].find(s => countType(s) < 1 && !anyQueued(s) && !respawnQueue.some(r => r.team === team && r.type === s) && game.money[team] >= U[s].cost);
+      const special = ['cartman', 'kenny', 'stan', 'kyle', 'jedi', 'sith', 'bountyhunter'].find(s => countType(s) < 1 && !anyQueued(s) && !respawnQueue.some(r => r.team === team && r.type === s) && game.money[team] >= U[s].cost);
       if (special) { fSup.queue.push(special); game.money[team] -= U[special].cost; }
     }
   }

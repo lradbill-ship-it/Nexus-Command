@@ -166,6 +166,7 @@ export interface UnitDef {
   auraHeal?: number;       // hp/sec healed to nearby allies (Warden hero aura)
   deflect?: number;        // Jedi: chance [0..1] to deflect an incoming direct shot (and reflect a bolt back)
   forceLightning?: number; // Sith: # of enemies a periodic Force-Lightning chain damages + briefly stuns
+  seekerSalvo?: number;    // Bounty Hunter: # of homing seeker missiles launched per periodic salvo
   requires?: string;       // building type that must be built before this unit can be trained
   alloy?: number;          // alloy build-cost surcharge (advanced units)
   desc: string;
@@ -198,6 +199,7 @@ export const U: Record<string, UnitDef> = {
   kyle: { name: 'Kyle', cost: 850, hp: 360, speed: 70, radius: 11, sight: 7, buildTime: 16, dmg: 16, range: 130, rof: 0.8, hero: true, unique: true, auraHeal: 14, requires: 'cyber', desc: 'SPECIAL — the conscience of the squad. Constantly mends nearby allies with a healing aura. One per faction. Needs a Cyber Ops Center.' },
   jedi: { name: 'Jedi Knight', cost: 900, hp: 440, speed: 96, radius: 11, sight: 8, buildTime: 17, dmg: 34, range: 116, rof: 0.65, hero: true, unique: true, deflect: 0.5, requires: 'cyber', desc: 'SPECIAL — a saber duelist. Fast and deadly up close, and DEFLECTS incoming blaster fire — often bouncing the bolt back at the shooter. Hard-countered by splash/explosions. One per faction. Needs a Cyber Ops Center.' },
   sith: { name: 'Sith Lord', cost: 1000, hp: 520, speed: 64, radius: 12, sight: 8, buildTime: 18, dmg: 28, range: 124, rof: 0.9, hero: true, unique: true, forceLightning: 4, requires: 'cyber', desc: 'SPECIAL — a dark-side sorcerer. Every few seconds unleashes FORCE LIGHTNING that arcs through several nearby enemies, searing them and leaving them briefly stunned. One per faction. Needs a Cyber Ops Center.' },
+  bountyhunter: { name: 'Bounty Hunter', cost: 950, hp: 360, speed: 150, radius: 10, sight: 9, buildTime: 17, dmg: 16, range: 150, rof: 0.7, air: true, antiAir: true, coolant: 4, hero: true, unique: true, seekerSalvo: 4, requires: 'cyber', desc: 'SPECIAL — a jetpack mercenary. Flies over terrain (only AA can hit her) and periodically locks a SALVO of homing seeker missiles onto several enemies at once. Fast hit-and-run raider; fragile. One per faction. Needs a Cyber Ops Center.' },
   // Heroes — never built; excavated from Hero Vaults by a Borer. cost/buildTime unused.
   titan: { name: 'Colossus Titan', cost: 0, hp: 1700, speed: 58, radius: 15, sight: 7, buildTime: 0, dmg: 46, range: 128, rof: 0.9, splash: 30, coolant: 3, hero: true, desc: 'HERO — a towering brawler. Massive armour and a crushing short-range cannon.' },
   siegelord: { name: 'Devastator', cost: 0, hp: 760, speed: 54, radius: 13, sight: 8, buildTime: 0, dmg: 95, range: 300, rof: 3.2, splash: 72, coolant: 4, hero: true, desc: 'HERO — siege artillery. Annihilating long-range splash; fragile up close.' },

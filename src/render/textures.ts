@@ -401,6 +401,16 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillStyle = '#e7c9a0'; g.beginPath(); g.arc(cx, cy - 4, 6, 0, 7); g.fill();                      // face
     g.fillStyle = '#2f9e4f'; g.beginPath(); g.arc(cx, cy - 7, 6.5, Math.PI, 0); g.fill(); g.fillRect(cx - 7, cy - 8, 14, 2.4);  // green ushanka
     g.fillStyle = '#2f9e4f'; g.fillRect(cx - 8, cy - 8, 2.5, 5); g.fillRect(cx + 5.5, cy - 8, 2.5, 5);  // ear flaps
+  } else if (type === 'bountyhunter') {
+    // Bounty Hunter: armored mercenary with a T-visor helmet, twin jetpack thrusters firing
+    g.fillStyle = 'rgba(255,150,60,.7)'; g.beginPath(); g.moveTo(cx - 7, cy + 6); g.lineTo(cx - 5, cy + 14); g.lineTo(cx - 3, cy + 6); g.closePath(); g.fill();   // L thruster flame
+    g.beginPath(); g.moveTo(cx + 3, cy + 6); g.lineTo(cx + 5, cy + 14); g.lineTo(cx + 7, cy + 6); g.closePath(); g.fill();   // R thruster flame
+    g.fillStyle = '#5a6470'; rr(g, cx - 6, cy - 4, 12, 13, 3); g.fill();
+    g.strokeStyle = col; g.lineWidth = 1.5; rr(g, cx - 6, cy - 4, 12, 13, 3); g.stroke();
+    g.fillStyle = '#39424f'; rr(g, cx - 9, cy - 2, 4, 9, 1.5); g.fill(); rr(g, cx + 5, cy - 2, 4, 9, 1.5); g.fill();   // jetpack packs
+    g.fillStyle = '#3a4450'; g.beginPath(); g.arc(cx, cy - 7, 5, 0, 7); g.fill();   // helmet
+    g.strokeStyle = '#2aa9c0'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx - 3, cy - 8); g.lineTo(cx + 3, cy - 8); g.stroke();   // T-visor slit
+    g.fillStyle = `rgba(${rgb},.85)`; g.fillRect(cx - 6, cy + 6, 12, 2.4);   // faction belt
   } else if (type === 'sith') {
     // Sith Lord: black hooded robe, shadowed face, crackling violet Force-lightning at the fingertips
     g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(cx, cy + 11, 10, 3.5, 0, 0, 7); g.fill();   // shadow
