@@ -5,7 +5,8 @@ import { makeUI, refresh, showEnd, resetOverlays, setRestartHook, setStartHook, 
 import { setLeader } from './sim/sim';
 import { PLAYER } from './sim/constants';
 import { initAudio, sfx } from './audio';
-import { isInCampaignBattle, onBattleEnd as conquestBattleEnd, setLaunchBattle, startCampaign } from './conquest';
+import { isInCampaignBattle, onBattleEnd as conquestBattleEnd, setLaunchBattle, startCampaign, campaignTech, campaignTechMul } from './conquest';
+import { setCampaignBuffs } from './sim/sim';
 
 // Guard against duplicate boots (Vite HMR can re-run this module without a full
 // page reload, which would otherwise stack multiple Phaser games on one page).
@@ -35,10 +36,12 @@ scene.setEndHandler((win) => {
 setLaunchBattle((bonus, name) => {
   initAudio();
   resetOverlays();
-  scene.newMatch(true);
+  scene.newMatch(true);                 // resets sim locals (campaign buffs → 1); re-apply them after
   setLeader(PLAYER, getChosenLeader());
   if (bonus > 0) game.money[PLAYER] += bonus;
-  logMsg('Theater: ' + name + '.' + (bonus > 0 ? ' Reinforcement grant +' + bonus + ' credits.' : ''));
+  setCampaignBuffs(campaignTechMul(), campaignTechMul());   // persistent War-Tech army upgrade
+  const tech = campaignTech();
+  logMsg('Theater: ' + name + '.' + (bonus > 0 ? ' Reinforcement +' + bonus + ' cr.' : '') + (tech > 0 ? ' War-Tech Lv ' + tech + ' active.' : ''));
   sfx('place');
 });
 

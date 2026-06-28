@@ -43,7 +43,7 @@ let peaceCd: Record<string, number> = {};      // pair key → game.t until whic
 let aiPeaceOffer: Record<number, number> = {}; // AI team → game.t until which it is standing-offering the player a free ceasefire
 let lastPeaceLog: Record<number, number> = {}; // AI team → game.t of its last "sues for peace" feed line (throttle)
 export function pendingStrikeList(): readonly Strike[] { return pendingStrikes; }
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; uprisings = 0; legionFounded = false; pendingStrikes = []; lastWoodNag = -9; peaceCd = {}; aiPeaceOffer = {}; lastPeaceLog = {}; stealthT = 0; mineTrip = 0; respawnQueue = []; }
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; uprisings = 0; legionFounded = false; pendingStrikes = []; lastWoodNag = -9; peaceCd = {}; aiPeaceOffer = {}; lastPeaceLog = {}; stealthT = 0; mineTrip = 0; respawnQueue = []; campaignDmgMul = 1; campaignHpMul = 1; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -81,8 +81,12 @@ export function addUnit(type: string, x: number, y: number, team: number): Unit 
     facing: Math.random() * 7, aim: Math.random() * 7, bob: Math.random() * 7,
     moving: false, trailT: 0, lastShot: -9,
   };
+  if (team === PLAYER && campaignHpMul !== 1) { u.hpMax = Math.round(u.hpMax * campaignHpMul); u.hp = u.hpMax; }   // Conquest War-Tech: tougher campaign units
   game.units.push(u); return u;
 }
+// Conquest War-Tech: persistent player army upgrades applied per campaign battle (1 = none, set after newMatch).
+let campaignDmgMul = 1, campaignHpMul = 1;
+export function setCampaignBuffs(dmgMul: number, hpMul: number) { campaignDmgMul = dmgMul; campaignHpMul = hpMul; }
 function freeSpotNear(x: number, y: number): Vec {
   for (let r = 0; r < 12; r++) for (let i = 0; i < 12; i++) {
     const a = Math.random() * Math.PI * 2, px = x + Math.cos(a) * r * 20, py = y + Math.sin(a) * r * 20;
@@ -728,6 +732,7 @@ function rofMult(e: Entity) { return defOf(e).coolant && game.overheat[e.team] ?
 
 function fireAt(src: Entity, target: Entity, dmg: number, rail: boolean, splash = 0) {
   dmg = dmg * (styleMod(src.team).combat ?? 1);          // Militarist hits harder, Mercantile/Populist softer
+  if (src.team === PLAYER) dmg *= campaignDmgMul;        // Conquest War-Tech: persistent campaign damage upgrade
   const byUnit = src.kind === 'u' ? (src as Unit) : undefined;
   if (byUnit) dmg *= vetDmg(byUnit.vet || 0);            // veterans/elites hit harder
   if (byUnit && buffed(byUnit)) dmg *= OVERCHARGE_DMG;   // Overcharge combat stim

@@ -24,11 +24,16 @@ let battleMode: 'attack' | 'defend' = 'attack';
 let battleAttacker = -1;   // the AI faction invading (defense battles)
 let pendingDefense = -1;   // a player territory currently under AI attack — must be defended before anything else
 let defenseBy = -1;        // the AI faction mounting the pending incursion
+let tech = 0;              // War-Tech level — +1 per battle won; persistent army upgrade across the campaign
+const TECH_MAX = 6;        // cap
+const TECH_STEP = 0.08;    // +8% army HP & damage per level
 
 export function setLaunchBattle(fn: (bonus: number, name: string) => void) { launchBattle = fn; }
 export function isCampaignActive() { return active; }
 export function isInCampaignBattle() { return active && inBattle; }
-export function campaignStatus() { return { active, inBattle, owned: ownedCount(), total: world.length, owners: world.map(t => t.owner), pendingDefense, defenseBy, battleMode }; }
+export function campaignTech() { return tech; }
+export function campaignTechMul() { return 1 + tech * TECH_STEP; }   // damage & HP multiplier for the player this campaign
+export function campaignStatus() { return { active, inBattle, owned: ownedCount(), total: world.length, owners: world.map(t => t.owner), pendingDefense, defenseBy, battleMode, tech }; }
 const ownedCount = () => world.filter(t => t.owner === PLAYER).length;
 const factionTerr = (f: number) => world.filter(t => t.owner === f).length;
 
@@ -51,7 +56,7 @@ function freshWorld(): Territory[] {
 }
 
 export function startCampaign(reset: boolean) {
-  if (reset || !loadState()) { world = freshWorld(); active = true; inBattle = false; battleTarget = -1; selected = -1; pendingDefense = -1; defenseBy = -1; saveState(); }
+  if (reset || !loadState()) { world = freshWorld(); active = true; inBattle = false; battleTarget = -1; selected = -1; pendingDefense = -1; defenseBy = -1; tech = 0; saveState(); }
   active = true;
   ensureOverlay();
   showMap();
@@ -89,6 +94,7 @@ export function onBattleEnd(win: boolean) {
     if (win) t.owner = PLAYER;
     note = win ? t.name + ' secured.' : 'The assault on ' + t.name + ' failed — regroup and try again.';
   }
+  if (win && tech < TECH_MAX) { tech++; note += ' War-Tech advanced to level ' + tech + ' (+' + Math.round(tech * TECH_STEP * 100) + '% army HP & damage).'; }
   inBattle = false; battleTarget = -1; selected = -1; battleMode = 'attack'; battleAttacker = -1;
   aiWorldTurn();
   saveState();
@@ -119,7 +125,7 @@ function aiWorldTurn() {
 }
 
 // ── persistence (survives a reload) ──────────────────────────────────────────
-function saveState() { try { localStorage.setItem('nexusConquest', JSON.stringify({ world, active, pendingDefense, defenseBy })); } catch { /* ignore */ } }
+function saveState() { try { localStorage.setItem('nexusConquest', JSON.stringify({ world, active, pendingDefense, defenseBy, tech })); } catch { /* ignore */ } }
 function loadState(): boolean {
   try {
     const raw = localStorage.getItem('nexusConquest'); if (!raw) return false;
@@ -127,6 +133,7 @@ function loadState(): boolean {
     if (!d.world || !Array.isArray(d.world) || d.world.length !== 12) return false;
     world = d.world; active = !!d.active; inBattle = false; battleTarget = -1; selected = -1; battleMode = 'attack'; battleAttacker = -1;
     pendingDefense = typeof d.pendingDefense === 'number' ? d.pendingDefense : -1; defenseBy = typeof d.defenseBy === 'number' ? d.defenseBy : -1;
+    tech = typeof d.tech === 'number' ? d.tech : 0;
     return true;
   } catch { return false; }
 }
@@ -173,7 +180,7 @@ function showMap(note = '') {
     <div class="panelBox" style="max-width:880px;width:94%">
       <h1 style="color:#e8b64c;letter-spacing:.12em">CONQUEST CAMPAIGN</h1>
       ${intro}
-      <p style="margin:2px 0 8px;font-size:12px">Territories held: <b style="color:#9ce6a4">${owned}/${total}</b> · Reinforcement grant next battle: <b style="color:#e8b64c">+${bonus} cr</b> &nbsp;|&nbsp; ${standings}</p>
+      <p style="margin:2px 0 8px;font-size:12px">Territories held: <b style="color:#9ce6a4">${owned}/${total}</b> · Reinforcement: <b style="color:#e8b64c">+${bonus} cr</b> · War-Tech: <b style="color:#9fdcff">Lv ${tech}</b> <span style="color:#7f8a98">(+${Math.round(tech * TECH_STEP * 100)}% army HP & dmg)</span> &nbsp;|&nbsp; ${standings}</p>
       <svg id="cqMap" viewBox="0 0 950 560" style="width:100%;height:auto;background:#0c1118;border:1px solid #2a313c;border-radius:6px">${lines}${nodes}</svg>
       <div style="margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         ${buttons}
