@@ -653,6 +653,36 @@ function authoritahTick(u: Unit) {
   if (u.team === PLAYER || tileVisible(u.x, u.y)) { logMsg('🗣 Cartman: "' + CARTMAN_QUIPS[Math.random() * CARTMAN_QUIPS.length | 0] + '" — ' + n + ' stunned', u.team === PLAYER ? 'good' : 'war', { x: u.x, y: u.y }); sfx('emp', u.x); }
 }
 
+// ── Sith Lord: Force Lightning — a periodic chain that damages + briefly stuns several enemies ──
+const FORCE_CD = 9;          // seconds between Force-Lightning casts
+const FORCE_RANGE = 190;     // acquisition range for the first arc
+const FORCE_JUMP = 135;      // max distance the lightning leaps to the next victim
+const FORCE_DUR = 2;         // stun seconds applied to each chained enemy
+const FORCE_DMG = 70;        // damage to the first victim (falls off per hop)
+function forceLightningTick(u: Unit) {
+  if ((u.authT ?? 0) > game.t) return;
+  if (u.authT === undefined) { u.authT = game.t + FORCE_CD; return; }   // arm on first sight, don't fire instantly
+  const first = nearestHostile(u, FORCE_RANGE, u.team, false);
+  if (!first || first.kind !== 'u') { u.authT = game.t + 1; return; }    // nothing in range — re-check soon
+  u.authT = game.t + FORCE_CD;
+  const hit = new Set<Entity>(); let from: Entity = u, tgt: Entity | null = first, dmg = FORCE_DMG;
+  for (let i = 0; i < (U[u.type].forceLightning || 1) && tgt; i++) {
+    hit.add(tgt);
+    game.parts.push({ type: 'arc', x: from.x, y: from.y, x2: tgt.x, y2: tgt.y, t: 0, life: 0.2, rgb: '200,180,255' });
+    spawnParts('spark', tgt.x, tgt.y, 4, '210,180,255');
+    if (tgt.kind === 'u') { (tgt as Unit).disabledUntil = game.t + FORCE_DUR; (tgt as Unit).moving = false; (tgt as Unit).path = null; }
+    damage(tgt, dmg, u.team);
+    from = tgt; dmg *= 0.7;
+    let next: Entity | null = null, nd = FORCE_JUMP;
+    forNearbyUnits(from.x, from.y, FORCE_JUMP, (o) => {
+      if (o.dead || hit.has(o) || !isWar(u.team, o.team) || o.team === 0 || U[o.type].hero || isAir(o) || cloaked(o) || (o.tunnelT ?? 0) > 0) return;
+      const dd = dist(from, o); if (dd < nd) { nd = dd; next = o; }
+    });
+    tgt = next;
+  }
+  if (u.team === PLAYER || tileVisible(u.x, u.y)) { logMsg('⚡ ' + FAC[u.team].name + ' Sith Lord unleashes Force Lightning', u.team === PLAYER ? 'good' : 'war', { x: u.x, y: u.y }); sfx('emp', u.x); }
+}
+
 // ── Stan: leadership rally aura (allied combat units near him hit harder & move faster) ──
 function rallyTick(u: Unit) {
   const r = U[u.type].rallyAura!;
@@ -1432,6 +1462,7 @@ function updateUnit(u: Unit, dt: number) {
   if (U[u.type].tunneler && u.moving && Math.random() < dt * 7) spawnParts('debris', u.x, u.y + 6, 1, '120,100,72');   // burrow spoil trail
   if (U[u.type].auraHeal) auraTick(u, dt);                              // Warden hero — constant heal aura
   if (U[u.type].authoritah) authoritahTick(u);                          // Cartman — periodic "RESPECT MY AUTHORITAH" stun
+  if (U[u.type].forceLightning) forceLightningTick(u);                  // Sith Lord — periodic Force-Lightning chain (damage + stun)
   if (U[u.type].rallyAura) rallyTick(u);                                // Stan — leadership rally aura (+dmg/+speed to nearby allies)
   if ((u.vet || 0) >= 2 && u.hp < u.hpMax) u.hp = Math.min(u.hpMax, u.hp + 4 * dt);   // Elite units self-repair slowly
   // turret aim smoothing
@@ -2352,7 +2383,7 @@ function aiUpdate(team: number, dt: number) {
     if (hasMill && countType('repair') < 2 && !anyQueued('repair') && game.money[team] > 800) { fSup.queue.push('repair'); game.money[team] -= U.repair.cost; }
     else if (hasDrill && countType('hunter') < 1 && !anyQueued('hunter') && game.money[team] > 900) { fSup.queue.push('hunter'); game.money[team] -= U.hunter.cost; }
     else if (hasCyberB && game.money[team] > 1500 && Math.random() < dt * 0.03) {   // a special character — one of each per AI, occasionally
-      const special = ['cartman', 'kenny', 'stan', 'kyle', 'jedi'].find(s => countType(s) < 1 && !anyQueued(s) && !respawnQueue.some(r => r.team === team && r.type === s) && game.money[team] >= U[s].cost);
+      const special = ['cartman', 'kenny', 'stan', 'kyle', 'jedi', 'sith'].find(s => countType(s) < 1 && !anyQueued(s) && !respawnQueue.some(r => r.team === team && r.type === s) && game.money[team] >= U[s].cost);
       if (special) { fSup.queue.push(special); game.money[team] -= U[special].cost; }
     }
   }

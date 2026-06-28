@@ -401,6 +401,16 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillStyle = '#e7c9a0'; g.beginPath(); g.arc(cx, cy - 4, 6, 0, 7); g.fill();                      // face
     g.fillStyle = '#2f9e4f'; g.beginPath(); g.arc(cx, cy - 7, 6.5, Math.PI, 0); g.fill(); g.fillRect(cx - 7, cy - 8, 14, 2.4);  // green ushanka
     g.fillStyle = '#2f9e4f'; g.fillRect(cx - 8, cy - 8, 2.5, 5); g.fillRect(cx + 5.5, cy - 8, 2.5, 5);  // ear flaps
+  } else if (type === 'sith') {
+    // Sith Lord: black hooded robe, shadowed face, crackling violet Force-lightning at the fingertips
+    g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(cx, cy + 11, 10, 3.5, 0, 0, 7); g.fill();   // shadow
+    g.fillStyle = '#16121d'; g.beginPath(); g.moveTo(cx - 9, cy + 12); g.lineTo(cx + 9, cy + 12); g.lineTo(cx + 5, cy - 6); g.lineTo(cx - 5, cy - 6); g.closePath(); g.fill();   // black robe
+    g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.moveTo(cx - 9, cy + 12); g.lineTo(cx + 9, cy + 12); g.lineTo(cx + 5, cy - 6); g.lineTo(cx - 5, cy - 6); g.closePath(); g.stroke();
+    g.fillStyle = '#0c0a10'; g.beginPath(); g.arc(cx, cy - 8, 6.5, Math.PI * 1.02, Math.PI * 1.98); g.fill();   // deep hood
+    g.fillStyle = '#d23a4a'; g.beginPath(); g.arc(cx - 2, cy - 7, 0.9, 0, 7); g.fill(); g.beginPath(); g.arc(cx + 2, cy - 7, 0.9, 0, 7); g.fill();   // red eyes
+    g.strokeStyle = 'rgba(199,155,255,.95)'; g.lineWidth = 1.4; g.beginPath();   // force lightning from the hand
+    g.moveTo(cx + 6, cy + 2); g.lineTo(cx + 11, cy - 2); g.lineTo(cx + 8, cy - 5); g.lineTo(cx + 14, cy - 9); g.stroke();
+    g.strokeStyle = 'rgba(230,210,255,.6)'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx + 6, cy + 2); g.lineTo(cx + 14, cy - 9); g.stroke();
   } else if (type === 'jedi') {
     // Jedi Knight: hooded robe + a glowing lightsaber held to one side
     g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(cx, cy + 11, 10, 3.5, 0, 0, 7); g.fill();   // shadow
