@@ -762,7 +762,7 @@ function applyShield(e: Entity, amt: number): number {
   if (Math.random() < 0.25) game.parts.push({ type: 'spark', x: e.x, y: e.y, t: 0, life: 0.25, rgb: '150,210,255' });   // shimmer on absorb
   return amt - soak;
 }
-function damage(e: Entity, amt: number, fromTeam: number) { e.hp -= applyShield(e, amt); if (e.hp <= 0) destroy(e, fromTeam); }
+function damage(e: Entity, amt: number, fromTeam: number) { e.hitT = game.t; e.hp -= applyShield(e, amt); if (e.hp <= 0) destroy(e, fromTeam); }
 function destroy(e: Entity, fromTeam: number) {
   if (e.dead) return; e.dead = true;
   const big = e.kind === 'b';
@@ -1659,7 +1659,8 @@ function updateShots(dt: number) {
         game.parts.push({ type: 'ring', x: hx, y: hy, t: 0, life: 0.5, big: false });
         game.shake = Math.min(11, game.shake + 1.5);
       }
-      spawnParts('spark', hx, hy, 3, '255,240,200');
+      spawnParts('spark', hx, hy, 4, '255,240,200');
+      game.parts.push({ type: 'flash', x: hx, y: hy, t: 0, life: 0.08 });   // a crisp impact pop for punchier hits
     } else { s.x += dx / l * step; s.y += dy / l * step; }
   }
   game.shots = game.shots.filter(s => !s.dead);

@@ -85,6 +85,7 @@ export interface Building {
   garrison?: { type: string; hp: number; vet?: number }[];   // infantry sheltering inside → defensive fire; eject if it falls
   fromPod?: boolean;     // this turret was deployed from a Sentry Pod (can be packed back into one)
   shieldE?: number;      // Shield Projector: remaining absorb energy (drains soaking damage, recharges over time)
+  hitT?: number;         // game.t of the last damage taken → a brief render hit-flash
   dead?: boolean;
 }
 
@@ -132,6 +133,7 @@ export interface Unit {
   buffUntil?: number;    // Overcharge: game.t until which this unit has the combat-stim (+dmg/+speed) buff
   enterT?: number;       // game.t an 'enter' (garrison) order began → give up if it can't reach in time
   authT?: number;        // Cartman: game.t of the next "RESPECT MY AUTHORITAH" stun pulse
+  hitT?: number;         // game.t of the last damage taken → a brief render hit-flash
   dead?: boolean;
 }
 

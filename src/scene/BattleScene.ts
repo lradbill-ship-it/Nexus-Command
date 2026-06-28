@@ -450,7 +450,7 @@ export class BattleScene extends Phaser.Scene {
     r.body.setVisible(vis).setDepth(b.y);
     // construction look: darken + fade while building
     const built = b.progress >= 1;
-    r.body.setAlpha(built ? 1 : 0.55).setTint(built ? 0xffffff : 0x6b7a5a);
+    r.body.setAlpha(built ? 1 : 0.55).setTint(!built ? 0x6b7a5a : game.t - (b.hitT ?? -9) < 0.08 ? 0xff7a60 : 0xffffff);   // hit-flash when struck
     if (r.glow) {
       const pulse = 0.5 + 0.5 * Math.sin(b.anim * 2.4);
       r.glow.setVisible(vis && built).setDepth(b.y + 0.2)
@@ -494,7 +494,7 @@ export class BattleScene extends Phaser.Scene {
     const mega = u.stack && u.stack > 1 ? 1 + Math.min(0.9, (u.stack - 1) * 0.06) : 1;   // merged collectors render bigger
     r.body.setVisible(vis).setDepth(depth).setPosition(u.x, dy).setRotation(u.facing + Math.PI / 2).setScale(mega)
       .setAlpha((u.tunnelT ?? 0) > 0 ? 0.3 : (U[u.type].stealth && cloaked(u)) ? 0.4 : u.disabledUntil > game.t ? 0.6 : 1);   // burrowing / cloaked → faded
-    r.body.setTint(buffed(u) ? 0xffce6a : 0xffffff);   // Overcharge → warm glow
+    r.body.setTint(game.t - (u.hitT ?? -9) < 0.08 ? 0xff7a60 : buffed(u) ? 0xffce6a : 0xffffff);   // hit-flash on damage · Overcharge → warm glow
     if (r.shadow) r.shadow.setVisible(vis).setDepth(u.y - 1).setPosition(u.x, u.y).setScale(0.8).setAlpha(0.45);
     if (r.barrel) r.barrel.setVisible(vis).setDepth(depth + 0.5).setPosition(u.x, dy).setRotation(u.aim + Math.PI / 2);
     if (r.rotor) r.rotor.setVisible(vis).setDepth(depth + 0.6).setPosition(u.x, dy).setRotation(game.t * 22)
