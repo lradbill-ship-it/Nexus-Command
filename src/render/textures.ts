@@ -368,6 +368,29 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillRect(cx - 7.5, cy - 9, 15, 2.5);                                                               // beanie brim
     g.fillStyle = '#f2d23a'; g.beginPath(); g.arc(cx, cy - 16, 2.6, 0, 7); g.fill();                     // yellow puff
     g.fillStyle = '#2a2a2a'; g.beginPath(); g.arc(cx - 2.6, cy - 5, 1, 0, 7); g.fill(); g.beginPath(); g.arc(cx + 2.6, cy - 5, 1, 0, 7); g.fill();   // eyes
+  } else if (type === 'kenny') {
+    // Kenny: orange parka, hood drawn tight — only a dark face-slit shows
+    g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(cx, cy + 9, 9, 3, 0, 0, 7); g.fill();
+    g.fillStyle = '#e07a23'; g.beginPath(); g.ellipse(cx, cy + 2, 9, 9, 0, 0, 7); g.fill();           // parka body
+    g.strokeStyle = col; g.lineWidth = 1.4; g.beginPath(); g.ellipse(cx, cy + 2, 9, 9, 0, 0, 7); g.stroke();
+    g.fillStyle = '#e88a33'; g.beginPath(); g.arc(cx, cy - 6, 7, 0, 7); g.fill();                      // hood
+    g.fillStyle = '#1c1c1c'; g.beginPath(); g.arc(cx, cy - 5, 3.4, 0, 7); g.fill();                    // dark face slit
+  } else if (type === 'stan') {
+    // Stan: brown jacket, blue beanie with a red puff
+    g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(cx, cy + 10, 10, 3, 0, 0, 7); g.fill();
+    g.fillStyle = '#6f4a2b'; g.beginPath(); g.ellipse(cx, cy + 3, 10, 9, 0, 0, 7); g.fill();           // brown jacket
+    g.strokeStyle = col; g.lineWidth = 1.4; g.beginPath(); g.ellipse(cx, cy + 3, 10, 9, 0, 0, 7); g.stroke();
+    g.fillStyle = '#e7c9a0'; g.beginPath(); g.arc(cx, cy - 4, 6, 0, 7); g.fill();                      // face
+    g.fillStyle = '#2f6fd0'; g.beginPath(); g.arc(cx, cy - 7, 6.5, Math.PI, 0); g.fill(); g.fillRect(cx - 6.5, cy - 8, 13, 2); // blue beanie
+    g.fillStyle = '#d23a2f'; g.beginPath(); g.arc(cx, cy - 14, 2.3, 0, 7); g.fill();                   // red puff
+  } else if (type === 'kyle') {
+    // Kyle: orange jacket, green ushanka with ear flaps
+    g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(cx, cy + 10, 10, 3, 0, 0, 7); g.fill();
+    g.fillStyle = '#e08a2a'; g.beginPath(); g.ellipse(cx, cy + 3, 10, 9, 0, 0, 7); g.fill();           // orange jacket
+    g.strokeStyle = col; g.lineWidth = 1.4; g.beginPath(); g.ellipse(cx, cy + 3, 10, 9, 0, 0, 7); g.stroke();
+    g.fillStyle = '#e7c9a0'; g.beginPath(); g.arc(cx, cy - 4, 6, 0, 7); g.fill();                      // face
+    g.fillStyle = '#2f9e4f'; g.beginPath(); g.arc(cx, cy - 7, 6.5, Math.PI, 0); g.fill(); g.fillRect(cx - 7, cy - 8, 14, 2.4);  // green ushanka
+    g.fillStyle = '#2f9e4f'; g.fillRect(cx - 8, cy - 8, 2.5, 5); g.fillRect(cx + 5.5, cy - 8, 2.5, 5);  // ear flaps
   } else if (type === 'borer') {
     // subterranean borer: heavy hull + big conical drill bit up front
     g.fillStyle = '#1a232e'; g.fillRect(cx - 13, cy - 6, 3.6, 18); g.fillRect(cx + 9.4, cy - 6, 3.6, 18);   // tracks

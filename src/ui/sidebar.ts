@@ -13,7 +13,7 @@ let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
 
 const buildOrder = ['power', 'refinery', 'foundry', 'turret', 'wall', 'gate', 'palisade', 'pump', 'watertower', 'smelter', 'mill', 'habitat', 'market', 'aaturret', 'idome', 'shieldgen', 'cyber', 'silo', 'drillbay'];
-const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'envoy', 'aegis', 'recon', 'infantry', 'rocket', 'transport', 'sentrypod', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'hunter', 'spectre', 'borer', 'cartman'];
+const unitOrder = ['harvester', 'tanker', 'hauler', 'logger', 'repair', 'envoy', 'aegis', 'recon', 'infantry', 'rocket', 'transport', 'sentrypod', 'strike', 'artillery', 'walker', 'harrier', 'aircraft', 'hunter', 'spectre', 'borer', 'cartman', 'kenny', 'stan', 'kyle'];
 const covertOrder = ['steal', 'sabotage', 'recon', 'incite'];
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -51,6 +51,9 @@ function iconCanvas(kind: 'b' | 'u', type: string): HTMLCanvasElement {
     else if (type === 'transport') { g.fillRect(11, 6, 18, 14); g.strokeRect(11, 6, 18, 14); g.fillStyle = 'rgba(160,195,220,.6)'; g.fillRect(14, 8, 12, 3); g.strokeStyle = '#9fd9cc'; g.strokeRect(15, 14, 10, 5); }
     else if (type === 'sentrypod') { g.fillRect(12, 9, 16, 11); g.strokeRect(12, 9, 16, 11); g.fillStyle = '#2c3744'; g.beginPath(); g.arc(cx, cy + 2, 4, 0, 7); g.fill(); g.strokeStyle = '#aebcc8'; g.lineWidth = 2.2; g.beginPath(); g.moveTo(cx, cy + 2); g.lineTo(cx + 2, cy - 7); g.stroke(); }
     else if (type === 'cartman') { g.fillStyle = '#c0392b'; g.beginPath(); g.ellipse(cx, cy + 3, 8, 7, 0, 0, 7); g.fill(); g.fillStyle = '#e7c9a0'; g.beginPath(); g.arc(cx, cy - 3, 5, 0, 7); g.fill(); g.fillStyle = '#27a3b8'; g.beginPath(); g.arc(cx, cy - 5, 5.5, Math.PI, 0); g.fill(); g.fillStyle = '#f2d23a'; g.beginPath(); g.arc(cx, cy - 11, 2, 0, 7); g.fill(); }
+    else if (type === 'kenny') { g.fillStyle = '#e07a23'; g.beginPath(); g.ellipse(cx, cy + 2, 7, 7, 0, 0, 7); g.fill(); g.fillStyle = '#e88a33'; g.beginPath(); g.arc(cx, cy - 4, 5.5, 0, 7); g.fill(); g.fillStyle = '#1c1c1c'; g.beginPath(); g.arc(cx, cy - 3, 2.6, 0, 7); g.fill(); }
+    else if (type === 'stan') { g.fillStyle = '#6f4a2b'; g.beginPath(); g.ellipse(cx, cy + 3, 8, 7, 0, 0, 7); g.fill(); g.fillStyle = '#e7c9a0'; g.beginPath(); g.arc(cx, cy - 3, 5, 0, 7); g.fill(); g.fillStyle = '#2f6fd0'; g.beginPath(); g.arc(cx, cy - 5, 5.5, Math.PI, 0); g.fill(); g.fillStyle = '#d23a2f'; g.beginPath(); g.arc(cx, cy - 11, 2, 0, 7); g.fill(); }
+    else if (type === 'kyle') { g.fillStyle = '#e08a2a'; g.beginPath(); g.ellipse(cx, cy + 3, 8, 7, 0, 0, 7); g.fill(); g.fillStyle = '#e7c9a0'; g.beginPath(); g.arc(cx, cy - 3, 5, 0, 7); g.fill(); g.fillStyle = '#2f9e4f'; g.beginPath(); g.arc(cx, cy - 5, 5.5, Math.PI, 0); g.fill(); g.fillStyle = '#2f9e4f'; g.fillRect(cx - 6, cy - 6, 2, 4); g.fillRect(cx + 4, cy - 6, 2, 4); }
     else if (type === 'recon') { g.strokeStyle = '#cfe6ee'; for (const [rx, ry] of [[-6, -4], [6, -4], [-6, 4], [6, 4]]) { g.beginPath(); g.arc(cx + rx, cy + ry, 3, 0, 7); g.stroke(); } }
     else if (type === 'infantry') { g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill(); g.fillStyle = '#2c3744'; g.fillRect(cx - 3, cy - 1, 6, 8); g.strokeStyle = '#cdd9e3'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + 7, cy - 6); g.stroke(); }
     else if (type === 'rocket') { g.fillStyle = '#9fb3c2'; g.beginPath(); g.arc(cx, cy - 4, 3, 0, 7); g.fill(); g.fillStyle = '#2c3744'; g.fillRect(cx - 3, cy - 1, 6, 8); g.strokeStyle = '#e8a33d'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 4, cy - 1); g.lineTo(cx + 8, cy - 7); g.stroke(); }

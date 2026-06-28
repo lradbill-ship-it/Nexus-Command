@@ -43,7 +43,7 @@ let peaceCd: Record<string, number> = {};      // pair key → game.t until whic
 let aiPeaceOffer: Record<number, number> = {}; // AI team → game.t until which it is standing-offering the player a free ceasefire
 let lastPeaceLog: Record<number, number> = {}; // AI team → game.t of its last "sues for peace" feed line (throttle)
 export function pendingStrikeList(): readonly Strike[] { return pendingStrikes; }
-export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; uprisings = 0; legionFounded = false; pendingStrikes = []; lastWoodNag = -9; peaceCd = {}; aiPeaceOffer = {}; lastPeaceLog = {}; stealthT = 0; mineTrip = 0; }
+export function resetSimLocals() { nextId = 1; dipTickT = 0; lastStates = {}; lastHintT = 0; crystalT = 55; autoScout = false; autoScoutT = 0; aiAccum = 0; visionAccum = 0; militiaT = 0; uprisings = 0; legionFounded = false; pendingStrikes = []; lastWoodNag = -9; peaceCd = {}; aiPeaceOffer = {}; lastPeaceLog = {}; stealthT = 0; mineTrip = 0; respawnQueue = []; }
 
 // ── Entities ─────────────────────────────────────────────────────────────────
 export function footprintFree(type: string, tx: number, ty: number) {
@@ -649,6 +649,39 @@ function authoritahTick(u: Unit) {
   if (u.team === PLAYER || tileVisible(u.x, u.y)) { logMsg('🗣 Cartman: "' + CARTMAN_QUIPS[Math.random() * CARTMAN_QUIPS.length | 0] + '" — ' + n + ' stunned', u.team === PLAYER ? 'good' : 'war', { x: u.x, y: u.y }); sfx('emp', u.x); }
 }
 
+// ── Stan: leadership rally aura (allied combat units near him hit harder & move faster) ──
+function rallyTick(u: Unit) {
+  const r = U[u.type].rallyAura!;
+  forNearbyUnits(u.x, u.y, r, (o) => {
+    if (o === u || o.dead || !isAllied(u.team, o.team) || isSupport(o.type) || (U[o.type].dmg || 0) <= 0 || dist(o, u) > r) return;
+    o.buffUntil = Math.max(o.buffUntil || 0, game.t + 0.6);     // refreshed continuously while near Stan (reuses Overcharge's +dmg/+speed)
+  });
+}
+
+// ── Kenny: dies easily but always comes back (respawns at the owner's HQ) ──────
+const KENNY_QUIPS = ['Oh my God, they killed Kenny!', '…you bastards!'];
+let respawnQueue: { team: number; type: string; at: number }[] = [];
+function queueRespawn(u: Unit) {
+  respawnQueue.push({ team: u.team, type: u.type, at: game.t + (U[u.type].respawns || 15) });
+  if (u.team === PLAYER) { logMsg('🗣 "' + KENNY_QUIPS[0] + ' ' + KENNY_QUIPS[1] + '" — ' + U[u.type].name + ' will return', 'war'); sfx('war'); }
+}
+function respawnTick() {
+  if (!respawnQueue.length) return;
+  for (let i = respawnQueue.length - 1; i >= 0; i--) {
+    const t = respawnQueue[i];
+    if (game.t < t.at) continue;
+    respawnQueue.splice(i, 1);
+    if (game.eliminated[t.team]) continue;                       // no HQ left → he stays gone
+    const hq = game.buildings.find(b => b.team === t.team && b.type === 'hq') || game.buildings.find(b => b.team === t.team);
+    if (!hq) continue;
+    const sp = freeSpotNear(hq.x, hq.y + hq.h * 0.6);
+    addUnit(t.type, sp.x, sp.y, t.team);
+    if (t.team === PLAYER) { logMsg(U[t.type].name + ' is back on the battlefield.', 'good', { x: sp.x, y: sp.y }); sfx('chime'); }
+  }
+}
+/** True if a unique character of this type is alive OR pending respawn for the team (for the train cap). */
+function uniqueLive(team: number, type: string) { return game.units.some(u => u.team === team && u.type === type) || respawnQueue.some(r => r.team === team && r.type === type); }
+
 // ── Crystal regeneration ──────────────────────────────────────────────────────
 // Living fields slowly regrow, and fresh formations crystallize at random sites
 // over the course of a match so the economy never permanently dries up.
@@ -745,6 +778,7 @@ function destroy(e: Entity, fromTeam: number) {
     logMsg((e.team === PLAYER ? 'Our ' : FAC[e.team].name + ' ') + B[(e as Building).type].name + ' destroyed', e.team === PLAYER ? 'war' : undefined);
   } else {
     if ((e as Unit).cargoUnits?.length) unloadTransport(e as Unit, true);   // a downed transport spills its passengers out wounded
+    if (U[(e as Unit).type].respawns) queueRespawn(e as Unit);              // Kenny — schedule his return
     game.units = game.units.filter(u => u !== e);
   }
   game.selection = game.selection.filter(s => s !== e);
@@ -1354,6 +1388,7 @@ function updateUnit(u: Unit, dt: number) {
   if (U[u.type].tunneler && u.moving && Math.random() < dt * 7) spawnParts('debris', u.x, u.y + 6, 1, '120,100,72');   // burrow spoil trail
   if (U[u.type].auraHeal) auraTick(u, dt);                              // Warden hero — constant heal aura
   if (U[u.type].authoritah) authoritahTick(u);                          // Cartman — periodic "RESPECT MY AUTHORITAH" stun
+  if (U[u.type].rallyAura) rallyTick(u);                                // Stan — leadership rally aura (+dmg/+speed to nearby allies)
   if ((u.vet || 0) >= 2 && u.hp < u.hpMax) u.hp = Math.min(u.hpMax, u.hp + 4 * dt);   // Elite units self-repair slowly
   // turret aim smoothing
   let want = u.facing;
@@ -2254,7 +2289,10 @@ function aiUpdate(team: number, dt: number) {
   if (fSup) {
     if (hasMill && countType('repair') < 2 && !anyQueued('repair') && game.money[team] > 800) { fSup.queue.push('repair'); game.money[team] -= U.repair.cost; }
     else if (hasDrill && countType('hunter') < 1 && !anyQueued('hunter') && game.money[team] > 900) { fSup.queue.push('hunter'); game.money[team] -= U.hunter.cost; }
-    else if (hasCyberB && countType('cartman') < 1 && !anyQueued('cartman') && game.money[team] > 1500 && Math.random() < dt * 0.03) { fSup.queue.push('cartman'); game.money[team] -= U.cartman.cost; }   // a special character — one Cartman per AI, occasionally
+    else if (hasCyberB && game.money[team] > 1500 && Math.random() < dt * 0.03) {   // a special character — one of each per AI, occasionally
+      const special = ['cartman', 'kenny', 'stan', 'kyle'].find(s => countType(s) < 1 && !anyQueued(s) && !respawnQueue.some(r => r.team === team && r.type === s) && game.money[team] >= U[s].cost);
+      if (special) { fSup.queue.push(special); game.money[team] -= U[special].cost; }
+    }
   }
   // Diplomacy parity: field an Envoy and send it to court the nearest neutral settlement (peaceful expansion).
   const neutralSettles = game.settlements.filter(s => !s.owner);
@@ -2585,7 +2623,7 @@ export function trainUnit(t: string) {
   if (!fs.length) { hint('Build a War Foundry first'); return; }
   const req = U[t].requires;
   if (req && !hasBuilding(req)) { hint('Requires a ' + B[req].name); return; }
-  if (U[t].unique && (game.units.some(u => u.team === PLAYER && u.type === t) || fs.some(f => f.queue.includes(t)))) { hint('You already command your ' + U[t].name); return; }
+  if (U[t].unique && (uniqueLive(PLAYER, t) || fs.some(f => f.queue.includes(t)))) { hint('You already command your ' + U[t].name); return; }
   if (game.money[PLAYER] < U[t].cost) { hint('Insufficient crystals'); return; }
   if (alloyCost(PLAYER, U[t].alloy) > (game.alloy[PLAYER] || 0)) { hint('Insufficient alloy — build an Alloy Smelter'); return; }
   fs.sort((a, b) => a.queue.length - b.queue.length);
@@ -2678,6 +2716,7 @@ export function stepWorld(dt: number) {
   autoScoutTick(dt);
   stealthTick(dt);
   mineTick(dt);
+  respawnTick();              // bring back fallen respawning characters (Kenny)
   processStrikes();
   visionAccum += dt;
   if (visionAccum >= 0.066) { computeVision(); visionAccum = 0; }   // player fog ~15Hz (AI targeting doesn't use it)
