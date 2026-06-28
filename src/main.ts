@@ -5,6 +5,7 @@ import { makeUI, refresh, showEnd, resetOverlays, setRestartHook, setStartHook, 
 import { setLeader } from './sim/sim';
 import { PLAYER } from './sim/constants';
 import { initAudio, sfx } from './audio';
+import { isInCampaignBattle, onBattleEnd as conquestBattleEnd, setLaunchBattle, startCampaign } from './conquest';
 
 // Guard against duplicate boots (Vite HMR can re-run this module without a full
 // page reload, which would otherwise stack multiple Phaser games on one page).
@@ -24,7 +25,26 @@ w.__nexusGame = new Phaser.Game({
   scene,
 });
 
-scene.setEndHandler((win) => { showEnd(win); sfx(win ? 'victory' : 'defeat'); });
+scene.setEndHandler((win) => {
+  sfx(win ? 'victory' : 'defeat');
+  if (isInCampaignBattle()) conquestBattleEnd(win);   // resolve the territory + return to the world map
+  else showEnd(win);
+});
+
+// Conquest campaign: a battle launched from the world map (carry-over reinforcement bonus + theater name)
+setLaunchBattle((bonus, name) => {
+  initAudio();
+  resetOverlays();
+  scene.newMatch(true);
+  setLeader(PLAYER, getChosenLeader());
+  if (bonus > 0) game.money[PLAYER] += bonus;
+  logMsg('Theater: ' + name + '.' + (bonus > 0 ? ' Reinforcement grant +' + bonus + ' credits.' : ''));
+  sfx('place');
+});
+
+// "CONQUEST CAMPAIGN" button on the intro overlay → open the world map (resume a saved one or start fresh)
+const cqBtn = document.getElementById('conquestBtn');
+if (cqBtn) cqBtn.onclick = () => { const intro = document.getElementById('introOverlay'); if (intro) intro.style.display = 'none'; startCampaign(false); };
 
 setStartHook(() => {
   initAudio();
