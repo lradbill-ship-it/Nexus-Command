@@ -219,16 +219,20 @@ function showMap(note = '') {
 
 function showVictory() {
   ensureOverlay();
-  overlay!.innerHTML = `<div class="panelBox"><h1 class="win" style="color:#9ce6a4">WORLD CONQUERED</h1>
-    <p>Every territory flies your colors, Commander. The continent is yours.</p>
+  overlay!.innerHTML = `<div class="panelBox" style="text-align:center;max-width:560px">
+    <div style="font-size:46px;line-height:1;margin-bottom:6px;filter:drop-shadow(0 0 18px rgba(232,182,76,.6))">🏆</div>
+    <h1 style="color:#9ce6a4;text-shadow:0 0 26px rgba(156,230,164,.6),0 0 6px rgba(156,230,164,.8)">WORLD CONQUERED</h1>
+    <p style="margin-top:10px">Every one of the <b style="color:#9ce6a4">${world.length}</b> territories flies your colors, Commander — and your forces reached <b style="color:#9fdcff">War-Tech Lv ${tech}</b>. The continent is yours.</p>
     <button class="go" id="cqNew">NEW CAMPAIGN</button></div>`;
   overlay!.style.display = 'flex';
   (overlay!.querySelector('#cqNew') as HTMLButtonElement).onclick = () => startCampaign(true);
 }
 function showDefeat() {
   ensureOverlay();
-  overlay!.innerHTML = `<div class="panelBox"><h1 class="lose" style="color:#e8483a">CAMPAIGN LOST</h1>
-    <p>Your last holding has fallen. The war is over.</p>
+  overlay!.innerHTML = `<div class="panelBox" style="text-align:center;max-width:560px">
+    <div style="font-size:42px;line-height:1;margin-bottom:6px;filter:grayscale(.3) drop-shadow(0 0 14px rgba(232,72,58,.5))">🏴</div>
+    <h1 style="color:#e8483a;text-shadow:0 0 22px rgba(232,72,58,.55)">CAMPAIGN LOST</h1>
+    <p style="margin-top:10px">Your last holding has fallen and the continent answers to another. The war is over — but another can always begin.</p>
     <button class="go" id="cqNew">NEW CAMPAIGN</button></div>`;
   overlay!.style.display = 'flex';
   (overlay!.querySelector('#cqNew') as HTMLButtonElement).onclick = () => startCampaign(true);
