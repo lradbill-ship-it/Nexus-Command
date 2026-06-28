@@ -154,18 +154,24 @@ function showMap(note = '') {
   const ov = overlay!;
   const owned = ownedCount(), total = world.length, bonus = (owned - 1) * BONUS_PER;
   const colOf = (o: number) => o === 0 ? '#6b7280' : FAC[o].col;
-  const lines = world.flatMap(t => t.adj.filter(n => n > t.id).map(n =>
-    `<line x1="${t.x}" y1="${t.y}" x2="${world[n].x}" y2="${world[n].y}" stroke="#39414d" stroke-width="2"/>`)).join('');
+  const lines = world.flatMap(t => t.adj.filter(n => n > t.id).map(n => {
+    const b = world[n], frontier = (t.owner === PLAYER) !== (b.owner === PLAYER);   // a player border = a live front
+    return `<line x1="${t.x}" y1="${t.y}" x2="${b.x}" y2="${b.y}" stroke="${frontier ? '#7d8aa0' : '#3f4a5a'}" stroke-width="${frontier ? 2.4 : 1.8}" opacity="${frontier ? 0.7 : 0.45}" stroke-linecap="round"/>`;
+  })).join('');
   const nodes = world.map(t => {
-    const sel = t.id === selected;
+    const c = colOf(t.owner), sel = t.id === selected;
     const atk = selected >= 0 && world[selected].adj.includes(t.id) && t.owner !== PLAYER;
     const threatened = t.id === pendingDefense;
-    const ring = threatened ? '#ff5436' : sel ? '#e8b64c' : atk ? '#e8483a' : '#11161d';
-    return `<g class="terr" data-id="${t.id}" style="cursor:pointer">
-      ${threatened ? `<circle cx="${t.x}" cy="${t.y}" r="38" fill="none" stroke="#ff5436" stroke-width="2" opacity="0.6"/>` : ''}
-      <circle cx="${t.x}" cy="${t.y}" r="30" fill="${colOf(t.owner)}" stroke="${ring}" stroke-width="${threatened || sel || atk ? 5 : 2}"/>
-      <text x="${t.x}" y="${t.y + 50}" fill="#cdd6e0" font-size="15" text-anchor="middle" font-family="monospace">${t.name}</text>
-      ${t.owner === PLAYER ? `<text x="${t.x}" y="${t.y + 5}" fill="#0a0e14" font-size="16" text-anchor="middle">★</text>` : ''}
+    const ring = threatened ? '#ff5436' : sel ? '#e8b64c' : atk ? '#ff6f5e' : 'rgba(255,255,255,.28)';
+    const rw = threatened || sel || atk ? 4 : 1.6;
+    const haloOp = sel || threatened ? 0.34 : atk ? 0.24 : 0.13;
+    return `<g class="terr" data-id="${t.id}">
+      <circle class="halo" cx="${t.x}" cy="${t.y}" r="44" fill="${c}" opacity="${haloOp}" filter="url(#cqGlow)"/>
+      ${threatened ? `<circle cx="${t.x}" cy="${t.y}" r="34" fill="none" stroke="#ff5436" stroke-width="2.5"><animate attributeName="r" values="33;43;33" dur="1.4s" repeatCount="indefinite"/><animate attributeName="opacity" values=".85;.1;.85" dur="1.4s" repeatCount="indefinite"/></circle>` : ''}
+      <circle class="main" cx="${t.x}" cy="${t.y}" r="30" fill="${c}" stroke="${ring}" stroke-width="${rw}"/>
+      <ellipse cx="${t.x - 8}" cy="${t.y - 10}" rx="13" ry="8" fill="rgba(255,255,255,.20)"/>
+      ${t.owner === PLAYER ? `<text x="${t.x}" y="${t.y + 7}" fill="#0a0e14" font-size="20" font-weight="bold" text-anchor="middle">★</text>` : ''}
+      <text x="${t.x}" y="${t.y + 50}" fill="#e6edf4" font-size="14" text-anchor="middle" font-family="monospace" style="paint-order:stroke;stroke:#070b10;stroke-width:3.5px;stroke-linejoin:round">${t.name}</text>
     </g>`;
   }).join('');
   const standings = [1, 2, 3, 4, 5, 6].map(f => `<span style="color:${FAC[f].col}">${FAC[f].name.split(' ')[0]} ${factionTerr(f)}</span>`).join(' · ');
@@ -181,7 +187,15 @@ function showMap(note = '') {
       <h1 style="color:#e8b64c;letter-spacing:.12em">CONQUEST CAMPAIGN</h1>
       ${intro}
       <p style="margin:2px 0 8px;font-size:12px">Territories held: <b style="color:#9ce6a4">${owned}/${total}</b> · Reinforcement: <b style="color:#e8b64c">+${bonus} cr</b> · War-Tech: <b style="color:#9fdcff">Lv ${tech}</b> <span style="color:#7f8a98">(+${Math.round(tech * TECH_STEP * 100)}% army HP & dmg)</span> &nbsp;|&nbsp; ${standings}</p>
-      <svg id="cqMap" viewBox="0 0 950 560" style="width:100%;height:auto;background:#0c1118;border:1px solid #2a313c;border-radius:6px">${lines}${nodes}</svg>
+      <svg id="cqMap" viewBox="0 0 950 560" style="width:100%;height:auto;border:1px solid #2a313c;border-radius:8px;box-shadow:inset 0 0 60px rgba(0,0,0,.6)">
+        <defs>
+          <radialGradient id="cqBg" cx="50%" cy="42%" r="78%"><stop offset="0%" stop-color="#17222f"/><stop offset="100%" stop-color="#070b11"/></radialGradient>
+          <filter id="cqGlow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="7"/></filter>
+        </defs>
+        <style>.terr{cursor:pointer;transition:transform .1s} .terr:hover .main{stroke:#ffffff;stroke-width:4} .terr:hover .halo{opacity:.45}</style>
+        <rect x="0" y="0" width="950" height="560" fill="url(#cqBg)"/>
+        ${lines}${nodes}
+      </svg>
       <div style="margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         ${buttons}
         <button class="go" id="cqAbandon" style="background:linear-gradient(180deg,#3a414d,#272d36)">ABANDON CAMPAIGN</button>
