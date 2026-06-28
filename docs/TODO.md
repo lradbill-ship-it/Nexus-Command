@@ -9,7 +9,7 @@
 > so: put the 3–4 best candidates on cards, and **always also paste the full list (below) in the message**
 > so nothing is hidden — Lane can pick a card or name any other item. Then update this file.
 
-Last updated: **2026‑06‑27** (Session 5 in progress — civilian‑diplomacy arc shipped + live). Canonical handoff: **`docs/SESSION_5_HANDOFF.md`**. Session 5 = **playtest‑driven balance pass** (the toolbox is full) + design‑first society depth.
+Last updated: **2026‑06‑28** (Session 5 WRAPPED — ~18 increments shipped + live: Conquest Campaign epic, 4 combat toys, Shield Projector, civilian diplomacy, the South Park boys, a measured perf pass, a full UI/visual polish sweep). Canonical handoff: **`docs/SESSION_6_HANDOFF.md`**. Session 6 = **playtest‑driven balance/feel pass** (the toolbox is overflowing; all of S5 is unplaytested).
 
 ---
 
@@ -50,11 +50,12 @@ Last updated: **2026‑06‑27** (Session 5 in progress — civilian‑diplomacy
 ---
 
 ## ▶ Up next — top candidates (curate to 3–5; these go on the cards first)
-- [ ] **🎯 PLAYTEST‑DRIVEN BALANCE PASS — the #1 Session‑5 move.** Lane is now actively playing (found + got fixed 2 bugs in S4). Ask what felt off, then turn the §8 knobs (handoff). Likely dials: the new toys (**Spectre / Orbital / Overcharge / Minefield / Garrison** strength + cost), **Free Legion** timing/strength, coolant in big air pushes, AI missile/EMP cadence, hero strength. **Ask‑first** per `CLAUDE.md` (pacing). Needs his feel data — don't blind‑tune.
-- [x] **More combat depth** — ✅ Session 5: chrono‑freeze, carpet‑bomb, APC transport, deployable Sentry Pod (`3322746`+`df2c7be`), **Shield Projector** (`2b1e1a8`). **Still open (additive):** repair‑reload (ammo/rearm), cloak‑field, EMP‑grenade infantry, Arc/Tesla tower, more superweapons.
-- [x] **Society layer — deeper civilian diplomacy** — ✅ Session 5 (`d0df3b4`): Envoy courtship (peaceful annexation via affinity) + town development tiers. **Possible follow‑ons:** envoy can flip an *enemy's* town (defection), settlement build‑menu/selection UI, render the dev tier on the map, a "loyalty decays if neglected" pressure.
-- [ ] **More CC0 audio (optional, by‑ear)** — real CC0 weapon/UI samples + distinct explosion variants. Lane curates sound; drop files in `src/assets/audio/` (transcode OGG→AAC via `afconvert`). ✅ S4 added asset‑free explosion variety.
-- [ ] **Deeper perf — Web Worker sim** — 🛑 **HELD.** FPS was fine pre‑S4 garrison bug (now fixed). Revisit only if late‑game FPS still bites after the fix; re‑confirm with Lane first.
+- [ ] **🎯 PLAYTEST‑DRIVEN BALANCE + FEEL PASS — the #1 Session‑6 move.** ALL of Session 5 (~18 increments) is unplaytested. Ask what felt off, then turn the §8 knobs (handoff). Likely dials: **special‑character strength** (Cartman stun / Kenny respawn / Stan rally / Kyle heal), **Conquest pacing** (incursion frequency, War‑Tech snowball, reinforcement bonus), **Shield Projector** balance, **Chrono/Carpet** cost, civilian‑diplomacy timing. Plus **battlefield FPS on Lane's device** (sim is now fast post‑perf‑pass; render is the only unmeasured piece). **Ask‑first** per `CLAUDE.md`.
+- [ ] **Conquest depth (slices)** — defender‑tailored battles (battle reflects the defending faction + territory strength); carry‑over unit veterancy (beyond credits/War‑Tech); mission‑objective variants per territory; bigger/varied world maps.
+- [ ] **More combat depth / characters (additive)** — repair‑reload, cloak‑field, EMP‑grenade, Arc/Tesla tower; more special characters (Butters/Randy/Chef…) via the established pattern; a character team‑up synergy buff.
+- [ ] **Battlefield visuals (needs Lane's eyes)** — richer sprites/lighting/FX. Render is RAF‑gated headless → can't verify; have Lane direct it from his device. (Verifiable UI polish is largely done.)
+- [ ] **More CC0 audio (optional, by‑ear)** — real CC0 weapon/UI samples + distinct explosion variants. `src/assets/audio/` (OGG→AAC via `afconvert`).
+- [ ] **Deeper perf — Web Worker sim** — 🛑 **HELD.** Session‑5 perf pass made the sim very fast (avg <2ms/step, GC spikes killed). Unwarranted unless Lane's device shows a render‑side FPS problem specifically.
 
 ## Backlog — Features
 - [ ] **Emergent factions** — neutral civilian populations coalesce into a NEW faction that can grow into a real threat (note #3).
