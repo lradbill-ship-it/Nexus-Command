@@ -164,6 +164,7 @@ export interface UnitDef {
   respawns?: number;       // Kenny: seconds after death before this unit reappears at the owner's HQ
   rallyAura?: number;      // Stan: radius within which allied combat units get a damage/speed rally buff
   auraHeal?: number;       // hp/sec healed to nearby allies (Warden hero aura)
+  deflect?: number;        // Jedi: chance [0..1] to deflect an incoming direct shot (and reflect a bolt back)
   requires?: string;       // building type that must be built before this unit can be trained
   alloy?: number;          // alloy build-cost surcharge (advanced units)
   desc: string;
@@ -194,6 +195,7 @@ export const U: Record<string, UnitDef> = {
   kenny: { name: 'Kenny', cost: 500, hp: 90, speed: 92, radius: 9, sight: 7, buildTime: 12, dmg: 18, range: 120, rof: 0.7, hero: true, unique: true, respawns: 18, requires: 'cyber', desc: 'SPECIAL — fragile but immortal. He dies easily ("Oh my God, they killed Kenny!") then reappears at your HQ a little later. One per faction. Needs a Cyber Ops Center.' },
   stan: { name: 'Stan', cost: 850, hp: 380, speed: 70, radius: 11, sight: 7, buildTime: 16, dmg: 22, range: 130, rof: 0.9, hero: true, unique: true, rallyAura: 150, requires: 'cyber', desc: 'SPECIAL — a natural leader. Allied combat units fighting near him hit harder & move faster (a constant rally aura). One per faction. Needs a Cyber Ops Center.' },
   kyle: { name: 'Kyle', cost: 850, hp: 360, speed: 70, radius: 11, sight: 7, buildTime: 16, dmg: 16, range: 130, rof: 0.8, hero: true, unique: true, auraHeal: 14, requires: 'cyber', desc: 'SPECIAL — the conscience of the squad. Constantly mends nearby allies with a healing aura. One per faction. Needs a Cyber Ops Center.' },
+  jedi: { name: 'Jedi Knight', cost: 900, hp: 440, speed: 96, radius: 11, sight: 8, buildTime: 17, dmg: 34, range: 116, rof: 0.65, hero: true, unique: true, deflect: 0.5, requires: 'cyber', desc: 'SPECIAL — a saber duelist. Fast and deadly up close, and DEFLECTS incoming blaster fire — often bouncing the bolt back at the shooter. Hard-countered by splash/explosions. One per faction. Needs a Cyber Ops Center.' },
   // Heroes — never built; excavated from Hero Vaults by a Borer. cost/buildTime unused.
   titan: { name: 'Colossus Titan', cost: 0, hp: 1700, speed: 58, radius: 15, sight: 7, buildTime: 0, dmg: 46, range: 128, rof: 0.9, splash: 30, coolant: 3, hero: true, desc: 'HERO — a towering brawler. Massive armour and a crushing short-range cannon.' },
   siegelord: { name: 'Devastator', cost: 0, hp: 760, speed: 54, radius: 13, sight: 8, buildTime: 0, dmg: 95, range: 300, rof: 3.2, splash: 72, coolant: 4, hero: true, desc: 'HERO — siege artillery. Annihilating long-range splash; fragile up close.' },

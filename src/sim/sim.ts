@@ -1674,6 +1674,18 @@ function updateShots(dt: number) {
     const dx = s.target.x - s.x, dy = s.target.y - s.y, l = Math.hypot(dx, dy), step = s.speed * dt;
     if (l <= step) {
       const hx = s.target.x, hy = s.target.y;
+      // Jedi saber deflect: a chance to negate an incoming direct shot and bounce a bolt back at the shooter.
+      const tu = s.target.kind === 'u' ? s.target as Unit : null;
+      if (tu && !tu.dead && Math.random() < (U[tu.type].deflect ?? 0)) {
+        s.dead = true;
+        spawnParts('spark', tu.x, tu.y, 6, '150,205,255');
+        game.parts.push({ type: 'flash', x: tu.x, y: tu.y, t: 0, life: 0.1 });
+        sfx('rail', tu.x);
+        if (s.by && !s.by.dead && isWar(tu.team, s.by.team)) {   // reflect the bolt back at the firer
+          game.shots.push({ x: tu.x, y: tu.y, target: s.by, dmg: s.dmg * 0.6, team: tu.team, speed: 760, col: FAC[tu.team].col, rail: true, splash: 0, by: tu });
+        }
+        continue;
+      }
       const wasAlive = !s.target.dead, victim = s.target;
       damage(s.target, s.dmg, s.team); s.dead = true;
       if (wasAlive && victim.dead && s.by && !s.by.dead && s.by.team !== victim.team) creditKill(s.by);   // veterancy
@@ -2340,7 +2352,7 @@ function aiUpdate(team: number, dt: number) {
     if (hasMill && countType('repair') < 2 && !anyQueued('repair') && game.money[team] > 800) { fSup.queue.push('repair'); game.money[team] -= U.repair.cost; }
     else if (hasDrill && countType('hunter') < 1 && !anyQueued('hunter') && game.money[team] > 900) { fSup.queue.push('hunter'); game.money[team] -= U.hunter.cost; }
     else if (hasCyberB && game.money[team] > 1500 && Math.random() < dt * 0.03) {   // a special character — one of each per AI, occasionally
-      const special = ['cartman', 'kenny', 'stan', 'kyle'].find(s => countType(s) < 1 && !anyQueued(s) && !respawnQueue.some(r => r.team === team && r.type === s) && game.money[team] >= U[s].cost);
+      const special = ['cartman', 'kenny', 'stan', 'kyle', 'jedi'].find(s => countType(s) < 1 && !anyQueued(s) && !respawnQueue.some(r => r.team === team && r.type === s) && game.money[team] >= U[s].cost);
       if (special) { fSup.queue.push(special); game.money[team] -= U[special].cost; }
     }
   }
