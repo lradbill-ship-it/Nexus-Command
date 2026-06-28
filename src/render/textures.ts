@@ -401,6 +401,17 @@ function unitCanvas(type: string, team: number): [HTMLCanvasElement, number, num
     g.fillStyle = '#e7c9a0'; g.beginPath(); g.arc(cx, cy - 4, 6, 0, 7); g.fill();                      // face
     g.fillStyle = '#2f9e4f'; g.beginPath(); g.arc(cx, cy - 7, 6.5, Math.PI, 0); g.fill(); g.fillRect(cx - 7, cy - 8, 14, 2.4);  // green ushanka
     g.fillStyle = '#2f9e4f'; g.fillRect(cx - 8, cy - 8, 2.5, 5); g.fillRect(cx + 5.5, cy - 8, 2.5, 5);  // ear flaps
+  } else if (type === 'droideka') {
+    // Droideka: a tripod destroyer droid — central head + two splayed blaster arms on a clawed base
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(cx, cy + 11, 11, 4, 0, 0, 7); g.fill();   // shadow
+    g.strokeStyle = '#b9a778'; g.lineWidth = 3; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(cx, cy + 2); g.lineTo(cx - 11, cy + 11); g.moveTo(cx, cy + 2); g.lineTo(cx + 11, cy + 11); g.moveTo(cx, cy + 2); g.lineTo(cx, cy + 13); g.stroke();   // tripod legs
+    g.lineCap = 'butt';
+    g.fillStyle = '#7a6a4a'; g.beginPath(); g.ellipse(cx, cy, 7, 8, 0, 0, 7); g.fill();   // core body
+    g.strokeStyle = col; g.lineWidth = 1.6; g.beginPath(); g.ellipse(cx, cy, 7, 8, 0, 0, 7); g.stroke();
+    g.strokeStyle = '#8a7a58'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 4, cy - 2); g.lineTo(cx - 12, cy - 8); g.moveTo(cx + 4, cy - 2); g.lineTo(cx + 12, cy - 8); g.stroke();   // blaster arms
+    g.fillStyle = '#e8483a'; g.beginPath(); g.arc(cx - 12, cy - 8, 1.8, 0, 7); g.fill(); g.beginPath(); g.arc(cx + 12, cy - 8, 1.8, 0, 7); g.fill();   // blaster tips
+    g.fillStyle = '#d23a2f'; g.beginPath(); g.arc(cx, cy - 3, 2.2, 0, 7); g.fill();   // sensor eye
   } else if (type === 'bountyhunter') {
     // Bounty Hunter: armored mercenary with a T-visor helmet, twin jetpack thrusters firing
     g.fillStyle = 'rgba(255,150,60,.7)'; g.beginPath(); g.moveTo(cx - 7, cy + 6); g.lineTo(cx - 5, cy + 14); g.lineTo(cx - 3, cy + 6); g.closePath(); g.fill();   // L thruster flame

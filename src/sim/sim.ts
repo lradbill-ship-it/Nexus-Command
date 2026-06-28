@@ -841,7 +841,22 @@ function applyShield(e: Entity, amt: number): number {
   if (Math.random() < 0.25) game.parts.push({ type: 'spark', x: e.x, y: e.y, t: 0, life: 0.25, rgb: '150,210,255' });   // shimmer on absorb
   return amt - soak;
 }
-function damage(e: Entity, amt: number, fromTeam: number) { e.hitT = game.t; e.hp -= applyShield(e, amt); if (e.hp <= 0) destroy(e, fromTeam); }
+// Droideka personal deflector: while DEPLOYED (stationary) it soaks incoming damage 1:1 from its energy pool.
+const SELF_SHIELD_REGEN = 70;    // energy/sec recharge once out of fire
+const SELF_SHIELD_DELAY = 2.5;   // seconds without taking a hit before the shield recharges
+function applySelfShield(u: Unit, amt: number): number {
+  const max = U[u.type].selfShield; if (!max || u.moving) return amt;   // shield is down while rolling
+  const e = u.shieldE ?? max; if (e <= 0) return amt;
+  const soak = Math.min(amt, e); u.shieldE = e - soak;
+  if (Math.random() < 0.3) game.parts.push({ type: 'spark', x: u.x, y: u.y, t: 0, life: 0.22, rgb: '130,205,255' });
+  return amt - soak;
+}
+function damage(e: Entity, amt: number, fromTeam: number) {
+  e.hitT = game.t;
+  amt = applyShield(e, amt);
+  if (e.kind === 'u' && U[(e as Unit).type].selfShield) amt = applySelfShield(e as Unit, amt);
+  e.hp -= amt; if (e.hp <= 0) destroy(e, fromTeam);
+}
 function destroy(e: Entity, fromTeam: number) {
   if (e.dead) return; e.dead = true;
   const big = e.kind === 'b';
@@ -1489,6 +1504,8 @@ function updateUnit(u: Unit, dt: number) {
   if (U[u.type].authoritah) authoritahTick(u);                          // Cartman — periodic "RESPECT MY AUTHORITAH" stun
   if (U[u.type].forceLightning) forceLightningTick(u);                  // Sith Lord — periodic Force-Lightning chain (damage + stun)
   if (U[u.type].seekerSalvo) seekerSalvoTick(u);                        // Bounty Hunter — periodic homing-seeker missile salvo
+  if (U[u.type].selfShield && game.t - (u.hitT ?? -9) > SELF_SHIELD_DELAY)   // Droideka — recharge the deflector when out of fire
+    u.shieldE = Math.min(U[u.type].selfShield!, (u.shieldE ?? U[u.type].selfShield!) + SELF_SHIELD_REGEN * dt);
   if (U[u.type].rallyAura) rallyTick(u);                                // Stan — leadership rally aura (+dmg/+speed to nearby allies)
   if ((u.vet || 0) >= 2 && u.hp < u.hpMax) u.hp = Math.min(u.hpMax, u.hp + 4 * dt);   // Elite units self-repair slowly
   // turret aim smoothing
@@ -2409,7 +2426,7 @@ function aiUpdate(team: number, dt: number) {
     if (hasMill && countType('repair') < 2 && !anyQueued('repair') && game.money[team] > 800) { fSup.queue.push('repair'); game.money[team] -= U.repair.cost; }
     else if (hasDrill && countType('hunter') < 1 && !anyQueued('hunter') && game.money[team] > 900) { fSup.queue.push('hunter'); game.money[team] -= U.hunter.cost; }
     else if (hasCyberB && game.money[team] > 1500 && Math.random() < dt * 0.03) {   // a special character — one of each per AI, occasionally
-      const special = ['cartman', 'kenny', 'stan', 'kyle', 'jedi', 'sith', 'bountyhunter'].find(s => countType(s) < 1 && !anyQueued(s) && !respawnQueue.some(r => r.team === team && r.type === s) && game.money[team] >= U[s].cost);
+      const special = ['cartman', 'kenny', 'stan', 'kyle', 'jedi', 'sith', 'bountyhunter', 'droideka'].find(s => countType(s) < 1 && !anyQueued(s) && !respawnQueue.some(r => r.team === team && r.type === s) && game.money[team] >= U[s].cost);
       if (special) { fSup.queue.push(special); game.money[team] -= U[special].cost; }
     }
   }

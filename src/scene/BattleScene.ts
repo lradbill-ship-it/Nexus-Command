@@ -736,6 +736,11 @@ export class BattleScene extends Phaser.Scene {
       const d = U[u.type], col = facCol(u.team);
       if (sel.has(u)) drawBr(u.x, u.y, d.radius + 7);
       if (sel.has(u) && d.shield) { g.lineStyle(1.5, 0x9fdcff, 0.5); g.strokeCircle(u.x, u.y, 5.5 * TILE); }   // Aegis intercept coverage
+      if (d.selfShield && !u.moving && (u.shieldE ?? d.selfShield) > 0) {   // Droideka deflector dome (up while deployed)
+        const f = (u.shieldE ?? d.selfShield) / d.selfShield;
+        g.lineStyle(2, 0x7fd0ff, 0.25 + 0.45 * f); g.strokeCircle(u.x, u.y, d.radius + 7);
+        g.fillStyle(0x7fd0ff, 0.06 * f); g.fillCircle(u.x, u.y, d.radius + 7);
+      }
       if (u.hp < u.hpMax || sel.has(u)) drawHp(u.x, u.y - d.radius - 9, 22, u.hp / u.hpMax, col);
       if (u.vet) {                                                                              // veterancy rank chevrons (gold)
         g.lineStyle(1.5, 0xffd95a, 0.95);

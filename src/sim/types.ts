@@ -134,6 +134,7 @@ export interface Unit {
   enterT?: number;       // game.t an 'enter' (garrison) order began → give up if it can't reach in time
   authT?: number;        // Cartman: game.t of the next "RESPECT MY AUTHORITAH" stun pulse
   hitT?: number;         // game.t of the last damage taken → a brief render hit-flash
+  shieldE?: number;      // Droideka: remaining personal deflector-shield energy (absorbs damage while stationary, recharges)
   dead?: boolean;
 }
 
