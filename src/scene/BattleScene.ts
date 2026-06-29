@@ -390,12 +390,17 @@ export class BattleScene extends Phaser.Scene {
       // Fixed-timestep accumulator: advance the sim in steady 1/60s steps to consume the REAL time elapsed
       // (× game speed). This keeps the game running at true real-time pace even when the device renders below
       // 60fps — instead of going into slow-motion. Capped at MAX_CATCHUP steps/frame to avoid a spiral of death.
-      const FIXED = 1 / 60, MAX_CATCHUP = 12;   // up to 12 sim steps/frame → 1× real-time down to ~5fps, 2× down to ~10fps
+      const FIXED = 1 / 60, MAX_CATCHUP = 12, BUDGET_MS = 10;   // up to 12 sim steps/frame, but never burn >10ms of sim per frame
       if (game.paused) this.simAccum = 0;
       else {
         this.simAccum += frame * (game.speed || 1);
-        let steps = 0;
-        while (this.simAccum >= FIXED && steps < MAX_CATCHUP) { stepWorld(FIXED); this.simAccum -= FIXED; steps++; }
+        let steps = 0; const t0 = performance.now();
+        while (this.simAccum >= FIXED && steps < MAX_CATCHUP) {
+          stepWorld(FIXED); this.simAccum -= FIXED; steps++;
+          // Wall-clock guard: if a tick is unexpectedly heavy (e.g. several big pathfinds land together),
+          // bail out of the catch-up rather than stacking a dozen of them into one frozen frame.
+          if (performance.now() - t0 > BUDGET_MS) { this.simAccum = 0; break; }
+        }
         if (steps >= MAX_CATCHUP) this.simAccum = 0;   // can't keep up (very low fps) — drop the backlog
       }
       if (!this.lowDetail && game.parts.length < 180 && Math.random() < 0.3) {     // faint ambient dust drifting across the view

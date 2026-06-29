@@ -57,7 +57,7 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, tea
     hf.push(f); hi.push(i); let c = hf.length - 1;
     while (c > 0) {
       const p = (c - 1) >> 1; if (hf[p] <= hf[c]) break;
-      [hf[p], hf[c]] = [hf[c], hf[p]];[hi[p], hi[c]] = [hi[c], hi[p]]; c = p;
+      const tf = hf[p]; hf[p] = hf[c]; hf[c] = tf; const ti = hi[p]; hi[p] = hi[c]; hi[c] = ti; c = p;   // swap (no array alloc)
     }
   }
   function pop() {
@@ -69,7 +69,7 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, tea
         if (l < hf.length && hf[l] < hf[m]) m = l;
         if (r < hf.length && hf[r] < hf[m]) m = r;
         if (m === c) break;
-        [hf[m], hf[c]] = [hf[c], hf[m]];[hi[m], hi[c]] = [hi[c], hi[m]]; c = m;
+        const tf = hf[m]; hf[m] = hf[c]; hf[c] = tf; const ti = hi[m]; hi[m] = hi[c]; hi[c] = ti; c = m;   // swap (no array alloc)
       }
     }
     return i;
