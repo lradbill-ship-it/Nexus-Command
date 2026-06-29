@@ -1723,8 +1723,13 @@ function updateBuilding(b: Building, dt: number) {
 }
 
 // ── Shots & particles ────────────────────────────────────────────────────────
+// Particles are redrawn as vector graphics every frame, so the live count is a real render cost in big
+// battles. Cap it (lower in Low Detail mode, which a weak GPU can toggle with F).
+let lowDetail = false;
+export function setLowDetail(v: boolean) { lowDetail = v; }
+const partCap = () => lowDetail ? 90 : 300;
 export function spawnParts(type: string, x: number, y: number, n: number, rgb: string) {
-  if (game.parts.length > 520) return;
+  if (game.parts.length > partCap()) return;
   for (let i = 0; i < n; i++) {
     const a = Math.random() * 7;
     const sp = type === 'fire' ? 50 + Math.random() * 190 : type === 'debris' ? 70 + Math.random() * 200 :
@@ -1790,6 +1795,8 @@ function updateShots(dt: number) {
     }
   }
   game.parts = game.parts.filter(p => p.t < p.life);
+  const cap = partCap();   // hard cap incl. the direct pushes (rings/flashes/arcs) that bypass spawnParts → drop the oldest
+  if (game.parts.length > cap) game.parts.splice(0, game.parts.length - cap);
 }
 
 // ── Abilities & covert ───────────────────────────────────────────────────────

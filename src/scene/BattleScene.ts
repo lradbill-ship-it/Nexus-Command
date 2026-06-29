@@ -4,7 +4,7 @@ import {
   idx, clamp, dist, T_WATER,
 } from '../sim/constants';
 import { game, resetState, isAllied, logMsg, setFocusHook } from '../sim/state';
-import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, armPatrol, spawnParts, pendingStrikeList, cloaked, cloakedToPlayer, buffed, ejectGarrison, toggleDeploy } from '../sim/sim';
+import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, armPatrol, spawnParts, pendingStrikeList, cloaked, cloakedToPlayer, buffed, ejectGarrison, toggleDeploy, setLowDetail } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
 import { renderTerrain, getTerrainCanvas, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import grassTex from '../assets/terrain/grass.jpg?inline';
@@ -346,6 +346,7 @@ export class BattleScene extends Phaser.Scene {
       else if (k === 'delete' || k === 'backspace') { e.preventDefault(); sellSelected(); }
       else if (k === 'f') {   // performance mode: drop the continuous eye-candy
         this.lowDetail = !this.lowDetail;
+        setLowDetail(this.lowDetail);   // also slashes the particle cap (sim side)
         if (this.lowDetail) { this.waterGfx?.clear(); this.vignette?.setVisible(false); }
         else this.vignette?.setVisible(true);
         logMsg(this.lowDetail ? '⚙ Low Detail ON (lighter visuals for performance)' : '⚙ Low Detail OFF');
