@@ -41,6 +41,9 @@ export class BattleScene extends Phaser.Scene {
   private waterGfx!: Phaser.GameObjects.Graphics;   // animated water sheen — additive glints over visible water tiles
   private waterAccum = 0;                            // throttle for the water shimmer (~30Hz; slow motion, cheap)
   private simAccum = 0;                              // fixed-timestep accumulator (keeps real-time pace below 60fps)
+  private fpsBadge?: HTMLDivElement;                 // on-screen framerate readout (diagnostic)
+  private fpsAccum = 0;                              // throttle for the fps readout
+  private lowDetail = false;                         // performance mode: drops the continuous eye-candy (water shimmer, motes, vignette)
   private overlay!: Phaser.GameObjects.Graphics;
   private vignette!: Phaser.GameObjects.Image;
   private recs = new Map<number, SpriteRec>();
@@ -142,6 +145,11 @@ export class BattleScene extends Phaser.Scene {
     const badge = document.createElement('div');
     badge.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:50;padding:3px 11px;border-radius:5px;background:rgba(8,12,16,.82);color:#cfe6ee;font:600 12px ui-monospace,monospace;letter-spacing:.5px;border:1px solid rgba(120,200,180,.4);pointer-events:none;display:none';
     document.body.appendChild(badge); this.speedBadge = badge;
+
+    const fps = document.createElement('div');
+    fps.style.cssText = 'position:fixed;top:8px;left:8px;z-index:50;padding:2px 8px;border-radius:5px;background:rgba(8,12,16,.7);color:#8fd6b6;font:600 11px ui-monospace,monospace;border:1px solid rgba(120,200,180,.3);pointer-events:none';
+    fps.textContent = 'FPS —';
+    document.body.appendChild(fps); this.fpsBadge = fps;
 
     this.newMatch(false);
   }
@@ -336,6 +344,12 @@ export class BattleScene extends Phaser.Scene {
       else if (k === 'g') combineSelected();   // merge selected collectors into one mega-collector
       else if (k === 'p') armPatrol();          // patrol: click a spot to guard an area
       else if (k === 'delete' || k === 'backspace') { e.preventDefault(); sellSelected(); }
+      else if (k === 'f') {   // performance mode: drop the continuous eye-candy
+        this.lowDetail = !this.lowDetail;
+        if (this.lowDetail) { this.waterGfx?.clear(); this.vignette?.setVisible(false); }
+        else this.vignette?.setVisible(true);
+        logMsg(this.lowDetail ? '⚙ Low Detail ON (lighter visuals for performance)' : '⚙ Low Detail OFF');
+      }
       else if (k === ' ') { e.preventDefault(); game.paused = !game.paused; logMsg(game.paused ? '⏸ Paused' : '▶ Resumed'); }
       else if (k === ']' || k === '+' || k === '=') { game.speed = Math.min(3, (game.speed || 1) + 1); game.paused = false; logMsg('▶▶ Game speed ' + game.speed + '×'); }
       else if (k === '[' || k === '-' || k === '_') { game.speed = Math.max(1, (game.speed || 1) - 1); logMsg('▶ Game speed ' + game.speed + '×'); }
@@ -384,7 +398,7 @@ export class BattleScene extends Phaser.Scene {
         while (this.simAccum >= FIXED && steps < MAX_CATCHUP) { stepWorld(FIXED); this.simAccum -= FIXED; steps++; }
         if (steps >= MAX_CATCHUP) this.simAccum = 0;   // can't keep up (very low fps) — drop the backlog
       }
-      if (game.parts.length < 180 && Math.random() < 0.3) {     // faint ambient dust drifting across the view
+      if (!this.lowDetail && game.parts.length < 180 && Math.random() < 0.3) {     // faint ambient dust drifting across the view
         const wv = this.cameras.main.worldView;
         spawnParts('mote', wv.x + Math.random() * wv.width, wv.y + Math.random() * wv.height, 1, '198,210,196');
       }
@@ -400,7 +414,12 @@ export class BattleScene extends Phaser.Scene {
 
     this.syncCrystals();
     this.waterAccum += delta;
-    if (this.waterAccum >= 33) { this.waterAccum = 0; this.drawWater(); }   // ~30Hz water shimmer (slow + cheap)
+    if (!this.lowDetail && this.waterAccum >= 33) { this.waterAccum = 0; this.drawWater(); }   // ~30Hz water shimmer (slow + cheap)
+
+    if (this.fpsBadge) {   // framerate readout (~2Hz) — diagnostic so we can size the perf problem
+      this.fpsAccum += delta;
+      if (this.fpsAccum >= 500) { this.fpsAccum = 0; this.fpsBadge.textContent = 'FPS ' + Math.round(this.game.loop.actualFps) + (this.lowDetail ? ' · LOW' : ''); }
+    }
     this.drawSettlements();
     this.syncEntities();
     this.drawFx();
