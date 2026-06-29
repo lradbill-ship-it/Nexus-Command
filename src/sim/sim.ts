@@ -1496,6 +1496,13 @@ const GUARD_FOLLOW = 70;    // how close an escort stays to the unit it guards
 const GUARD_LEASH = 230;    // how far an escort chases a threat from the guarded unit before disengaging
 const PATROL_R = 12 * TILE; // patrol/area-guard radius — engage any enemy entering this zone (far past weapon range)
 function updateUnit(u: Unit, dt: number) {
+  // General anti-wedge: any ground unit sitting on an impassable tile (an excavated hero unearthed in rock, a
+  // unit a building was dropped on, one shoved into terrain by separation) is nudged to the nearest open tile
+  // every tick — so nothing can stay permanently stuck in terrain, even while idle.
+  if (!phasing(u) && unitBlocked(u.x, u.y, u.team)) {
+    const np = nearestPassableTile(u.x / TILE | 0, u.y / TILE | 0);
+    if (np) { u.x = np[0] * TILE + 16; u.y = np[1] * TILE + 16; }
+  }
   if (u.disabledUntil > game.t) { u.moving = false; return; }
   const d = U[u.type];
   u.cooldown = Math.max(0, u.cooldown - dt);
@@ -2821,7 +2828,7 @@ function autoScoutTick(dt: number) {
 // ── Per-frame world step (everything except camera/input/render) ─────────────
 export function stepWorld(dt: number) {
   game.t += dt;
-  resetPathBudget(6);   // cap A* searches this tick so simultaneous repaths can't stack into a frame spike
+  resetPathBudget(40000);   // cap A* WORK (node pops) this tick so a repath storm can't stack into a frame spike
   game.shake = Math.max(0, game.shake - dt * 14);
   for (const k in game.cooldowns) game.cooldowns[k] = Math.max(0, game.cooldowns[k] - dt);
   for (const k in game.covCd) game.covCd[k] = Math.max(0, game.covCd[k] - dt);
