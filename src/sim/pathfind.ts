@@ -30,9 +30,18 @@ const DIRS: [number, number, number][] = [
   [1, 1, 1.4], [1, -1, 1.4], [-1, 1, 1.4], [-1, -1, 1.4],
 ];
 
+// Per-sim-step pathfinding budget: a full A* can cost several ms on the ×3 map, so if many units repath in
+// the SAME tick (e.g. a squad assaulting a base, harvesters re-finding fields) the steps stack into a frame
+// spike. We cap the number of searches per step; over-budget callers get null and simply keep their current
+// path / retry next tick (units still move via straight-line steering), staggering the work across frames.
+let pathCalls = 0, pathBudget = 6;
+export function resetPathBudget(n = 6) { pathCalls = 0; pathBudget = n; }
+
 /** A* on the tile grid, returns a smoothed world-space waypoint list (or null).
  *  `team` makes allied gates walkable for that team (enemies route around them). */
 export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, team = 0): Vec[] | null {
+  if (pathCalls >= pathBudget) return null;   // over this tick's search budget → defer to a later tick
+  pathCalls++;
   const pass = (x: number, y: number) => passableFor(x, y, team);
   const losClear = (ax: number, ay: number, bx: number, by: number) => {
     const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 10);
@@ -77,7 +86,7 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, tea
   const H = (i: number) => { const x = i % MAPW, y = i / MAPW | 0; return Math.abs(x - tx) + Math.abs(y - ty); };
   push(H(start), start);
   let pops = 0, found = false;
-  while (hf.length && pops++ < 30000) {   // higher budget for long cross-map paths on the ×3 map
+  while (hf.length && pops++ < 14000) {   // node budget — enough for long ×3-map paths, but a failed search stays cheap
     const cur = pop();
     if (cur === goal) { found = true; break; }
     const cx = cur % MAPW, cy = cur / MAPW | 0, cg = _g[cur];

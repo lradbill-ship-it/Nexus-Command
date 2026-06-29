@@ -10,7 +10,7 @@ import {
   game, dip, rk, getRel, setRel, addRel, isAllied, isWar, stateOf, logMsg, hint,
 } from './state';
 import type { Building, Unit, Entity, Vec, Particle, Settlement, Relay, ResourceNode, Vault } from './types';
-import { findPath, passable, passableFor, nearestPassableTile } from './pathfind';
+import { findPath, passable, passableFor, nearestPassableTile, resetPathBudget } from './pathfind';
 import { spawnResourceField } from './mapgen';
 import { sfx } from '../audio';
 
@@ -2814,6 +2814,7 @@ function autoScoutTick(dt: number) {
 // ── Per-frame world step (everything except camera/input/render) ─────────────
 export function stepWorld(dt: number) {
   game.t += dt;
+  resetPathBudget(6);   // cap A* searches this tick so simultaneous repaths can't stack into a frame spike
   game.shake = Math.max(0, game.shake - dt * 14);
   for (const k in game.cooldowns) game.cooldowns[k] = Math.max(0, game.cooldowns[k] - dt);
   for (const k in game.covCd) game.covCd[k] = Math.max(0, game.covCd[k] - dt);
