@@ -1036,6 +1036,26 @@ export function setPath(u: Unit, wx: number, wy: number) {
   u.finalDest = { x: wx, y: wy };
   u.stuckT = 0;
 }
+// How many orthogonal neighbours are open — a unit needs room to manoeuvre, not just a point-passable tile.
+function tileClearance(tx: number, ty: number) {
+  return (passable(tx + 1, ty) ? 1 : 0) + (passable(tx - 1, ty) ? 1 : 0) + (passable(tx, ty + 1) ? 1 : 0) + (passable(tx, ty - 1) ? 1 : 0);
+}
+/** Nearest passable tile with real CLEARANCE (≥3 open neighbours), optionally biased toward `ang`;
+ *  falls back to any passable tile if no roomy one is within range. Used to dislodge units wedged in terrain. */
+function nearestOpenTile(tx: number, ty: number, maxR: number, ang?: number): [number, number] | null {
+  let best: [number, number] | null = null, bestScore = Infinity, fallback: [number, number] | null = null;
+  for (let r = 0; r <= maxR; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+    const x = tx + dx, y = ty + dy;
+    if (!passable(x, y)) continue;
+    if (!fallback) fallback = [x, y];
+    if (tileClearance(x, y) < 3) continue;
+    let score = r - tileClearance(x, y) * 0.4;
+    if (ang !== undefined) { const a = Math.atan2(dy, dx); score += Math.abs(((a - ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * 0.7; }
+    if (score < bestScore) { bestScore = score; best = [x, y]; }
+  }
+  return best || fallback;
+}
 function followPath(u: Unit, dt: number) {
   // escape if we ended up sitting on a blocked tile (e.g. a building was placed on us)
   if (!phasing(u) && unitBlocked(u.x, u.y, u.team)) {
@@ -1064,18 +1084,22 @@ function followPath(u: Unit, dt: number) {
       u.path = [{ x: u.finalDest.x, y: u.finalDest.y }];
       return false;
     }
-    const n = (u.unstick || 0) + 1; u.unstick = n;
-    if (n >= 2) {
-      // wedged → hop toward the next waypoint onto open ground (get past the obstacle), then re-path
-      const aim = (u.path && u.path[0]) ? u.path[0] : u.finalDest;
-      const ang = Math.atan2(aim.y - u.y, aim.x - u.x);
+    const aim = (u.path && u.path[0]) ? u.path[0] : u.finalDest;
+    const ang = Math.atan2(aim.y - u.y, aim.x - u.x);
+    const n = (u.unstick || 0) + 1; u.unstick = n;   // escalates across cycles (reset only on a new destination / real progress)
+    if (n >= 4) {
+      // sustained stuck (≈3s) in tight terrain → hard escape: jump to the nearest roomy tile toward the goal
+      const esc = nearestOpenTile(u.x / TILE | 0, u.y / TILE | 0, 14, ang);
+      if (esc) { u.x = esc[0] * TILE + 16; u.y = esc[1] * TILE + 16; }
+      u.unstick = 0;
+    } else if (n >= 2) {
+      // wedged → hop toward the next waypoint onto OPEN ground (clearance, not just any passable tile)
       let placed = false;
       for (const hop of [2.2, 1.4, 3.2, 0.8]) {
-        const np = nearestPassableTile((u.x + Math.cos(ang) * hop * TILE) / TILE | 0, (u.y + Math.sin(ang) * hop * TILE) / TILE | 0);
-        if (np) { u.x = np[0] * TILE + 16; u.y = np[1] * TILE + 16; placed = true; break; }
+        const t = nearestOpenTile((u.x + Math.cos(ang) * hop * TILE) / TILE | 0, (u.y + Math.sin(ang) * hop * TILE) / TILE | 0, 3, ang);
+        if (t) { u.x = t[0] * TILE + 16; u.y = t[1] * TILE + 16; placed = true; break; }
       }
-      if (!placed) { const np = nearestPassableTile(u.x / TILE | 0, u.y / TILE | 0); if (np) { u.x = np[0] * TILE + 16; u.y = np[1] * TILE + 16; } }
-      u.unstick = 0;
+      if (!placed) { const t = nearestOpenTile(u.x / TILE | 0, u.y / TILE | 0, 4); if (t) { u.x = t[0] * TILE + 16; u.y = t[1] * TILE + 16; } }
     }
     setPath(u, u.finalDest.x, u.finalDest.y);
   }
