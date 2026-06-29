@@ -44,6 +44,9 @@ export class BattleScene extends Phaser.Scene {
   private fpsBadge?: HTMLDivElement;                 // on-screen framerate readout (diagnostic)
   private fpsAccum = 0;                              // throttle for the fps readout
   private lowDetail = false;                         // performance mode: drops the continuous eye-candy (water shimmer, motes, vignette)
+  private fpsWindow: number[] = [];                  // rolling fps samples for adaptive quality
+  private autoDetailActive = false;                  // Low Detail was auto-enabled (vs manual) → may auto-restore
+  private manualDetail = false;                      // the player pressed F → stop auto-adjusting, respect their choice
   private overlay!: Phaser.GameObjects.Graphics;
   private vignette!: Phaser.GameObjects.Image;
   private recs = new Map<number, SpriteRec>();
@@ -344,11 +347,9 @@ export class BattleScene extends Phaser.Scene {
       else if (k === 'g') combineSelected();   // merge selected collectors into one mega-collector
       else if (k === 'p') armPatrol();          // patrol: click a spot to guard an area
       else if (k === 'delete' || k === 'backspace') { e.preventDefault(); sellSelected(); }
-      else if (k === 'f') {   // performance mode: drop the continuous eye-candy
-        this.lowDetail = !this.lowDetail;
-        setLowDetail(this.lowDetail);   // also slashes the particle cap (sim side)
-        if (this.lowDetail) { this.waterGfx?.clear(); this.vignette?.setVisible(false); }
-        else this.vignette?.setVisible(true);
+      else if (k === 'f') {   // performance mode: drop the continuous eye-candy (manual override → stop auto-adjusting)
+        this.manualDetail = true; this.autoDetailActive = false;
+        this.applyDetail(!this.lowDetail);
         logMsg(this.lowDetail ? '⚙ Low Detail ON (lighter visuals for performance)' : '⚙ Low Detail OFF');
       }
       else if (k === ' ') { e.preventDefault(); game.paused = !game.paused; logMsg(game.paused ? '⏸ Paused' : '▶ Resumed'); }
@@ -422,9 +423,12 @@ export class BattleScene extends Phaser.Scene {
     this.waterAccum += delta;
     if (!this.lowDetail && this.waterAccum >= 33) { this.waterAccum = 0; this.drawWater(); }   // ~30Hz water shimmer (slow + cheap)
 
-    if (this.fpsBadge) {   // framerate readout (~2Hz) — diagnostic so we can size the perf problem
-      this.fpsAccum += delta;
-      if (this.fpsAccum >= 500) { this.fpsAccum = 0; this.fpsBadge.textContent = 'FPS ' + Math.round(this.game.loop.actualFps) + (this.lowDetail ? ' · LOW' : ''); }
+    this.fpsAccum += delta;   // framerate readout + adaptive quality (~2Hz)
+    if (this.fpsAccum >= 500) {
+      this.fpsAccum = 0;
+      const fps = Math.round(this.game.loop.actualFps);
+      if (this.fpsBadge) this.fpsBadge.textContent = 'FPS ' + fps + (this.lowDetail ? (this.autoDetailActive ? ' · AUTO-LOW' : ' · LOW') : '');
+      this.adaptQuality(fps);
     }
     this.drawSettlements();
     this.syncEntities();
@@ -445,6 +449,27 @@ export class BattleScene extends Phaser.Scene {
     );
   }
 
+  /** Apply (or lift) Low Detail mode: drops the continuous eye-candy + slashes the particle cap (sim side). */
+  private applyDetail(low: boolean) {
+    this.lowDetail = low; setLowDetail(low);
+    if (low) { this.waterGfx?.clear(); this.vignette?.setVisible(false); }
+    else this.vignette?.setVisible(true);
+  }
+  /** Adaptive quality: auto-enable Low Detail when the framerate is low & sustained (and restore it when it
+   *  recovers), so a weak GPU degrades gracefully. Disabled once the player takes manual control with F. */
+  private adaptQuality(fps: number) {
+    if (this.manualDetail || !game.started || game.over) return;
+    this.fpsWindow.push(fps); if (this.fpsWindow.length > 4) this.fpsWindow.shift();
+    if (this.fpsWindow.length < 4) return;                      // need ~2s of data (also skips the startup ramp)
+    const avg = this.fpsWindow.reduce((a, b) => a + b, 0) / this.fpsWindow.length;
+    if (!this.lowDetail && avg < 40) {                          // sustained low → drop detail
+      this.applyDetail(true); this.autoDetailActive = true; this.fpsWindow = [];
+      logMsg('⚙ Auto Low Detail ON (low framerate) — press F to override', 'good');
+    } else if (this.lowDetail && this.autoDetailActive && avg > 56) {   // recovered with headroom → restore
+      this.applyDetail(false); this.autoDetailActive = false; this.fpsWindow = [];
+      logMsg('⚙ Auto Low Detail OFF (framerate recovered)', 'good');
+    }
+  }
   private panCamera(dt: number) {
     const cam = this.cameras.main;
     const sp = 900 * dt;
