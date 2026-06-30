@@ -1662,14 +1662,21 @@ function updateUnit(u: Unit, dt: number) {
   u.aim += clamp(da, -7 * dt, 7 * dt);
   if (U[u.type].harvests) {
     if (u.order === 'move' && u.dest) {
-      if (followPath(u, dt)) { u.order = 'idle'; u.hState = 'find'; u.dest = null; }
+      // A manual move must RE-PATH (budget-deferred searches & consumed/partial paths) — otherwise a harvester
+      // whose path deferred under a busy path budget holds forever or trails a stale harvest path (the "new
+      // harvesters won't move where I click" bug). Same fix the combat movers already have.
+      u.repathT -= dt;
+      if (u.waitPath || !u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 0.8; setPath(u, u.dest.x, u.dest.y); }
+      if (followPath(u, dt)) { u.order = 'idle'; u.hState = 'find'; u.dest = null; u.path = null; u.waitPath = false; }
       return;
     }
     updateHarvester(u, dt); return;
   }
   if (U[u.type].logs) {
     if (u.order === 'move' && u.dest) {
-      if (followPath(u, dt)) { u.order = 'idle'; u.hState = 'find'; u.dest = null; }
+      u.repathT -= dt;
+      if (u.waitPath || !u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 0.8; setPath(u, u.dest.x, u.dest.y); }
+      if (followPath(u, dt)) { u.order = 'idle'; u.hState = 'find'; u.dest = null; u.path = null; u.waitPath = false; }
       return;
     }
     updateLogger(u, dt); return;
