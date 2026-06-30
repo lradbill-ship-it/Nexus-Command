@@ -9,7 +9,7 @@ import type { LeaderStyle } from './constants';
 import {
   game, dip, rk, getRel, setRel, addRel, isAllied, isWar, stateOf, logMsg, hint,
 } from './state';
-import type { Building, Unit, Entity, Vec, Particle, Settlement, Relay, ResourceNode, Vault } from './types';
+import type { Building, Unit, Entity, Vec, Particle, Settlement, Relay, ResourceNode, Vault, Landmark } from './types';
 import { findPath, passable, passableFor, nearestPassableTile, resetPathBudget, pathDeferred } from './pathfind';
 import { spawnResourceField } from './mapgen';
 import { sfx } from '../audio';
@@ -572,6 +572,115 @@ export function tryRecruit(s: Settlement): boolean {
   if (game.money[PLAYER] < COST) { hint('Recruiting costs ' + COST + ' crystals'); return false; }
   game.money[PLAYER] -= COST; captureSettlement(s, PLAYER, false);
   return true;
+}
+
+// ── Legendary Landmarks: ancient monoliths only a SPECIAL CHARACTER can claim ──
+// A held monolith trickles resources to its owner AND radiates a bonus themed to the
+// character that claimed it (slice of the "character quest" idea, on one shared mechanic).
+const LANDMARK_R = 3 * TILE;       // a special character must stand this close to channel a claim
+const LANDMARK_CLAIM = 5;          // seconds of channeling for a full claim
+const LANDMARK_INCOME = 4;         // base crystal/sec trickle while held
+const LANDMARK_ALLOY = 0.5;        // base alloy/sec trickle while held
+const LANDMARK_WINDFALL = 600;     // one-time credit payoff on claiming
+const LANDMARK_FX_R = 5 * TILE;    // radius of the attuned aura effect around a held monolith
+const LANDMARK_HEAL = 16;          // hp/sec healed by a sanctuary/shrine monolith
+const LANDMARK_DRAIN = 14;         // dmg/sec a dark-nexus monolith inflicts on nearby enemies
+
+// Which character attunes the monolith to which effect, and its lore name (only `unique` chars qualify).
+const LANDMARK_FX: Record<string, { kind: 'tax' | 'loot' | 'heal' | 'buff' | 'drain'; name: string }> = {
+  cartman:      { kind: 'tax',   name: 'Cartmanland' },        // taxes it → double income + happiness
+  bountyhunter: { kind: 'loot',  name: 'Bounty Cache' },       // loots it → double windfall + alloy stream
+  kenny:        { kind: 'heal',  name: "Martyr's Shrine" },    // mends nearby allies
+  kyle:         { kind: 'heal',  name: 'Sanctuary' },          // mends nearby allies
+  stan:         { kind: 'buff',  name: 'Rally Banner' },       // +dmg/+speed to nearby allied combat
+  jedi:         { kind: 'buff',  name: 'Light Nexus' },        // the Force strengthens nearby allies
+  droideka:     { kind: 'buff',  name: 'Aegis Field' },        // deflector field hardens the line
+  sith:         { kind: 'drain', name: 'Dark Nexus' },         // Force corruption sears nearby enemies
+};
+export const landmarkName = (attune: string) => LANDMARK_FX[attune]?.name ?? 'Legendary Landmark';
+
+function claimLandmark(L: Landmark, team: number, type: string) {
+  const prev = L.owner;
+  L.owner = team; L.attune = type; L.capT = 0; L.capBy = 0;
+  const fx = LANDMARK_FX[type] ?? { kind: 'tax' as const, name: 'Legendary Landmark' };
+  game.money[team] += LANDMARK_WINDFALL * (fx.kind === 'loot' ? 2 : 1);
+  if (fx.kind === 'loot') game.alloy[team] = (game.alloy[team] || 0) + 150;
+  game.parts.push({ type: 'ring', x: L.x, y: L.y, t: 0, life: 0.8, big: true });
+  spawnParts('mote', L.x, L.y, 10, '255,225,150');
+  if (team === PLAYER) { logMsg(U[type].name + ' claimed a Legendary Landmark — ' + fx.name + ' active!', 'good', { x: L.x, y: L.y }); sfx('cash'); }
+  else if (prev === PLAYER) { logMsg(FAC[team].name + ' seized one of our Legendary Landmarks', 'war', { x: L.x, y: L.y }); sfx('war'); }
+  else if (isAllied(PLAYER, team)) logMsg(FAC[team].name + ' (ally) claimed a Legendary Landmark', 'good', { x: L.x, y: L.y });
+}
+
+/** Resource trickle + the character-themed aura, applied every tick to a held monolith. */
+function applyLandmarkEffect(L: Landmark, dt: number) {
+  const team = L.owner;
+  const fx = LANDMARK_FX[L.attune] ?? { kind: 'tax' as const, name: '' };
+  game.money[team] += LANDMARK_INCOME * (fx.kind === 'tax' ? 2 : 1) * dt;
+  game.alloy[team] = (game.alloy[team] || 0) + LANDMARK_ALLOY * (fx.kind === 'loot' ? 2.4 : 1) * dt;
+  if (fx.kind === 'tax') game.happy[team] = Math.min(100, (game.happy[team] || 0) + 1.2 * dt);   // Cartmanland keeps the faction giddy
+  const r = LANDMARK_FX_R;
+  if (fx.kind === 'heal') {
+    forNearbyUnits(L.x, L.y, r, (o) => {
+      if (o.dead || !isAllied(team, o.team) || o.team === 0 || o.hp >= o.hpMax || dist(o, L) > r) return;
+      o.hp = Math.min(o.hpMax, o.hp + LANDMARK_HEAL * dt);
+      if (Math.random() < dt * 1.2) spawnParts('spark', o.x + (Math.random() * 12 - 6), o.y - 6, 1, '150,235,160');
+    });
+  } else if (fx.kind === 'buff') {
+    forNearbyUnits(L.x, L.y, r, (o) => {
+      if (o.dead || !isAllied(team, o.team) || isSupport(o.type) || (U[o.type].dmg || 0) <= 0 || dist(o, L) > r) return;
+      o.buffUntil = Math.max(o.buffUntil || 0, game.t + 0.6);   // reuses Overcharge's +dmg/+speed
+    });
+  } else if (fx.kind === 'drain') {
+    forNearbyUnits(L.x, L.y, r, (o) => {
+      if (o.dead || !isWar(team, o.team) || o.team === 0 || U[o.type].hero || dist(o, L) > r) return;
+      damage(o, LANDMARK_DRAIN * dt, team);
+      if (Math.random() < dt * 1.6) spawnParts('spark', o.x + (Math.random() * 12 - 6), o.y - 6, 1, '190,90,255');
+    });
+  }
+}
+
+function landmarkTick(dt: number) {
+  for (const L of game.landmarks) {
+    // Tally which teams have a SPECIAL CHARACTER (a `unique` unit) channeling here — ordinary units can't claim.
+    const champs: Record<number, string> = {};
+    forNearbyUnits(L.x, L.y, LANDMARK_R, (u) => {
+      if (u.dead || !U[u.type].unique || dist(u, L) > LANDMARK_R) return;
+      champs[u.team] = u.type;
+    });
+    const teams = Object.keys(champs).map(Number);
+    if (L.owner) {
+      applyLandmarkEffect(L, dt);
+      const defended = teams.includes(L.owner);
+      const challengers = teams.filter(t => !isAllied(t, L.owner));
+      if (!defended && challengers.length === 1) {                 // a lone enemy champion can wrest it away
+        const team = challengers[0];
+        L.capBy = team; L.capT += dt / LANDMARK_CLAIM;
+        if (L.capT >= 1) claimLandmark(L, team, champs[team]);
+      } else { L.capT = Math.max(0, L.capT - dt / 8); if (L.capT === 0) L.capBy = 0; }
+    } else {
+      if (teams.length === 1) {                                    // a single team's champion claims an unowned monolith
+        const team = teams[0];
+        L.capBy = team; L.capT += dt / LANDMARK_CLAIM;
+        if (L.capT >= 1) claimLandmark(L, team, champs[team]);
+      } else if (teams.length === 0) {
+        L.capT = Math.max(0, L.capT - dt / 12); if (L.capT === 0) L.capBy = 0;
+      } else {
+        L.capT = Math.max(0, L.capT - dt / 20);                    // multiple champions contest → stalls
+      }
+    }
+  }
+}
+
+/** AI parity: divert an idle special character toward the nearest landmark it doesn't hold. */
+function aiLandmark(team: number) {
+  if (!game.landmarks.length) return;
+  const champ = game.units.find(u => u.team === team && U[u.type].unique && !u.dead && (u.order === 'idle' || u.order === 'guard'));
+  if (!champ) return;
+  const tgt = game.landmarks
+    .filter(L => L.owner !== team && !isAllied(team, L.owner))
+    .sort((a, b) => dist(champ, a) - dist(champ, b))[0];
+  if (tgt && dist(champ, tgt) > LANDMARK_R * 0.8) { champ.order = 'move'; champ.dest = { x: tgt.x, y: tgt.y }; champ.guard = null; champ.target = null; setPath(champ, tgt.x, tgt.y); }
 }
 
 // ── Hero Vaults: survey to find, Borer to excavate, unearth a hero (roadmap #6) ──
@@ -2554,6 +2663,7 @@ function aiUpdate(team: number, dt: number) {
     }
   }
   aiHero(team);   // divert idle Survey Hunters / Borers to hero vaults BEFORE the wave grabs idle units
+  aiLandmark(team);   // divert an idle special character to claim a Legendary Landmark
   if (game.t >= ai.nextWave) {
     ai.waveN++;
     const size = Math.min(16, 2 + Math.ceil(ai.waveN * 1.7));
@@ -2670,6 +2780,18 @@ export function issueOrder(wx: number, wy: number, fromAmove: boolean) {
   if (clickedVault && sel.some(s => U[s.type].tunneler)) {
     for (const u of sel) if (U[u.type].tunneler) { u.order = 'dig'; u.digVault = clickedVault.id; u.target = null; u.guard = null; setPath(u, clickedVault.x, clickedVault.y); }
     hint('Borer dispatched to excavate the Hero Vault'); orderMark(clickedVault.x, clickedVault.y, 'special'); sfx('click');
+    return;
+  }
+  // right-click a Legendary Landmark with a SPECIAL CHARACTER selected → send them to claim/hold it (only they can).
+  const clickedLandmark = game.landmarks.find(L => dist(L, { x: wx, y: wy }) < 32);
+  if (clickedLandmark && sel.some(s => U[s.type].unique)) {
+    const champs = sel.filter(u => U[u.type].unique);
+    const slots = formationSlots(champs, clickedLandmark.x, clickedLandmark.y);
+    for (let k = 0; k < champs.length; k++) { const u = champs[k]; u.order = 'move'; u.target = null; u.guard = null; u.dest = slots[k]; setPath(u, slots[k].x, slots[k].y); }
+    const escorts = sel.filter(u => !U[u.type].unique);            // any escorts tag along to defend the claim
+    if (escorts.length) { const es = formationSlots(escorts, clickedLandmark.x, clickedLandmark.y); for (let k = 0; k < escorts.length; k++) { const u = escorts[k]; u.order = 'move'; u.target = null; u.guard = null; u.dest = es[k]; setPath(u, es[k].x, es[k].y); } }
+    hint(clickedLandmark.owner === PLAYER ? 'Holding the Legendary Landmark' : 'Channeling the Legendary Landmark — keep your character on it');
+    orderMark(clickedLandmark.x, clickedLandmark.y, 'special'); sfx('click');
     return;
   }
   // right-clicking a settlement with an Envoy selected → court it peacefully (neutral) or develop it (your own).
@@ -2903,6 +3025,7 @@ export function stepWorld(dt: number) {
   settlementTick(dt);
   militiaTick(dt);
   relayTick(dt);
+  landmarkTick(dt);
   vaultTick(dt);
   governmentTick(dt);
   autoScoutTick(dt);

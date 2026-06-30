@@ -62,6 +62,20 @@ export interface Vault {
   pulse: number;          // render animation phase
 }
 
+// Legendary Landmarks — ancient monoliths only a SPECIAL CHARACTER can claim (no
+// ordinary unit can channel one). A held landmark trickles resources AND radiates a
+// bonus themed to whichever character claimed it (Cartmanland tax, a Sith dark nexus,
+// a Jedi light nexus, a healer's sanctuary, …). Contestable hero-vs-hero.
+export interface Landmark {
+  id: number;
+  x: number; y: number;
+  owner: number;        // 0 = neutral, else faction id
+  capBy: number;        // team currently channeling a claim (0 = none)
+  capT: number;         // claim progress 0..1
+  attune: string;       // character type that last claimed it ('' when neutral) → drives the flavored effect
+  pulse: number;        // render animation phase
+}
+
 export interface Building {
   id: number;
   kind: 'b';
@@ -211,6 +225,7 @@ export interface GameState {
   settlements: Settlement[];
   relays: Relay[];
   vaults: Vault[];
+  landmarks: Landmark[];
   mines: Mine[];
   trees: Tree[];
   waterTiles: { x: number; y: number }[];

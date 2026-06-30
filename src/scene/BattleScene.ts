@@ -658,6 +658,32 @@ export class BattleScene extends Phaser.Scene {
       }
       g.fillStyle(tint, 0.9); g.fillCircle(v.x, v.y, 3 + pulse * 1.6);                // core gem
     }
+    // Legendary Landmarks — tall monoliths only a special character can claim; attune-tinted core + halo
+    for (const L of game.landmarks) {
+      const tx = L.x / TILE | 0, ty = L.y / TILE | 0;
+      if (!game.explored[idx(tx, ty)]) continue;
+      const a = game.visible[idx(tx, ty)] ? 1 : 0.5;
+      const owner = L.owner ? Phaser.Display.Color.HexStringToColor(FAC[L.owner].col).color : 0xcfc2a0;
+      // attune tint: gold(tax) · amber(loot) · green(heal) · cyan(buff) · violet(drain)
+      const att = L.attune;
+      const gem = att === 'sith' ? 0xb070ff
+        : (att === 'stan' || att === 'jedi' || att === 'droideka') ? 0x7fe6ff
+        : (att === 'kenny' || att === 'kyle') ? 0x6fe08a
+        : att === 'bountyhunter' ? 0xe0a155
+        : att === 'cartman' ? 0xf2c94c : 0xe8e0c4;
+      const pulse = 0.5 + 0.5 * Math.sin(game.t * 2.2 + L.pulse);
+      if (L.owner) { g.fillStyle(gem, a * 0.06); g.fillCircle(L.x, L.y, 5 * TILE); }   // attuned aura footprint (matches sim LANDMARK_FX_R)
+      g.fillStyle(owner, a * (0.10 + pulse * 0.14)); g.fillCircle(L.x, L.y, 24);            // halo
+      g.fillStyle(0x171b22, a); g.fillRect(L.x - 5, L.y - 6, 10, 12);                       // plinth
+      g.fillStyle(0x2c3340, a); g.fillTriangle(L.x, L.y - 30, L.x - 5, L.y - 4, L.x + 5, L.y - 4); // obelisk
+      g.fillStyle(gem, a * (0.7 + pulse * 0.3)); g.fillCircle(L.x, L.y - 18, 3.2 + pulse * 1.4);    // glowing core gem
+      g.lineStyle(2, owner, a * 0.8); g.strokeCircle(L.x, L.y, 24);
+      if (L.capT > 0.02 && L.capBy) {
+        const cc = Phaser.Display.Color.HexStringToColor(FAC[L.capBy].col).color;
+        g.lineStyle(3, cc, 0.95); g.beginPath();
+        g.arc(L.x, L.y, 27, -Math.PI / 2, -Math.PI / 2 + L.capT * Math.PI * 2); g.strokePath();
+      }
+    }
     // Shield Projector fields — a faint hex-ring dome over the protected radius, brightness ∝ remaining energy
     const SHIELD_R = 6 * 24;   // matches sim SHIELD_R (6 tiles)
     for (const b of game.buildings) {
@@ -894,6 +920,13 @@ export class BattleScene extends Phaser.Scene {
       const mx = v.x / TILE * s, my = v.y / TILE * s;
       ctx.fillStyle = v.archetype === 'titan' ? '#e8a33d' : v.archetype === 'siegelord' ? '#b07dff' : '#6fe08a';
       ctx.beginPath(); ctx.moveTo(mx, my - 3.4); ctx.lineTo(mx + 3.4, my); ctx.lineTo(mx, my + 3.4); ctx.lineTo(mx - 3.4, my); ctx.closePath(); ctx.fill();
+    }
+    // legendary landmarks — owner-coloured (grey neutral) star-ish markers, always shown once explored
+    for (const L of game.landmarks) {
+      if (!game.explored[idx(L.x / TILE | 0, L.y / TILE | 0)]) continue;
+      const mx = L.x / TILE * s, my = L.y / TILE * s;
+      ctx.fillStyle = L.owner ? FAC[L.owner].col : '#e8e0c4';
+      ctx.beginPath(); ctx.moveTo(mx, my - 4); ctx.lineTo(mx + 1.4, my - 1.4); ctx.lineTo(mx + 4, my); ctx.lineTo(mx + 1.4, my + 1.4); ctx.lineTo(mx, my + 4); ctx.lineTo(mx - 1.4, my + 1.4); ctx.lineTo(mx - 4, my); ctx.lineTo(mx - 1.4, my - 1.4); ctx.closePath(); ctx.fill();
     }
     // camera viewport box
     const cam = this.cameras.main;

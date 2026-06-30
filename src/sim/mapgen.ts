@@ -196,6 +196,20 @@ export function generateMap() {
     clear(r.x, r.y, 3);
     game.relays.push({ id: rid++, x: r.x * TILE + 16, y: r.y * TILE + 16, owner: 0, capBy: 0, capT: 0, hp: RELAY_HP, hpMax: RELAY_HP, pulse: Math.random() * 6 });
   }
+  // Legendary Landmarks — ancient monoliths only a SPECIAL CHARACTER can claim. Placed in a mid-ring
+  // between the bases and the contested centre, well-spaced, on cleared ground (always visible — they're landmarks).
+  game.landmarks.length = 0;
+  let lid = 1;
+  for (let n = 0, tries = 0; n < 3 && tries < 900; tries++) {
+    const tx = 12 + (Math.random() * (MAPW - 24) | 0), ty = 12 + (Math.random() * (MAPH - 24) | 0);
+    if (!farFromBases(tx, ty)) continue;
+    if (Math.hypot(tx - center.x, ty - center.y) < 16) continue;   // not on top of the central nexus
+    if (game.relays.some(r => Math.hypot(r.x / TILE - tx, r.y / TILE - ty) < 12)) continue;
+    if (game.landmarks.some(l => Math.hypot(l.x / TILE - tx, l.y / TILE - ty) < 26)) continue;
+    clear(tx, ty, 3);
+    game.landmarks.push({ id: lid++, x: tx * TILE + 16, y: ty * TILE + 16, owner: 0, capBy: 0, capT: 0, attune: '', pulse: Math.random() * 6 });
+    n++;
+  }
   // Hero Vaults — buried in mountain rock, away from bases. One per archetype (found by surveying, dug by a Borer).
   game.vaults.length = 0;
   const archetypes = ['titan', 'siegelord', 'warden'];
