@@ -9,7 +9,12 @@
 > so: put the 3–4 best candidates on cards, and **always also paste the full list (below) in the message**
 > so nothing is hidden — Lane can pick a card or name any other item. Then update this file.
 
-Last updated: **2026‑06‑30** (Session 6 WRAPPED — **5 Star Wars/combat toys** (Arc Tower + Jedi/Sith/Bounty Hunter/Droideka) + a **deep perf & pathfinding rescue** (9 fixes) triggered by Lane's playtests on a 2019 MacBook Pro). Canonical handoff: **`docs/SESSION_7_HANDOFF.md`**. Session 7 = confirm movement/FPS feel on Lane's machines, then back to features/balance.
+Last updated: **2026‑06‑30** (Session 7 in progress — shipped **Legendary Landmarks**, a special‑character‑only map objective). Canonical handoff: **`docs/SESSION_7_HANDOFF.md`**. Session 7 = confirm movement/FPS feel on Lane's machines, then back to features/balance.
+
+---
+
+## ✅ Shipped in Session 7 (newest first)
+- **🗿 Legendary Landmarks — a special‑character‑only map objective** (`dcb6ced`, live) — Lane's ask: a skirmish accomplishment that *requires* special characters. **3 ancient monoliths** spawn each match (mid‑ring, always visible). **Only a `unique` special character can channel a claim** (ordinary units can't — `landmarkTick` tallies only `U[u.type].unique` units within `LANDMARK_R`=3 tiles, ~5s channel). Holding one **trickles crystals + alloy** AND radiates a **bonus themed to the character that claimed it** (one shared mechanic, slice of the "character quest" idea): **Cartman→Cartmanland** (×2 income + happiness), **Bounty Hunter→Bounty Cache** (×2 windfall + alloy stream), **Kenny/Kyle** (heal aura), **Stan/Jedi/Droideka** (+dmg/+speed buff aura), **Sith→Dark Nexus** (sears nearby enemies). Attune persists while owned (the character can leave to fight). **Contestable hero‑vs‑hero** — an enemy character wrests it back (no defender present). **AI parity** (`aiLandmark`: idle special characters seek & claim the nearest landmark). Right‑click a monolith with a special character selected → send them to hold it. New `Landmark` type + `game.landmarks` + render (monolith + halo + capture ring + aura footprint + minimap marker) + help/intro. **7/7 headless** (ordinary‑can't‑claim, jedi claims + windfall, Sanctuary heals, Dark Nexus drains, enemy reclaims, AI claims); tsc + bundle clean, artifact boots no errors. ⚠ the monolith *look* + feel is RAF‑gated headless → Lane's eyes on device. **Knobs:** `LANDMARK_R` 3·TILE, `LANDMARK_CLAIM` 5s, `LANDMARK_INCOME` 4/s, `LANDMARK_ALLOY` 0.5/s, `LANDMARK_WINDFALL` 600, `LANDMARK_FX_R` 5·TILE, `LANDMARK_HEAL` 16, `LANDMARK_DRAIN` 14; 3 landmarks/map (mapgen). **Pattern reused:** relay/settlement capture loop + auraTick(heal)/buffUntil(buff)/damage(drain).
 
 ---
 
