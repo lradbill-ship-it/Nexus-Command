@@ -10,7 +10,7 @@ import {
   game, dip, rk, getRel, setRel, addRel, isAllied, isWar, stateOf, logMsg, hint,
 } from './state';
 import type { Building, Unit, Entity, Vec, Particle, Settlement, Relay, ResourceNode, Vault } from './types';
-import { findPath, passable, passableFor, nearestPassableTile, resetPathBudget } from './pathfind';
+import { findPath, passable, passableFor, nearestPassableTile, resetPathBudget, pathDeferred } from './pathfind';
 import { spawnResourceField } from './mapgen';
 import { sfx } from '../audio';
 
@@ -1032,9 +1032,13 @@ function stepToward(u: Unit, dx: number, dy: number, dt: number) {
 }
 export function setPath(u: Unit, wx: number, wy: number) {
   if (!u.finalDest || u.finalDest.x !== wx || u.finalDest.y !== wy) u.unstick = 0;   // reset escalation only on a genuinely new destination
-  u.path = U[u.type].air ? [{ x: wx, y: wy }] : findPath(u.x, u.y, wx, wy, u.team);   // fliers fly straight
   u.finalDest = { x: wx, y: wy };
   u.stuckT = 0;
+  if (U[u.type].air) { u.path = [{ x: wx, y: wy }]; u.waitPath = false; return; }    // fliers fly straight
+  const p = findPath(u.x, u.y, wx, wy, u.team);
+  if (p) { u.path = p; u.waitPath = false; }
+  else if (pathDeferred()) { u.waitPath = true; u.repathT = 0.04 + Math.random() * 0.12; }   // budget spent this tick → HOLD (keep any old path) & retry shortly; never wedge
+  else { u.path = null; u.waitPath = false; }                                          // genuine no route exists → straight-line + stuck recovery
 }
 // How many orthogonal neighbours are open — a unit needs room to manoeuvre, not just a point-passable tile.
 function tileClearance(tx: number, ty: number) {
@@ -1057,6 +1061,9 @@ function nearestOpenTile(tx: number, ty: number, maxR: number, ang?: number): [n
   return best || fallback;
 }
 function followPath(u: Unit, dt: number) {
+  // waiting for a pathfind that was deferred by this tick's budget → hold position; do NOT straight-line into
+  // terrain (that was the "hung up all over the place" wedging). setPath retries within a few ticks.
+  if (u.waitPath && (!u.path || !u.path.length)) { u.moving = false; return false; }
   // escape if we ended up sitting on a blocked tile (e.g. a building was placed on us)
   if (!phasing(u) && unitBlocked(u.x, u.y, u.team)) {
     const np = nearestPassableTile(u.x / TILE | 0, u.y / TILE | 0);
@@ -1560,8 +1567,10 @@ function updateUnit(u: Unit, dt: number) {
   }
   if (U[u.type].repair) { updateRepair(u, dt); return; }
   if (U[u.type].shield) {                                               // Aegis — mobile missile interceptor (no weapon); cooldown ticks above
-    if ((u.order === 'move' || u.order === 'amove') && u.dest) { if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; } }
-    else u.moving = false;
+    if ((u.order === 'move' || u.order === 'amove') && u.dest) {
+      u.repathT -= dt; if (!u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 0.8; setPath(u, u.dest.x, u.dest.y); }
+      if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; u.waitPath = false; }
+    } else u.moving = false;
     return;
   }
   if (U[u.type].diplomat) {                                             // Envoy — unarmed; courts a settlement or just moves (never engages)
@@ -1572,13 +1581,17 @@ function updateUnit(u: Unit, dt: number) {
       else { u.moving = false; u.path = null; }                         // parked inside the influence radius → courting/developing (settlementTick does the work)
       return;
     }
-    if ((u.order === 'move' || u.order === 'amove') && u.dest) { if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; } }
-    else u.moving = false;
+    if ((u.order === 'move' || u.order === 'amove') && u.dest) {
+      u.repathT -= dt; if (!u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 0.8; setPath(u, u.dest.x, u.dest.y); }
+      if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; u.waitPath = false; }
+    } else u.moving = false;
     return;
   }
   if (U[u.type].transport || U[u.type].deployable) {                   // APC / Sentry Pod — unarmed mover (no targeting)
-    if ((u.order === 'move' || u.order === 'amove') && u.dest) { if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; } }
-    else u.moving = false;
+    if ((u.order === 'move' || u.order === 'amove') && u.dest) {
+      u.repathT -= dt; if (!u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 0.8; setPath(u, u.dest.x, u.dest.y); }
+      if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; u.waitPath = false; }
+    } else u.moving = false;
     return;
   }
   // drop a target that's dead — or that dived underground (only a tunneler can keep hitting it)
@@ -1668,7 +1681,11 @@ function updateUnit(u: Unit, dt: number) {
         if (t) { u.target = t; u.savedDest = u.dest; u.order = 'attack'; u.resume = 'amove'; return; }
       }
     }
-    if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; }
+    // Repath periodically and whenever the current (possibly PARTIAL) path is consumed, so long hauls across
+    // the big map are walked incrementally to the goal instead of stalling once the first path runs out.
+    u.repathT -= dt;
+    if (!u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 0.8; setPath(u, u.dest.x, u.dest.y); }
+    if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; u.waitPath = false; }
     return;
   }
   if (u.order === 'idle') {
@@ -2852,7 +2869,7 @@ function autoScoutTick(dt: number) {
 // ── Per-frame world step (everything except camera/input/render) ─────────────
 export function stepWorld(dt: number) {
   game.t += dt;
-  resetPathBudget(40000);   // cap A* WORK (node pops) this tick so a repath storm can't stack into a frame spike
+  resetPathBudget(60000);   // cap A* WORK (node pops) this tick; over-budget searches DEFER (units hold + retry, never wedge)
   game.shake = Math.max(0, game.shake - dt * 14);
   for (const k in game.cooldowns) game.cooldowns[k] = Math.max(0, game.cooldowns[k] - dt);
   for (const k in game.covCd) game.covCd[k] = Math.max(0, game.covCd[k] - dt);

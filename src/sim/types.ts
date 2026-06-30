@@ -135,6 +135,7 @@ export interface Unit {
   authT?: number;        // Cartman: game.t of the next "RESPECT MY AUTHORITAH" stun pulse
   hitT?: number;         // game.t of the last damage taken → a brief render hit-flash
   shieldE?: number;      // Droideka: remaining personal deflector-shield energy (absorbs damage while stationary, recharges)
+  waitPath?: boolean;    // a pathfind was deferred by the per-tick budget → hold position and retry (don't wedge)
   dead?: boolean;
 }
 

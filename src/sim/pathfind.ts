@@ -31,17 +31,20 @@ const DIRS: [number, number, number][] = [
 ];
 
 // Per-sim-step pathfinding budget, measured in A* node-expansions ("pops"), NOT call count: a single full
-// search is costly, but a successful nearby one is cheap. Budgeting by work lets the economy/resource scans
-// (which fire MANY short, cheap findPaths per search — e.g. a logger checking forests) all run, while a storm
-// of expensive cross-map/failed searches in one tick is still bounded. Over-budget callers get null and keep
-// their current path / retry next tick (units still move via straight-line steering).
-let pathPops = 0, popBudget = 40000;
-export function resetPathBudget(n = 40000) { pathPops = 0; popBudget = n; }
+// search is costly, a nearby one is cheap. Budgeting by work lets the economy/resource scans (which fire MANY
+// short cheap findPaths per search) all run, while a storm of expensive searches in one tick is bounded.
+// IMPORTANT: when the budget is spent, findPath sets `deferred` and returns null — callers must DISTINGUISH a
+// deferral (retry next tick, hold position) from a genuine no-path (no route exists), so units never wedge.
+let pathPops = 0, popBudget = 60000, deferred = false;
+export function resetPathBudget(n = 60000) { pathPops = 0; popBudget = n; deferred = false; }
+/** True iff the most recent findPath returned null only because this tick's work budget was spent (retry-able). */
+export function pathDeferred() { return deferred; }
 
 /** A* on the tile grid, returns a smoothed world-space waypoint list (or null).
  *  `team` makes allied gates walkable for that team (enemies route around them). */
 export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, team = 0): Vec[] | null {
-  if (pathPops >= popBudget) return null;   // this tick's pathfinding work budget is spent → defer to a later tick
+  if (pathPops >= popBudget) { deferred = true; return null; }   // budget spent → defer (caller should retry next tick)
+  deferred = false;
   const pass = (x: number, y: number) => passableFor(x, y, team);
   const losClear = (ax: number, ay: number, bx: number, by: number) => {
     const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 10);
@@ -85,10 +88,11 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, tea
   }
   const H = (i: number) => { const x = i % MAPW, y = i / MAPW | 0; return Math.abs(x - tx) + Math.abs(y - ty); };
   push(H(start), start);
-  let pops = 0, found = false;
-  while (hf.length && pops++ < 26000) {   // per-search node cap — generous so long ×3-map paths succeed (fewer stuck units)
+  let pops = 0, found = false, bestIdx = start, bestH = H(start);   // track the closest node reached (for partial paths)
+  while (hf.length && pops++ < 30000) {   // per-search node cap — finds detours around barriers; long hauls fall back to a partial path
     const cur = pop();
     if (cur === goal) { found = true; break; }
+    const h = H(cur); if (h < bestH) { bestH = h; bestIdx = cur; }
     const cx = cur % MAPW, cy = cur / MAPW | 0, cg = _g[cur];
     for (const [dx, dy, c] of DIRS) {
       const nx = cx + dx, ny = cy + dy;
@@ -99,12 +103,15 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, tea
     }
   }
   pathPops += pops;   // charge this search's work to the tick budget
-  if (!found) return null;
-  // reconstruct
-  const pts: Vec[] = []; let cur = goal;
+  // Goal not reached within budget → return a PARTIAL path to the closest node we got to, so the unit makes
+  // real progress and re-paths from nearer (incrementally crosses arbitrarily long / huge-map distances).
+  const endIdx = found ? goal : bestIdx;
+  if (endIdx === start) return null;   // couldn't get any closer at all → genuinely no route
+  const pts: Vec[] = []; let cur = endIdx;
   while (cur !== -1 && cur !== start) { pts.push({ x: (cur % MAPW) * TILE + 16, y: (cur / MAPW | 0) * TILE + 16 }); cur = _came[cur]; }
   pts.reverse();
-  pts.push({ x: wx1, y: wy1 });
+  if (found) pts.push({ x: wx1, y: wy1 });   // only walk to the exact dest if we actually reached the goal tile
+  if (!pts.length) return null;
   // smooth with line-of-sight skips
   const sm: Vec[] = []; let from: Vec = { x: wx0, y: wy0 }; let i = 0;
   while (i < pts.length) {
