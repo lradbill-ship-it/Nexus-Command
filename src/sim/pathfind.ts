@@ -42,9 +42,9 @@ export function pathDeferred() { return deferred; }
 
 /** A* on the tile grid, returns a smoothed world-space waypoint list (or null).
  *  `team` makes allied gates walkable for that team (enemies route around them). */
-export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, team = 0): Vec[] | null {
-  if (pathPops >= popBudget) { deferred = true; return null; }   // budget spent → defer (caller should retry next tick)
-  deferred = false;
+export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, team = 0, force = false): Vec[] | null {
+  if (!force && pathPops >= popBudget) { deferred = true; return null; }   // budget spent → defer (caller should retry next tick)
+  deferred = false;   // `force` = a starvation-escape search that runs even over-budget (see setPath) so nothing hangs forever
   const pass = (x: number, y: number) => passableFor(x, y, team);
   const losClear = (ax: number, ay: number, bx: number, by: number) => {
     const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 10);

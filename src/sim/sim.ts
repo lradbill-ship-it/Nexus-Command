@@ -1143,11 +1143,21 @@ export function setPath(u: Unit, wx: number, wy: number) {
   if (!u.finalDest || u.finalDest.x !== wx || u.finalDest.y !== wy) u.unstick = 0;   // reset escalation only on a genuinely new destination
   u.finalDest = { x: wx, y: wy };
   u.stuckT = 0;
-  if (U[u.type].air) { u.path = [{ x: wx, y: wy }]; u.waitPath = false; return; }    // fliers fly straight
+  if (U[u.type].air) { u.path = [{ x: wx, y: wy }]; u.waitPath = false; u.waitSince = undefined; return; }    // fliers fly straight
   const p = findPath(u.x, u.y, wx, wy, u.team);
-  if (p) { u.path = p; u.waitPath = false; }
-  else if (pathDeferred()) { u.waitPath = true; u.repathT = 0.04 + Math.random() * 0.12; }   // budget spent this tick → HOLD (keep any old path) & retry shortly; never wedge
-  else { u.path = null; u.waitPath = false; }                                          // genuine no route exists → straight-line + stuck recovery
+  if (p) { u.path = p; u.waitPath = false; u.waitSince = undefined; }
+  else if (pathDeferred()) {
+    // budget spent this tick → HOLD (keep any old path) & retry shortly; never wedge. BUT a big active army can
+    // chronically exhaust the tick budget and permanently strand later-processed units (fresh economy units by
+    // the factory were sitting stuck) — so if we've been starved > ~1.2s, FORCE an un-budgeted search once.
+    if (u.waitPath && u.waitSince !== undefined && game.t - u.waitSince > 1.2) {
+      const fp = findPath(u.x, u.y, wx, wy, u.team, true);
+      if (fp) { u.path = fp; u.waitPath = false; u.waitSince = undefined; return; }
+    }
+    if (!u.waitPath) u.waitSince = game.t;
+    u.waitPath = true; u.repathT = 0.04 + Math.random() * 0.12;
+  }
+  else { u.path = null; u.waitPath = false; u.waitSince = undefined; }                 // genuine no route exists → straight-line + stuck recovery
 }
 // How many orthogonal neighbours are open — a unit needs room to manoeuvre, not just a point-passable tile.
 function tileClearance(tx: number, ty: number) {
