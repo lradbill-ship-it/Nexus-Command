@@ -25,6 +25,11 @@ export function nearestPassableTile(tx: number, ty: number): [number, number] | 
 
 const _g = new Float32Array(MAPW * MAPH);
 const _came = new Int32Array(MAPW * MAPH);
+// Generation stamp: instead of clearing the whole map (_g.fill/_came.fill = ~113k writes) on EVERY findPath —
+// crippling in late game where economy scans fire dozens of short findPaths per tick — a cell counts as
+// "unvisited" unless its _gen matches the current search. One counter bump replaces two full-array fills.
+const _gen = new Int32Array(MAPW * MAPH);
+let curGen = 0;
 const DIRS: [number, number, number][] = [
   [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1],
   [1, 1, 1.4], [1, -1, 1.4], [-1, 1, 1.4], [-1, -1, 1.4],
@@ -36,15 +41,21 @@ const DIRS: [number, number, number][] = [
 // IMPORTANT: when the budget is spent, findPath sets `deferred` and returns null — callers must DISTINGUISH a
 // deferral (retry next tick, hold position) from a genuine no-path (no route exists), so units never wedge.
 let pathPops = 0, popBudget = 60000, deferred = false;
-export function resetPathBudget(n = 60000) { pathPops = 0; popBudget = n; deferred = false; }
+// Starvation-escape valve: a chronically saturated budget can permanently strand later-processed units. A `force`
+// search runs over-budget — but ONLY a few per tick (throttle) and with a SMALL node cap (cheap partial path),
+// so it un-sticks starved units without the frame-time spike an unbounded forced search would cause.
+let forceCredits = 3;
+const FORCE_CAP = 6000;   // forced searches use a small node cap → cheap; the partial-path fallback still makes progress
+export function resetPathBudget(n = 60000) { pathPops = 0; popBudget = n; deferred = false; forceCredits = 3; }
 /** True iff the most recent findPath returned null only because this tick's work budget was spent (retry-able). */
 export function pathDeferred() { return deferred; }
 
 /** A* on the tile grid, returns a smoothed world-space waypoint list (or null).
  *  `team` makes allied gates walkable for that team (enemies route around them). */
 export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, team = 0, force = false): Vec[] | null {
-  if (!force && pathPops >= popBudget) { deferred = true; return null; }   // budget spent → defer (caller should retry next tick)
-  deferred = false;   // `force` = a starvation-escape search that runs even over-budget (see setPath) so nothing hangs forever
+  if (force) { if (forceCredits <= 0) { deferred = true; return null; } forceCredits--; }   // throttled over-budget escape
+  else if (pathPops >= popBudget) { deferred = true; return null; }                          // budget spent → defer (retry next tick)
+  deferred = false;
   const pass = (x: number, y: number) => passableFor(x, y, team);
   const losClear = (ax: number, ay: number, bx: number, by: number) => {
     const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 10);
@@ -60,9 +71,9 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, tea
   const [tx, ty] = tgt;
   if (sx === tx && sy === ty) return [{ x: wx1, y: wy1 }];
   if (!pass(sx, sy)) { const np = nearestPassableTile(sx, sy); if (np) { sx = np[0]; sy = np[1]; } }
-  _g.fill(Infinity); _came.fill(-1);
+  curGen++;   // bump the generation instead of clearing _g/_came across the whole map
   const start = idx(sx, sy), goal = idx(tx, ty);
-  _g[start] = 0;
+  _g[start] = 0; _gen[start] = curGen; _came[start] = -1;
   // binary heap of [f, idx]
   const hf: number[] = [], hi: number[] = [];
   function push(f: number, i: number) {
@@ -89,7 +100,8 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, tea
   const H = (i: number) => { const x = i % MAPW, y = i / MAPW | 0; return Math.abs(x - tx) + Math.abs(y - ty); };
   push(H(start), start);
   let pops = 0, found = false, bestIdx = start, bestH = H(start);   // track the closest node reached (for partial paths)
-  while (hf.length && pops++ < 30000) {   // per-search node cap — finds detours around barriers; long hauls fall back to a partial path
+  const nodeCap = force ? FORCE_CAP : 30000;
+  while (hf.length && pops++ < nodeCap) {   // per-search node cap — finds detours around barriers; long hauls fall back to a partial path
     const cur = pop();
     if (cur === goal) { found = true; break; }
     const h = H(cur); if (h < bestH) { bestH = h; bestIdx = cur; }
@@ -99,7 +111,8 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, tea
       if (!pass(nx, ny)) continue;
       if (dx && dy && (!pass(cx + dx, cy) || !pass(cx, cy + dy))) continue;
       const ni = idx(nx, ny), ng = cg + c;
-      if (ng < _g[ni]) { _g[ni] = ng; _came[ni] = cur; push(ng + H(ni), ni); }
+      const gni = _gen[ni] === curGen ? _g[ni] : Infinity;   // unvisited-this-search ⇒ treat as Infinity
+      if (ng < gni) { _g[ni] = ng; _gen[ni] = curGen; _came[ni] = cur; push(ng + H(ni), ni); }
     }
   }
   pathPops += pops;   // charge this search's work to the tick budget

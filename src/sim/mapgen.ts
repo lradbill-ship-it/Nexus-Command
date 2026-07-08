@@ -206,7 +206,11 @@ export function generateMap() {
     if (Math.hypot(tx - center.x, ty - center.y) < 16) continue;   // not on top of the central nexus
     if (game.relays.some(r => Math.hypot(r.x / TILE - tx, r.y / TILE - ty) < 12)) continue;
     if (game.landmarks.some(l => Math.hypot(l.x / TILE - tx, l.y / TILE - ty) < 26)) continue;
-    clear(tx, ty, 3);
+    // Guarantee ACCESSIBILITY: clear a roomy pad around the monolith AND carve a road back toward the centre
+    // (which connects to every base), so heroes always have a real route in — they can sit amid trees/rock but
+    // must never be walled off. (Fixes heroes getting stuck en route to landmarks buried in obstacles.)
+    clear(tx, ty, 4);
+    carve(tx, ty, center.x, center.y);
     game.landmarks.push({ id: lid++, x: tx * TILE + 16, y: ty * TILE + 16, owner: 0, capBy: 0, capT: 0, attune: '', pulse: Math.random() * 6 });
     n++;
   }

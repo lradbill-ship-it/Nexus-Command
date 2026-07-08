@@ -151,6 +151,7 @@ export interface Unit {
   shieldE?: number;      // Droideka: remaining personal deflector-shield energy (absorbs damage while stationary, recharges)
   waitPath?: boolean;    // a pathfind was deferred by the per-tick budget → hold position and retry (don't wedge)
   waitSince?: number;    // game.t when the current waitPath hold began → forces an un-budgeted search if starved too long
+  recourtT?: number;     // Envoy: game.t before which it won't be re-dispatched to court (after giving up on an unreachable town)
   dead?: boolean;
 }
 

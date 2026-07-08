@@ -1149,8 +1149,10 @@ export function setPath(u: Unit, wx: number, wy: number) {
   else if (pathDeferred()) {
     // budget spent this tick → HOLD (keep any old path) & retry shortly; never wedge. BUT a big active army can
     // chronically exhaust the tick budget and permanently strand later-processed units (fresh economy units by
-    // the factory were sitting stuck) — so if we've been starved > ~1.2s, FORCE an un-budgeted search once.
-    if (u.waitPath && u.waitSince !== undefined && game.t - u.waitSince > 1.2) {
+    // the factory were sitting stuck) — so if a SUPPORT unit has been starved > ~1.2s, FORCE a throttled search
+    // once. Only support/economy units force (they're few and mustn't idle); combat units just wait+retry (the
+    // S6 behaviour), so the army can't hog the forced-search credits or spike frame time.
+    if (isSupport(u.type) && u.waitPath && u.waitSince !== undefined && game.t - u.waitSince > 1.2) {
       const fp = findPath(u.x, u.y, wx, wy, u.team, true);
       if (fp) { u.path = fp; u.waitPath = false; u.waitSince = undefined; return; }
     }
@@ -1517,12 +1519,25 @@ function nearestForest(u: Unit): { tx: number; ty: number; approach: Vec; path: 
       cand.push({ tx, ty, d: (tx - utx) * (tx - utx) + (ty - uty) * (ty - uty) });
     }
   cand.sort((a, b) => a.d - b.d);
+  let anyDeferred = false;
   for (let i = 0; i < Math.min(6, cand.length); i++) {
     const { tx, ty } = cand[i];
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
       if (!passable(tx + dx, ty + dy)) continue;
       const ax = (tx + dx) * TILE + 16, ay = (ty + dy) * TILE + 16;
       const p = findPath(u.x, u.y, ax, ay, u.team);
+      if (p) return { tx, ty, approach: { x: ax, y: ay }, path: p };
+      if (pathDeferred()) anyDeferred = true;
+    }
+  }
+  // Budget-starvation fallback: all reachable candidates deferred (a busy army drained the tick budget) → loggers
+  // have no tunnel escape like harvesters, so force ONE throttled search to the nearest candidate rather than idle.
+  if (anyDeferred && cand.length) {
+    const { tx, ty } = cand[0];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      if (!passable(tx + dx, ty + dy)) continue;
+      const ax = (tx + dx) * TILE + 16, ay = (ty + dy) * TILE + 16;
+      const p = findPath(u.x, u.y, ax, ay, u.team, true);
       if (p) return { tx, ty, approach: { x: ax, y: ay }, path: p };
     }
   }
@@ -1702,9 +1717,17 @@ function updateUnit(u: Unit, dt: number) {
   if (U[u.type].diplomat) {                                             // Envoy — unarmed; courts a settlement or just moves (never engages)
     if (u.order === 'court') {
       const s = game.settlements.find(x => x.id === u.courtId);
-      if (!s) { u.order = 'idle'; u.courtId = undefined; u.path = null; }
-      else if (dist(u, s) > SETTLE_R - 14) { u.repathT -= dt; if (!u.path || u.repathT <= 0) { u.repathT = 0.6; setPath(u, s.x, s.y); } followPath(u, dt); }
-      else { u.moving = false; u.path = null; }                         // parked inside the influence radius → courting/developing (settlementTick does the work)
+      // Park as soon as we're inside the courting influence radius (settlementTick counts an envoy anywhere within
+      // SETTLE_R), and approach a REACHABLE spot beside the town (u.dest = freeSpotNear), not the settlement CENTRE.
+      // The old code chased the centre with SETTLE_R-14 tolerance, so envoys that couldn't reach it thrashed
+      // followPath + stuck-recovery (nearestOpenTile scans) every tick forever — a hard FPS sink per envoy.
+      if (!s) { u.order = 'idle'; u.courtId = undefined; u.path = null; u.enterT = undefined; }
+      else if (dist(u, s) <= SETTLE_R) { u.moving = false; u.path = null; u.enterT = undefined; }   // within influence → court in place (park, zero work)
+      else {
+        if (u.enterT === undefined) u.enterT = game.t;                        // start the approach clock
+        if (game.t - (u.enterT || game.t) > 20) { u.order = 'idle'; u.courtId = undefined; u.path = null; u.enterT = undefined; u.recourtT = game.t + 30; }   // can't reach in 20s → give up + cool down (don't instantly re-court the same unreachable town → no thrash loop)
+        else { const d2 = u.dest || s; u.repathT -= dt; if (u.repathT <= 0) { u.repathT = 0.6; setPath(u, d2.x, d2.y); } followPath(u, dt); }   // throttle re-path to 0.6s even with no path → an envoy chasing an unreachable town can't spam 30k-node searches every tick
+      }
       return;
     }
     if ((u.order === 'move' || u.order === 'amove') && u.dest) {
@@ -2618,7 +2641,7 @@ function aiUpdate(team: number, dt: number) {
     if (fEnv && countType('envoy') < 2 && !anyQueued('envoy') && game.money[team] > 500 && game.t >= (ai.envoyT ?? 0)) {
       fEnv.queue.push('envoy'); game.money[team] -= U.envoy.cost; ai.envoyT = game.t + 60 + Math.random() * 40;
     }
-    const idleEnvoy = game.units.find(u => u.team === team && U[u.type].diplomat && u.order === 'idle');
+    const idleEnvoy = game.units.find(u => u.team === team && U[u.type].diplomat && u.order === 'idle' && (u.recourtT ?? 0) <= game.t);
     if (idleEnvoy) {
       const tgt = neutralSettles.slice().sort((a, b) => dist(idleEnvoy, a) - dist(idleEnvoy, b))[0];
       if (tgt) { idleEnvoy.order = 'court'; idleEnvoy.courtId = tgt.id; idleEnvoy.target = null; const sp = freeSpotNear(tgt.x, tgt.y); idleEnvoy.dest = sp; setPath(idleEnvoy, sp.x, sp.y); }
@@ -2720,13 +2743,13 @@ function aiUpdate(team: number, dt: number) {
       if (Math.random() < 0.55) {
         const amt = Math.min(500, Math.max(100, game.money[v] * 0.22)) | 0;
         game.money[v] -= amt; game.money[team] += amt;
-        if (v === PLAYER) { logMsg('VANTA CELL siphoned ' + amt + ' crystals from our network', 'war'); sfx('covert'); }
+        if (v === PLAYER) { logMsg(FAC[team].name + ' operatives siphoned ' + amt + ' crystals from our network', 'war'); sfx('covert'); }
       } else {
         const bl = game.buildings.filter(b => b.team === v && b.type !== 'hq');
         if (bl.length) {
           const pick = bl[Math.random() * bl.length | 0];
           pick.hp = Math.max(pick.hpMax * 0.1, pick.hp - pick.hpMax * 0.3);
-          if (v === PLAYER) { logMsg('VANTA CELL sabotaged our ' + B[pick.type].name, 'war'); sfx('war'); spawnParts('fire', pick.x, pick.y, 10, '255,160,60'); }
+          if (v === PLAYER) { logMsg(FAC[team].name + ' operatives sabotaged our ' + B[pick.type].name, 'war'); sfx('war'); spawnParts('fire', pick.x, pick.y, 10, '255,160,60'); }
         }
       }
       if (Math.random() < 0.3) addRel(team, v, -12);
