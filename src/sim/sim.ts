@@ -1173,11 +1173,11 @@ export function setPath(u: Unit, wx: number, wy: number) {
   if (p) { u.path = p; u.waitPath = false; u.waitSince = undefined; }
   else if (pathDeferred()) {
     // budget spent this tick → HOLD (keep any old path) & retry shortly; never wedge. BUT a big active army can
-    // chronically exhaust the tick budget and permanently strand later-processed units (fresh economy units by
-    // the factory were sitting stuck) — so if a SUPPORT unit has been starved > ~1.2s, FORCE a throttled search
-    // once. Only support/economy units force (they're few and mustn't idle); combat units just wait+retry (the
-    // S6 behaviour), so the army can't hog the forced-search credits or spike frame time.
-    if (isSupport(u.type) && u.waitPath && u.waitSince !== undefined && game.t - u.waitSince > 1.2) {
+    // chronically exhaust the tick budget and permanently strand later-processed units — so ANY unit starved
+    // > ~1.2s FORCEs a search. The forced search is globally throttled (a few/tick, small node cap in pathfind.ts)
+    // so this can't spike frame time or let the army hog it. (Gating this to support-only froze combat units +
+    // heroes under a saturated budget — that was the "no ground unit moves except harvesters" bug.)
+    if (u.waitPath && u.waitSince !== undefined && game.t - u.waitSince > 1.2) {
       const fp = findPath(u.x, u.y, wx, wy, u.team, true);
       if (fp) { u.path = fp; u.waitPath = false; u.waitSince = undefined; return; }
     }
@@ -1208,8 +1208,10 @@ function nearestOpenTile(tx: number, ty: number, maxR: number, ang?: number): [n
 }
 function followPath(u: Unit, dt: number) {
   // waiting for a pathfind that was deferred by this tick's budget → hold position; do NOT straight-line into
-  // terrain (that was the "hung up all over the place" wedging). setPath retries within a few ticks.
-  if (u.waitPath && (!u.path || !u.path.length)) { u.moving = false; return false; }
+  // terrain (that was the "hung up all over the place" wedging). RE-REQUEST the path every tick so states that
+  // set a path only once (harvester/logger 'return' delivery, guard, dig-approach) still recover + trigger the
+  // starvation-escape — otherwise a deferred delivery path holds forever (loggers collected but never deposited).
+  if (u.waitPath && (!u.path || !u.path.length)) { u.moving = false; if (u.finalDest) setPath(u, u.finalDest.x, u.finalDest.y); return false; }
   // escape if we ended up sitting on a blocked tile (e.g. a building was placed on us)
   if (!phasing(u) && unitBlocked(u.x, u.y, u.team)) {
     const np = nearestPassableTile(u.x / TILE | 0, u.y / TILE | 0);
