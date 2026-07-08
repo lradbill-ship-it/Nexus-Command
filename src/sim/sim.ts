@@ -94,6 +94,31 @@ function freeSpotNear(x: number, y: number): Vec {
   }
   return { x, y };
 }
+/** Flood-fill the passable region containing (tx,ty); returns min(reachable tiles, cap). Small = a walled-off pocket. */
+function regionSize(tx: number, ty: number, cap: number): number {
+  if (!passable(tx, ty)) return 0;
+  const seen = new Set<number>([idx(tx, ty)]); const q = [idx(tx, ty)]; let n = 0;
+  while (q.length && n < cap) {
+    const c = q.pop()!; n++; const cx = c % MAPW, cy = c / MAPW | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as [number, number][]) {
+      const nx = cx + dx, ny = cy + dy; if (!inMap(nx, ny) || !passable(nx, ny)) continue;
+      const ni = idx(nx, ny); if (seen.has(ni)) continue; seen.add(ni); q.push(ni);
+    }
+  }
+  return n;
+}
+/** Nearest spot to (x,y) that sits in a LARGE connected open region — not a rock-locked pocket. For unearthing an
+ *  excavated hero from a vault buried deep in a mountain so it can actually walk out onto the map. */
+function reachableSpotNear(x: number, y: number): Vec {
+  const ctx = x / TILE | 0, cty = y / TILE | 0;
+  for (let r = 0; r < 28; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;   // ring shell
+    const tx = ctx + dx, ty = cty + dy;
+    if (!inMap(tx, ty) || !passable(tx, ty)) continue;
+    if (regionSize(tx, ty, 200) >= 200) return { x: tx * TILE + 16, y: ty * TILE + 16 };   // connected to the open map
+  }
+  return freeSpotNear(x, y);   // whole area is enclosed → fall back (rare)
+}
 function aiPlace(team: number, type: string, dx: number, dy: number, instant: boolean) {
   const bi = BASE_INFO[team];
   const tx = bi.tx + dx * bi.sx, ty = bi.ty + dy * bi.sy;
@@ -726,7 +751,7 @@ function excavate(v: Vault, team: number, dt: number) {
   if (Math.random() < dt * 9) spawnParts('debris', v.x + (Math.random() * 22 - 11), v.y + (Math.random() * 22 - 11), 1, '150,132,92');
   if (v.digT >= 1 && !v.done) {
     v.done = true;
-    const sp = freeSpotNear(v.x, v.y);
+    const sp = reachableSpotNear(v.x, v.y);   // unearth on ground connected to the open map, not a rock-locked pocket
     addUnit(v.archetype, sp.x, sp.y, team);
     game.parts.push({ type: 'ring', x: v.x, y: v.y, t: 0, life: 1.1, big: true });
     game.parts.push({ type: 'flash', x: v.x, y: v.y, t: 0, life: 0.32, big: true });
