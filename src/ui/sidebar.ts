@@ -8,6 +8,7 @@ import {
   hasCyber, hasBuilding, powerOf, tradeIncome, waterOf, conscript, housingCap, setLeader,
   setPlatform, campaignRally, launchCoup, nextElectionIn, approvalEst, sellSelected, combineSelected, armPatrol, canPatrol, setAutoScout, getAutoScout,
 } from '../sim/sim';
+import { AUDIO_CATS, getAudioPrefs, setAudioCat, setMasterMute, type AudioCat } from '../audio';
 
 let chosenLeader: LeaderStyle = 'industrialist';
 export function getChosenLeader() { return chosenLeader; }
@@ -206,8 +207,32 @@ export function makeUI() {
   ($('endBtn') as HTMLButtonElement).onclick = () => { $('endOverlay').style.display = 'none'; restartHook(); };
   ($('helpBtn') as HTMLButtonElement).onclick = () => { $('helpOverlay').style.display = 'flex'; };
   ($('helpCloseBtn') as HTMLButtonElement).onclick = () => { $('helpOverlay').style.display = 'none'; };
+  wireAudioPanel();
   const dt = $('drawerToggle') as HTMLButtonElement;
   dt.onclick = () => { const open = $('sidebar').classList.toggle('open'); dt.textContent = open ? '✕ CLOSE' : '☰ BUILD'; };
+}
+
+function wireAudioPanel() {
+  const g = (id: string) => document.getElementById(id)!;
+  const btn = g('audioBtn') as HTMLButtonElement;
+  const panel = g('audioPanel');
+  const mute = g('apMute') as HTMLInputElement;
+  const catsEl = g('apCats');
+  const prefs = getAudioPrefs();
+  catsEl.innerHTML = '';
+  for (const c of AUDIO_CATS) {
+    const row = document.createElement('label'); row.className = 'apRow';
+    const box = document.createElement('input'); box.type = 'checkbox'; box.checked = prefs.cats[c.key];
+    const txt = document.createElement('span'); txt.innerHTML = c.label + '<span class="apSub">' + c.hint + '</span>';
+    row.appendChild(box); row.appendChild(txt); catsEl.appendChild(row);
+    box.onchange = () => setAudioCat(c.key as AudioCat, box.checked);
+  }
+  mute.checked = prefs.muted;
+  const reflect = () => { panel.classList.toggle('disabled', mute.checked); btn.textContent = mute.checked ? '🔇 SOUND' : '🔊 SOUND'; btn.classList.toggle('off', mute.checked); };
+  reflect();
+  mute.onchange = () => { setMasterMute(mute.checked); reflect(); };
+  btn.onclick = (e) => { e.stopPropagation(); panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; };
+  document.addEventListener('pointerdown', (e) => { if (panel.style.display === 'block' && !panel.contains(e.target as Node) && e.target !== btn) panel.style.display = 'none'; });
 }
 
 export function logMsg(msg: string, cls?: string, at?: { x: number; y: number }) {

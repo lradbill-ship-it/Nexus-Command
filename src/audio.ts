@@ -10,16 +10,48 @@ import victoryUrl from './assets/audio/victory.m4a?inline';
 // master compressor, low ambient wind bed. Ported from wip-v3/p1-core.html.
 let AC: AudioContext | null = null;
 let masterG: GainNode | null = null;
+let ambientG: GainNode | null = null;                 // wind-bed gain (toggled by the 'ambient' category)
 let noiseBuf: AudioBuffer | null = null;
-export let muted = false;
+export let muted = false;                              // master mute — silences everything
 const sfxLast: Record<string, number> = {};
 let viewW = 1280;
+
+// ── Sound categories: turn groups on/off independently (e.g. keep only feed ALERTS) ──
+export type AudioCat = 'combat' | 'ui' | 'alert' | 'ambient';
+export const AUDIO_CATS: { key: AudioCat; label: string; hint: string }[] = [
+  { key: 'alert', label: 'Feed alerts', hint: 'chimes, war horns, missile klaxon, event stingers' },
+  { key: 'combat', label: 'Combat', hint: 'weapons, explosions, EMP' },
+  { key: 'ui', label: 'Interface', hint: 'clicks, placement, cash' },
+  { key: 'ambient', label: 'Ambient', hint: 'background wind bed' },
+];
+const CAT: Record<string, AudioCat> = {
+  shot: 'combat', rail: 'combat', boom: 'combat', bigboom: 'combat', emp: 'combat',
+  click: 'ui', place: 'ui', cash: 'ui',
+  chime: 'alert', war: 'alert', klaxon: 'alert', covert: 'alert', victory: 'alert', defeat: 'alert',
+};
+const DEFAULT_CATS: Record<AudioCat, boolean> = { combat: true, ui: true, alert: true, ambient: true };
+const catEnabled: Record<AudioCat, boolean> = { ...DEFAULT_CATS };
+
+function loadAudioPrefs() {
+  try {
+    const s = JSON.parse(localStorage.getItem('nexusAudio') || '{}');
+    if (s.cats) for (const k of Object.keys(DEFAULT_CATS) as AudioCat[]) if (typeof s.cats[k] === 'boolean') catEnabled[k] = s.cats[k];
+    if (typeof s.muted === 'boolean') muted = s.muted;
+  } catch (e) { /* no storage */ }
+}
+loadAudioPrefs();
+function saveAudioPrefs() { try { localStorage.setItem('nexusAudio', JSON.stringify({ cats: catEnabled, muted })); } catch (e) { /* no storage */ } }
+function applyAmbient() { if (ambientG) ambientG.gain.value = (!muted && catEnabled.ambient) ? 0.014 : 0; }
+
+export function getAudioPrefs() { return { muted, cats: { ...catEnabled } }; }
+export function setAudioCat(cat: AudioCat, on: boolean) { catEnabled[cat] = on; saveAudioPrefs(); applyAmbient(); }
+export function setMasterMute(on: boolean) { muted = on; saveAudioPrefs(); applyAmbient(); return muted; }
 // Decoded sample buffers (filled async on initAudio). playSample falls back to synth if not ready.
 const SAMPLE_URLS: Record<string, string> = { explosion: explosionUrl, blast: blastUrl, victory: victoryUrl };
 const samples: Record<string, AudioBuffer> = {};
 
 export function setViewWidth(w: number) { viewW = w; }
-export function toggleMute() { muted = !muted; return muted; }
+export function toggleMute() { return setMasterMute(!muted); }   // M key — master mute
 
 export function initAudio() {
   if (AC) return;
@@ -36,7 +68,7 @@ export function initAudio() {
     // ambient wind bed
     const amb = AC.createBufferSource(); amb.buffer = noiseBuf; amb.loop = true;
     const af = AC.createBiquadFilter(); af.type = 'lowpass'; af.frequency.value = 170;
-    const ag = AC.createGain(); ag.gain.value = 0.014;
+    const ag = AC.createGain(); ag.gain.value = 0.014; ambientG = ag; applyAmbient();
     amb.connect(af); af.connect(ag); ag.connect(masterG); amb.start();
     loadSamples();
   } catch (e) { /* audio unavailable */ }
@@ -96,6 +128,8 @@ function tone(pan: number, { w = 'sine' as OscillatorType, f0 = 440, f1 = null a
 
 export function sfx(type: string, x?: number) {
   if (muted || !AC) return;
+  const cat = CAT[type];
+  if (cat && !catEnabled[cat]) return;   // this sound's category is switched off
   const now = performance.now();
   const minGap = ({ shot: 45, boom: 70, cash: 120, klaxon: 1500 } as Record<string, number>)[type] || 30;
   if (sfxLast[type] && now - sfxLast[type] < minGap) return;

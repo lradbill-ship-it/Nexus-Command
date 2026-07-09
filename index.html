@@ -35,10 +35,22 @@
   #uiWoodWrap b{color:#9ec24f;text-shadow:0 0 6px rgba(158,194,79,.4);}
   #topbar .spacer{flex:1;}
   #uiHint{color:var(--gold);}
-  #restartBtn,#helpBtn{pointer-events:auto;background:linear-gradient(180deg,var(--steel),var(--steel-lo));
+  #restartBtn,#helpBtn,#audioBtn{pointer-events:auto;background:linear-gradient(180deg,var(--steel),var(--steel-lo));
     border:1px solid var(--steel-dk);border-top-color:var(--steel-hi);color:#16191f;
     font:inherit;font-weight:700;font-size:10px;letter-spacing:.14em;padding:6px 12px;cursor:pointer;border-radius:2px;}
-  #restartBtn:hover,#helpBtn:hover{filter:brightness(1.12);}
+  #restartBtn:hover,#helpBtn:hover,#audioBtn:hover{filter:brightness(1.12);}
+  #audioBtn.off{color:#7a2f2f;}
+  #audioPanel{display:none;position:absolute;top:44px;right:8px;z-index:60;width:236px;pointer-events:auto;
+    background:rgba(12,16,20,.96);border:1px solid rgba(120,200,180,.4);border-radius:8px;padding:12px 13px;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);color:#cfe6ee;font-size:12px;}
+  #audioPanel .apTitle{font-weight:700;font-size:10px;letter-spacing:.16em;color:#8fd6b6;margin-bottom:9px;}
+  #audioPanel .apRow{display:flex;align-items:flex-start;gap:8px;padding:5px 0;cursor:pointer;line-height:1.25;}
+  #audioPanel .apRow input{margin:2px 0 0;cursor:pointer;accent-color:#5fbf9a;flex:none;}
+  #audioPanel .apRow .apSub{display:block;color:#7f95a0;font-size:10px;}
+  #audioPanel .apMaster{font-weight:600;}
+  #audioPanel .apDiv{height:1px;background:rgba(120,200,180,.2);margin:7px 0;}
+  #audioPanel .apNote{margin-top:9px;color:#8aa0ab;font-size:10.5px;line-height:1.4;}
+  #audioPanel.disabled #apCats{opacity:.4;pointer-events:none;}
   /* mobile command-drawer toggle (hidden on desktop; shown via the mobile media query) */
   #drawerToggle{display:none;position:fixed;bottom:14px;left:14px;z-index:41;align-items:center;justify-content:center;
     gap:5px;padding:11px 15px;font:inherit;font-weight:700;font-size:13px;letter-spacing:.1em;color:#06210f;
@@ -222,8 +234,16 @@
       <div class="stat">UPTIME <b id="uiTime">00:00</b></div>
       <div class="spacer"></div>
       <div class="stat" id="uiHint"></div>
+      <button id="audioBtn" title="Sound options">🔊 SOUND</button>
       <button id="helpBtn" title="Controls &amp; legend">⌨ KEYS</button>
       <button id="restartBtn" title="Restart with a brand new random map">⟳ NEW MAP / RESTART</button>
+      <div id="audioPanel">
+        <div class="apTitle">SOUND OPTIONS</div>
+        <label class="apRow apMaster"><input type="checkbox" id="apMute"><span>🔇 Mute everything</span></label>
+        <div class="apDiv"></div>
+        <div id="apCats"></div>
+        <div class="apNote">Tip: leave <b>Feed alerts</b> on and the rest off to hear only event notifications.</div>
+      </div>
     </div>
 
     <div class="overlay" id="introOverlay">
