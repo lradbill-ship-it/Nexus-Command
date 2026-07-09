@@ -6,6 +6,7 @@ import {
 import { game, resetState, isAllied, logMsg, setFocusHook } from '../sim/state';
 import { resetSimLocals, setupBases, computeVision, canSee, setScorchHook, setEndHook, setClearForestHook, setDryWaterHook, setEmergeHook, stepWorld, issueOrder, tryPlace, castAbility, canPlaceHere, tryAbility, conscript, sellSelected, combineSelected, armPatrol, spawnParts, pendingStrikeList, cloaked, cloakedToPlayer, buffed, ejectGarrison, toggleDeploy, setLowDetail } from '../sim/sim';
 import { generateMap } from '../sim/mapgen';
+import { pathPopsLast } from '../sim/pathfind';
 import { renderTerrain, getTerrainCanvas, clearForestAt, dryWaterAt, setTerrainTextures, setTreeTextures, terrainDirty, clearTerrainDirty } from '../render/terrain';
 import grassTex from '../assets/terrain/grass.jpg?inline';
 import rockTex from '../assets/terrain/rock.jpg?inline';
@@ -427,7 +428,11 @@ export class BattleScene extends Phaser.Scene {
     if (this.fpsAccum >= 500) {
       this.fpsAccum = 0;
       const fps = Math.round(this.game.loop.actualFps);
-      if (this.fpsBadge) this.fpsBadge.textContent = 'FPS ' + fps + (this.lowDetail ? (this.autoDetailActive ? ' · AUTO-LOW' : ' · LOW') : '');
+      // TEMP movement diagnostic: units / moving / waiting-on-path / disabled(stun) / pops-per-tick.
+      let gu = 0, mv = 0, wt = 0, dz = 0;
+      for (const u of game.units) { if (u.dead) continue; gu++; if (u.moving) mv++; if (u.waitPath) wt++; if (u.disabledUntil > game.t) dz++; }
+      const diag = ` · U${gu} mv${mv} wt${wt} dz${dz} pp${Math.round(pathPopsLast / 1000)}k`;
+      if (this.fpsBadge) this.fpsBadge.textContent = 'FPS ' + fps + (this.lowDetail ? (this.autoDetailActive ? ' · AUTO-LOW' : ' · LOW') : '') + diag;
       this.adaptQuality(fps);
     }
     this.drawSettlements();

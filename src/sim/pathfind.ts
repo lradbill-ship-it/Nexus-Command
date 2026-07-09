@@ -41,12 +41,13 @@ const DIRS: [number, number, number][] = [
 // IMPORTANT: when the budget is spent, findPath sets `deferred` and returns null — callers must DISTINGUISH a
 // deferral (retry next tick, hold position) from a genuine no-path (no route exists), so units never wedge.
 let pathPops = 0, popBudget = 60000, deferred = false;
+export let pathPopsLast = 0, reachedGoal = false;   // pathPopsLast: pops consumed last tick (TEMP profiling). reachedGoal: did the last findPath reach the goal (vs a partial path)?
 // Starvation-escape valve: a chronically saturated budget can permanently strand later-processed units. A `force`
 // search runs over-budget — but ONLY a few per tick (throttle) and with a SMALL node cap (cheap partial path),
 // so it un-sticks starved units without the frame-time spike an unbounded forced search would cause.
 let forceCredits = 8;
 const FORCE_CAP = 6000;   // forced searches use a small node cap → cheap; the partial-path fallback still makes progress
-export function resetPathBudget(n = 90000) { pathPops = 0; popBudget = n; deferred = false; forceCredits = 8; }
+export function resetPathBudget(n = 90000) { pathPopsLast = pathPops; pathPops = 0; popBudget = n; deferred = false; forceCredits = 8; }
 /** True iff the most recent findPath returned null only because this tick's work budget was spent (retry-able). */
 export function pathDeferred() { return deferred; }
 
@@ -115,7 +116,7 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, tea
       if (ng < gni) { _g[ni] = ng; _gen[ni] = curGen; _came[ni] = cur; push(ng + H(ni), ni); }
     }
   }
-  pathPops += pops;   // charge this search's work to the tick budget
+  pathPops += pops; reachedGoal = found;   // charge this search's work to the tick budget; record whether we reached the goal
   // Goal not reached within budget → return a PARTIAL path to the closest node we got to, so the unit makes
   // real progress and re-paths from nearer (incrementally crosses arbitrarily long / huge-map distances).
   const endIdx = found ? goal : bestIdx;
