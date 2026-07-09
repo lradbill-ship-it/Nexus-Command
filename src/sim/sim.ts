@@ -3058,7 +3058,7 @@ function autoScoutTick(dt: number) {
 // ── Per-frame world step (everything except camera/input/render) ─────────────
 export function stepWorld(dt: number) {
   game.t += dt;
-  resetPathBudget(60000);   // cap A* WORK (node pops) this tick; over-budget searches DEFER (units hold + retry, never wedge)
+  resetPathBudget(90000);   // cap A* WORK (node pops) this tick; over-budget searches DEFER (units hold + retry, never wedge)
   game.shake = Math.max(0, game.shake - dt * 14);
   for (const k in game.cooldowns) game.cooldowns[k] = Math.max(0, game.cooldowns[k] - dt);
   for (const k in game.covCd) game.covCd[k] = Math.max(0, game.covCd[k] - dt);

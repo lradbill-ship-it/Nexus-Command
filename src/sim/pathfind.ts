@@ -44,9 +44,9 @@ let pathPops = 0, popBudget = 60000, deferred = false;
 // Starvation-escape valve: a chronically saturated budget can permanently strand later-processed units. A `force`
 // search runs over-budget — but ONLY a few per tick (throttle) and with a SMALL node cap (cheap partial path),
 // so it un-sticks starved units without the frame-time spike an unbounded forced search would cause.
-let forceCredits = 3;
+let forceCredits = 8;
 const FORCE_CAP = 6000;   // forced searches use a small node cap → cheap; the partial-path fallback still makes progress
-export function resetPathBudget(n = 60000) { pathPops = 0; popBudget = n; deferred = false; forceCredits = 3; }
+export function resetPathBudget(n = 90000) { pathPops = 0; popBudget = n; deferred = false; forceCredits = 8; }
 /** True iff the most recent findPath returned null only because this tick's work budget was spent (retry-able). */
 export function pathDeferred() { return deferred; }
 
@@ -100,7 +100,7 @@ export function findPath(wx0: number, wy0: number, wx1: number, wy1: number, tea
   const H = (i: number) => { const x = i % MAPW, y = i / MAPW | 0; return Math.abs(x - tx) + Math.abs(y - ty); };
   push(H(start), start);
   let pops = 0, found = false, bestIdx = start, bestH = H(start);   // track the closest node reached (for partial paths)
-  const nodeCap = force ? FORCE_CAP : 30000;
+  const nodeCap = force ? FORCE_CAP : 12000;   // per-search cap: lower ⇒ the tick budget serves MANY more units (partial paths + re-path walk long hauls), so a big army moving at once doesn't starve
   while (hf.length && pops++ < nodeCap) {   // per-search node cap — finds detours around barriers; long hauls fall back to a partial path
     const cur = pop();
     if (cur === goal) { found = true; break; }
