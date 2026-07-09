@@ -1718,7 +1718,7 @@ function updateUnit(u: Unit, dt: number) {
       // whose path deferred under a busy path budget holds forever or trails a stale harvest path (the "new
       // harvesters won't move where I click" bug). Same fix the combat movers already have.
       u.repathT -= dt;
-      if (u.waitPath || !u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 0.8; setPath(u, u.dest.x, u.dest.y); }
+      if (u.waitPath || !u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 2.5; setPath(u, u.dest.x, u.dest.y); }
       if (followPath(u, dt)) { u.order = 'idle'; u.hState = 'find'; u.dest = null; u.path = null; u.waitPath = false; }
       return;
     }
@@ -1727,7 +1727,7 @@ function updateUnit(u: Unit, dt: number) {
   if (U[u.type].logs) {
     if (u.order === 'move' && u.dest) {
       u.repathT -= dt;
-      if (u.waitPath || !u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 0.8; setPath(u, u.dest.x, u.dest.y); }
+      if (u.waitPath || !u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 2.5; setPath(u, u.dest.x, u.dest.y); }
       if (followPath(u, dt)) { u.order = 'idle'; u.hState = 'find'; u.dest = null; u.path = null; u.waitPath = false; }
       return;
     }
@@ -1843,7 +1843,7 @@ function updateUnit(u: Unit, dt: number) {
       if (u.cooldown <= 0 && Math.abs(da) < 0.5) { fireAt(u, tgt, d.dmg!, u.type === 'walker' || u.type === 'borer', d.splash || 0); u.cooldown = d.rof! * rofMult(u); }
     } else {
       u.repathT -= dt;
-      if (!u.path || u.repathT <= 0) { u.repathT = 1.0; setPath(u, tgt.x, tgt.y); }
+      if (!u.path || u.repathT <= 0) { u.repathT = 1.8; setPath(u, tgt.x, tgt.y); }   // chase a moving target; re-path on consume or a slow timer (budget-friendly at scale)
       followPath(u, dt);
     }
     return;
@@ -1857,10 +1857,11 @@ function updateUnit(u: Unit, dt: number) {
         if (t) { u.target = t; u.savedDest = u.dest; u.order = 'attack'; u.resume = 'amove'; return; }
       }
     }
-    // Repath periodically and whenever the current (possibly PARTIAL) path is consumed, so long hauls across
-    // the big map are walked incrementally to the goal instead of stalling once the first path runs out.
+    // Re-path whenever the current (possibly PARTIAL) path is consumed — this alone walks long hauls to the goal
+    // incrementally. The periodic timer is only a slow safety net; keep it LONG so 240-unit battles don't flood the
+    // pathfinding budget with redundant re-searches of paths that are already fine (that starved units → freezes).
     u.repathT -= dt;
-    if (!u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 0.8; setPath(u, u.dest.x, u.dest.y); }
+    if (!u.path || u.path.length === 0 || u.repathT <= 0) { u.repathT = 3.0; setPath(u, u.dest.x, u.dest.y); }
     if (followPath(u, dt)) { u.order = 'idle'; u.dest = null; u.path = null; u.waitPath = false; }
     return;
   }

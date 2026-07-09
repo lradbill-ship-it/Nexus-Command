@@ -45,9 +45,9 @@ export let pathPopsLast = 0, reachedGoal = false;   // pathPopsLast: pops consum
 // Starvation-escape valve: a chronically saturated budget can permanently strand later-processed units. A `force`
 // search runs over-budget — but ONLY a few per tick (throttle) and with a SMALL node cap (cheap partial path),
 // so it un-sticks starved units without the frame-time spike an unbounded forced search would cause.
-let forceCredits = 8;
+let forceCredits = 16;
 const FORCE_CAP = 6000;   // forced searches use a small node cap → cheap; the partial-path fallback still makes progress
-export function resetPathBudget(n = 90000) { pathPopsLast = pathPops; pathPops = 0; popBudget = n; deferred = false; forceCredits = 8; }
+export function resetPathBudget(n = 90000) { pathPopsLast = pathPops; pathPops = 0; popBudget = n; deferred = false; forceCredits = 16; }
 /** True iff the most recent findPath returned null only because this tick's work budget was spent (retry-able). */
 export function pathDeferred() { return deferred; }
 
